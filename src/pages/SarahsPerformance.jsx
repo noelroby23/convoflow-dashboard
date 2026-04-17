@@ -1,0 +1,86 @@
+import { useState } from 'react'
+import KPICard from '../components/ui/KPICard'
+import Tabs from '../components/ui/Tabs'
+import ErrorBoundary from '../components/ui/ErrorBoundary'
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
+import { mockSarahKPIs, mockCallOutcomes } from '../data/mockData'
+
+export default function SarahsPerformance() {
+  const [activeTab, setActiveTab] = useState('overview')
+
+  return (
+    <div>
+      <Tabs
+        tabs={[
+          { id: 'overview', label: 'Overview' },
+          { id: 'recent-calls', label: 'Recent Calls' },
+        ]}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+      />
+
+      {activeTab === 'overview' && (
+        <>
+          {/* KPI Cards */}
+          <ErrorBoundary>
+            <div className="grid grid-cols-4 gap-3 mb-6">
+              <KPICard label="Calls Attempted" value={mockSarahKPIs.callsAttempted} description="Total outbound call attempts Sarah made" />
+              <KPICard label="Calls Connected" value={mockSarahKPIs.callsConnected} description="Calls where Sarah actually reached the lead" />
+              <KPICard label="Qualified Rate" value={mockSarahKPIs.qualifiedRate} suffix="%" description="% of connected calls that were qualified" target={20} />
+              <KPICard label="Meetings Booked" value={mockSarahKPIs.meetingsBooked} description="Meetings Sarah booked from her calls" target={15} />
+            </div>
+          </ErrorBoundary>
+
+          {/* Outcome breakdown */}
+          <ErrorBoundary>
+            <div className="bg-white rounded-xl border border-[#E5E7EB] p-6 shadow-sm mb-6">
+              <h2 className="text-sm font-bold text-[#0F0F1A] mb-4">Call Outcome Breakdown</h2>
+              <ResponsiveContainer width="100%" height={280}>
+                <PieChart>
+                  <Pie
+                    data={mockCallOutcomes}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={70}
+                    outerRadius={110}
+                    dataKey="value"
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    labelLine={false}
+                  >
+                    {mockCallOutcomes.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </ErrorBoundary>
+
+          {/* DQ reasons */}
+          <ErrorBoundary>
+            <div className="bg-white rounded-xl border border-[#E5E7EB] p-6 shadow-sm">
+              <h2 className="text-sm font-bold text-[#0F0F1A] mb-4">Disqualification Reasons</h2>
+              {[
+                { reason: 'Budget too low', count: 11 },
+                { reason: 'Wrong timing', count: 6 },
+                { reason: 'Not ICP', count: 4 },
+                { reason: 'Already has solution', count: 3 },
+              ].map(({ reason, count }) => (
+                <div key={reason} className="flex items-center justify-between py-2 border-b border-[#F3F4F6] last:border-0">
+                  <span className="text-sm text-[#333333]">{reason}</span>
+                  <span className="text-sm font-semibold text-[#DC2626]">{count}</span>
+                </div>
+              ))}
+            </div>
+          </ErrorBoundary>
+        </>
+      )}
+
+      {activeTab === 'recent-calls' && (
+        <div className="bg-white rounded-xl border border-[#E5E7EB] p-12 flex flex-col items-center justify-center gap-3">
+          <p className="text-sm font-medium text-[#333333]">Call recordings coming soon</p>
+          <p className="text-xs text-[#9CA3AF] text-center max-w-sm">In the meantime, you can see call summaries on individual leads in the Lead Tracker.</p>
+        </div>
+      )}
+    </div>
+  )
+}

@@ -1,0 +1,54 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --cf-pink: #EC4899;
+  --cf-dark: #0F0F1A;
+  --cf-text: #333333;
+  --cf-gray: #6B7280;
+  --cf-light-gray: #9CA3AF;
+  --cf-green: #16A34A;
+  --cf-red: #DC2626;
+  --cf-amber: #F59E0B;
+  --cf-blue: #2563EB;
+  --cf-bg: #FAFAFA;
+  --cf-card: #FFFFFF;
+  --cf-border: #E5E7EB;
+  --cf-subtle: #F3F4F6;
+  --cf-radius: 12px;
+  --cf-radius-sm: 8px;
+}
+
+* {
+  font-family: 'Outfit', sans-serif;
+}
+
+body {
+  background: var(--cf-bg);
+  color: var(--cf-text);
+}
+
+/* Skeleton animation */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 6px;
+}
+
+@media print {
+  body { background: white !important; }
+  .no-print { display: none !important; }
+  .print-expand { overflow: visible !important; max-height: none !important; }
+  nav, aside, header { display: none !important; }
+  main { margin-left: 0 !important; padding: 16px !important; }
+  .shadow-sm { box-shadow: none !important; }
+  @page { margin: 1cm; }
+}
