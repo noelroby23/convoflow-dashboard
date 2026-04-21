@@ -1,8 +1,18 @@
+import { useEffect } from 'react'
 import ErrorBoundary from '../components/ui/ErrorBoundary'
+import AISummary from '../components/ui/AISummary'
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { mockTrendsData, mockAds } from '../data/mockData'
+import { useDashboard } from '../store/dashboard'
+import { revenueReport } from '../lib/reports/generators'
 
 export default function Revenue() {
+  const setReportBuilder = useDashboard(s => s.setReportBuilder)
+
+  useEffect(() => {
+    setReportBuilder(() => revenueReport())
+    return () => setReportBuilder(null)
+  }, [setReportBuilder])
   const totalSpend = 9194
   const closedRevenue = 24000
   const activePipelineValue = 45000
@@ -13,6 +23,13 @@ export default function Revenue() {
     name: ad.name,
     revenue: ad.closedWon * 24000,
   }))
+
+  // Build dual-line chart: spend per day + cumulative revenue (steps up on close date)
+  let cumulativeRevenue = 0
+  const spendVsRevenue = mockTrendsData.map(d => {
+    if (d.date === 'Apr 10') cumulativeRevenue = 24000
+    return { date: d.date, spend: d.spend, revenue: cumulativeRevenue }
+  })
 
   return (
     <div>
@@ -66,17 +83,25 @@ export default function Revenue() {
         <div className="bg-white rounded-xl border border-[#E5E7EB] p-6 shadow-sm">
           <h2 className="text-sm font-bold text-[#0F0F1A] mb-4">Spend vs Revenue Trend</h2>
           <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={mockTrendsData}>
+            <LineChart data={spendVsRevenue}>
               <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
               <XAxis dataKey="date" tick={{ fontSize: 12 }} />
               <YAxis tick={{ fontSize: 12 }} />
-              <Tooltip />
+              <Tooltip formatter={(v, name) => [`AED ${Number(v).toLocaleString()}`, name]} />
               <Legend />
               <Line type="monotone" dataKey="spend" stroke="#DC2626" strokeWidth={2} name="Ad Spend (AED)" dot={false} />
+              <Line type="stepAfter" dataKey="revenue" stroke="#16A34A" strokeWidth={2} name="Closed Revenue (AED)" dot={false} />
             </LineChart>
           </ResponsiveContainer>
         </div>
       </ErrorBoundary>
+
+      <AISummary summary={
+        `You spent AED ${totalSpend.toLocaleString()} and closed AED ${closedRevenue.toLocaleString()} in revenue — a ROAS of ${(closedRevenue / totalSpend).toFixed(1)}x. ` +
+        `${(closedRevenue / totalSpend) >= 4 ? 'ROAS is on target.' : 'ROAS is below the 4x target — closing active pipeline will bring it up.'} ` +
+        `There are AED ${activePipelineValue.toLocaleString()} in active deals being worked right now. ` +
+        `Projected revenue including active pipeline at a ${(historicalCloseRate * 100).toFixed(0)}% close rate is AED ${Math.round(projectedRevenue).toLocaleString()}.`
+      } />
     </div>
   )
 }

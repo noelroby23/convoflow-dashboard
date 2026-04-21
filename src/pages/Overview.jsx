@@ -1,15 +1,25 @@
+import { useEffect } from 'react'
 import { useFunnelByDate, useContactDetails } from '../hooks/useDashboardData'
 import KPICard from '../components/ui/KPICard'
 import InsightsFeed from '../components/ui/InsightsFeed'
 import Funnel from '../components/ui/Funnel'
 import ErrorBoundary from '../components/ui/ErrorBoundary'
 import StatusBadge from '../components/ui/StatusBadge'
+import AISummary from '../components/ui/AISummary'
 import { useNavigate } from 'react-router-dom'
+import { useDashboard } from '../store/dashboard'
+import { homeReport } from '../lib/reports/generators'
 
 export default function Overview() {
   const navigate = useNavigate()
+  const setReportBuilder = useDashboard(s => s.setReportBuilder)
   const { data: funnel, loading: funnelLoading } = useFunnelByDate()
   const { data: activePipeline, loading: pipelineLoading } = useContactDetails(['active', 'proposal_sent', 'follow_up_meeting', 'meeting_booked'])
+
+  useEffect(() => {
+    setReportBuilder(() => homeReport(funnel, activePipeline))
+    return () => setReportBuilder(null)
+  }, [funnel, activePipeline, setReportBuilder])
 
   // Derived calculations
   const totalLeads = funnel?.total_leads ?? 0
@@ -103,6 +113,13 @@ export default function Overview() {
           )}
         </div>
       </ErrorBoundary>
+      <AISummary summary={
+        `This period you generated ${totalLeads} leads at a cost of AED ${cpl} per lead, against a target of AED 85. ` +
+        `Sarah booked ${meetingsBooked} meetings, of which ${showedUp} showed up — a show rate of ${showRate}%. ` +
+        `${activeOpps} opportunities are currently active in the pipeline with a total value of AED ${(funnel?.pipeline_value ?? 0).toLocaleString()}. ` +
+        `${closedWon > 0 ? `You closed ${closedWon} deal${closedWon > 1 ? 's' : ''}, generating AED ${closedRevenue.toLocaleString()} in revenue and a ROAS of ${roas}x.` : 'No deals have closed yet this period — focus on progressing active opportunities.'}` +
+        (showRate > 0 && showRate < 75 ? ` Show rate is below the 75% target — consider adding WhatsApp reminders before meetings.` : '')
+      } loading={funnelLoading} />
     </div>
   )
 }

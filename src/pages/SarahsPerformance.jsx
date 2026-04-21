@@ -1,12 +1,28 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import KPICard from '../components/ui/KPICard'
 import Tabs from '../components/ui/Tabs'
 import ErrorBoundary from '../components/ui/ErrorBoundary'
+import AISummary from '../components/ui/AISummary'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import { mockSarahKPIs, mockCallOutcomes } from '../data/mockData'
+import { useDashboard } from '../store/dashboard'
+import { sarahReport } from '../lib/reports/generators'
+
+const DQ_REASONS = [
+  { reason: 'Budget too low', count: 11 },
+  { reason: 'Wrong timing', count: 6 },
+  { reason: 'Not ICP', count: 4 },
+  { reason: 'Already has solution', count: 3 },
+]
 
 export default function SarahsPerformance() {
   const [activeTab, setActiveTab] = useState('overview')
+  const setReportBuilder = useDashboard(s => s.setReportBuilder)
+
+  useEffect(() => {
+    setReportBuilder(() => sarahReport(mockSarahKPIs, DQ_REASONS))
+    return () => setReportBuilder(null)
+  }, [setReportBuilder])
 
   return (
     <div>
@@ -59,12 +75,7 @@ export default function SarahsPerformance() {
           <ErrorBoundary>
             <div className="bg-white rounded-xl border border-[#E5E7EB] p-6 shadow-sm">
               <h2 className="text-sm font-bold text-[#0F0F1A] mb-4">Disqualification Reasons</h2>
-              {[
-                { reason: 'Budget too low', count: 11 },
-                { reason: 'Wrong timing', count: 6 },
-                { reason: 'Not ICP', count: 4 },
-                { reason: 'Already has solution', count: 3 },
-              ].map(({ reason, count }) => (
+              {DQ_REASONS.map(({ reason, count }) => (
                 <div key={reason} className="flex items-center justify-between py-2 border-b border-[#F3F4F6] last:border-0">
                   <span className="text-sm text-[#333333]">{reason}</span>
                   <span className="text-sm font-semibold text-[#DC2626]">{count}</span>
@@ -72,6 +83,13 @@ export default function SarahsPerformance() {
               ))}
             </div>
           </ErrorBoundary>
+
+          <AISummary summary={
+            `Sarah attempted ${mockSarahKPIs.callsAttempted} calls this period, connecting with ${mockSarahKPIs.callsConnected} leads — a connection rate of ${((mockSarahKPIs.callsConnected / mockSarahKPIs.callsAttempted) * 100).toFixed(0)}%. ` +
+            `Of those connected, ${mockSarahKPIs.qualifiedRate}% were qualified, resulting in ${mockSarahKPIs.meetingsBooked} meetings booked. ` +
+            `The top disqualification reason is budget — 11 leads were disqualified for being under budget. ` +
+            `${mockSarahKPIs.qualifiedRate >= 20 ? 'Qualified rate is on target.' : 'Qualified rate is below the 20% target — review Sarah\'s qualification script.'}`
+          } />
         </>
       )}
 

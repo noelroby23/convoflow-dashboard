@@ -13,6 +13,7 @@ import Settings from './pages/Settings'
 import SarahsPerformance from './pages/SarahsPerformance'
 import SalesPerformance from './pages/SalesPerformance'
 import Revenue from './pages/Revenue'
+import ReportModal from './components/ui/ReportModal'
 
 function ProtectedRoute({ session, children }) {
   if (session === null) return <Navigate to="/login" replace />
@@ -60,6 +61,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <ReportModal />
       <Routes>
         <Route path="/login" element={(DEV_MODE || session) ? <Navigate to="/home" replace /> : <Login />} />
         <Route path="/" element={<Navigate to="/home" replace />} />

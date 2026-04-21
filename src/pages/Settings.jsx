@@ -102,7 +102,7 @@ export default function Settings() {
   }
 
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="space-y-6">
       {/* Targets */}
       <div className="bg-white rounded-xl shadow-sm border border-[#E5E7EB] overflow-hidden">
         <div className="px-6 py-4 border-b border-[#E5E7EB] flex items-center justify-between">
@@ -121,9 +121,9 @@ export default function Settings() {
           </button>
         </div>
         <div className="p-6">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-2">
             {Object.entries(targets).map(([key, val]) => (
-              <div key={key} className="flex items-center justify-between py-2 border-b border-[#F3F4F6] last:border-0">
+              <div key={key} className="flex items-center justify-between py-1.5 border-b border-[#F3F4F6] last:border-0">
                 <label className="text-sm font-medium text-[#333333]">{key}</label>
                 <input
                   type="number"

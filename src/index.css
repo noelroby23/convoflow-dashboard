@@ -3,6 +3,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Hide number input spinners */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type=number] { -moz-appearance: textfield; }
+
 :root {
   --cf-pink: #EC4899;
   --cf-dark: #0F0F1A;
@@ -44,11 +49,36 @@ body {
 }
 
 @media print {
-  body { background: white !important; }
+  body { background: white !important; font-size: 11px !important; }
   .no-print { display: none !important; }
   .print-expand { overflow: visible !important; max-height: none !important; }
   nav, aside, header { display: none !important; }
   main { margin-left: 0 !important; padding: 16px !important; }
-  .shadow-sm { box-shadow: none !important; }
-  @page { margin: 1cm; }
+  .shadow-sm, .shadow-md { box-shadow: none !important; }
+  @page { margin: 1.2cm; size: A4 landscape; }
+
+  /* Force grids to 3 columns max so cards don't overflow */
+  .grid { display: grid !important; }
+  .grid-cols-6 { grid-template-columns: repeat(3, 1fr) !important; }
+  .grid-cols-4 { grid-template-columns: repeat(2, 1fr) !important; }
+  .grid-cols-3 { grid-template-columns: repeat(3, 1fr) !important; }
+  .grid-cols-2 { grid-template-columns: repeat(2, 1fr) !important; }
+
+  /* Scale down large number text so it fits in narrower cards */
+  .text-3xl { font-size: 1.4rem !important; }
+  .text-4xl { font-size: 1.6rem !important; }
+  .text-2xl { font-size: 1.2rem !important; }
+
+  /* Prevent any content from overflowing card boundaries */
+  * { overflow: visible !important; box-sizing: border-box !important; }
+  .rounded-xl, .rounded-lg { border-radius: 8px !important; }
+
+  /* Don't break cards across pages */
+  .bg-white.rounded-xl { break-inside: avoid !important; }
+
+  /* When printing the AI Report modal, hide everything except the modal */
+  body.printing-report > #root > * { display: none !important; }
+  body.printing-report .report-modal-overlay { display: flex !important; position: static !important; background: white !important; }
+  body.printing-report .report-modal-card { box-shadow: none !important; max-height: none !important; overflow: visible !important; }
+  body.printing-report .report-modal-footer { display: none !important; }
 }

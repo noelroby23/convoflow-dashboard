@@ -1,29 +1,43 @@
+import { useEffect } from 'react'
 import { useFunnelSummary } from '../hooks/useDashboardData'
 import ErrorBoundary from '../components/ui/ErrorBoundary'
+import AISummary from '../components/ui/AISummary'
+import { useDashboard } from '../store/dashboard'
+import { healthReport } from '../lib/reports/generators'
 
 const TARGETS = {
   total_leads: 100,
   meetings_booked: 15,
   showed_up: 12,
   closed_won: 2,
+  revenue: 96000,
 }
 
 export default function Health() {
   const { data, loading } = useFunnelSummary()
+  const setReportBuilder = useDashboard(s => s.setReportBuilder)
+
+  const closedRevenue = data?.closed_revenue ?? 0
 
   const metrics = [
     { label: 'Total Leads', actual: data?.total_leads ?? 0, target: TARGETS.total_leads },
     { label: 'Meetings Booked', actual: data?.meetings_booked ?? 0, target: TARGETS.meetings_booked },
     { label: 'Showed Up', actual: data?.showed_up ?? 0, target: TARGETS.showed_up },
     { label: 'Closed Won', actual: data?.closed_won ?? 0, target: TARGETS.closed_won },
+    { label: 'Revenue (AED)', actual: closedRevenue, target: TARGETS.revenue, isCurrency: true },
   ]
 
-  const scores = metrics.map(m => Math.min((m.actual / m.target) * 100, 100))
+  const scores = metrics.filter(m => !m.isCurrency).map(m => Math.min((m.actual / m.target) * 100, 100))
   const healthScore = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0
 
   const healthStatus = healthScore >= 80 ? { label: 'GREEN', color: '#16A34A', bg: 'bg-green-100 text-green-700' }
     : healthScore >= 60 ? { label: 'YELLOW', color: '#F59E0B', bg: 'bg-amber-100 text-amber-700' }
     : { label: 'RED', color: '#DC2626', bg: 'bg-red-100 text-red-700' }
+
+  useEffect(() => {
+    setReportBuilder(() => healthReport(data, healthScore, healthStatus))
+    return () => setReportBuilder(null)
+  }, [data, healthScore, setReportBuilder])
 
   const churnRisk = healthScore >= 80 ? { label: 'LOW', bg: 'bg-green-100 text-green-700' }
     : healthScore >= 60 ? { label: 'MEDIUM', bg: 'bg-amber-100 text-amber-700' }
@@ -43,14 +57,46 @@ export default function Health() {
 
   return (
     <div className="space-y-4">
+      {/* Current month snapshot */}
+      <ErrorBoundary>
+        <div className="grid grid-cols-4 gap-3">
+          {[
+            { label: 'Total Spend', value: `AED ${(data?.total_spend ?? 0).toLocaleString()}`, color: '#DC2626' },
+            { label: 'Leads Generated', value: data?.total_leads ?? 0, color: '#2563EB' },
+            { label: 'Closed Revenue', value: `AED ${closedRevenue.toLocaleString()}`, color: '#16A34A' },
+            { label: 'Active Pipeline', value: `AED ${(data?.pipeline_value ?? 0).toLocaleString()}`, color: '#EC4899' },
+          ].map(({ label, value, color }) => (
+            <div key={label} className="bg-white rounded-xl border border-[#E5E7EB] p-5 shadow-sm text-center">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280] mb-1">{label}</p>
+              <p className="text-2xl font-bold" style={{ color }}>{loading ? '—' : value}</p>
+            </div>
+          ))}
+        </div>
+      </ErrorBoundary>
+
       {/* Health score + churn risk */}
       <ErrorBoundary>
         <div className="grid grid-cols-2 gap-4">
           <div className="bg-white rounded-xl border border-[#E5E7EB] p-6 shadow-sm flex flex-col items-center justify-center">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280] mb-2">Overall Health Score</p>
-            <p className="text-6xl font-bold" style={{ color: healthStatus.color }}>{healthScore}%</p>
-            <span className={`mt-2 px-3 py-1 rounded-full text-xs font-semibold ${healthStatus.bg}`}>{healthStatus.label}</span>
-            <p className="text-xs text-[#9CA3AF] mt-2 text-center">Average of leads, meetings, closes vs targets</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280] mb-4">Overall Health Score</p>
+            <div className="relative w-36 h-36">
+              <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+                <circle cx="50" cy="50" r="42" fill="none" stroke="#F3F4F6" strokeWidth="10" />
+                <circle
+                  cx="50" cy="50" r="42" fill="none"
+                  stroke={healthStatus.color} strokeWidth="10"
+                  strokeLinecap="round"
+                  strokeDasharray={`${2 * Math.PI * 42}`}
+                  strokeDashoffset={`${2 * Math.PI * 42 * (1 - healthScore / 100)}`}
+                  style={{ transition: 'stroke-dashoffset 0.6s ease' }}
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-3xl font-bold" style={{ color: healthStatus.color }}>{healthScore}%</span>
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full mt-1 ${healthStatus.bg}`}>{healthStatus.label}</span>
+              </div>
+            </div>
+            <p className="text-xs text-[#9CA3AF] mt-3 text-center">Average of leads, meetings, closes vs targets</p>
           </div>
           <div className="bg-white rounded-xl border border-[#E5E7EB] p-6 shadow-sm flex flex-col items-center justify-center">
             <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280] mb-2">Churn Risk</p>
@@ -73,13 +119,14 @@ export default function Health() {
               </tr>
             </thead>
             <tbody>
-              {metrics.map(({ label, actual, target }) => {
+              {metrics.map(({ label, actual, target, isCurrency }) => {
                 const pct = Math.round((actual / target) * 100)
+                const fmt = v => isCurrency ? `AED ${Number(v).toLocaleString()}` : v
                 return (
                   <tr key={label} className="border-b border-[#F3F4F6]">
                     <td className="py-3 pr-6 font-medium text-[#0F0F1A]">{label}</td>
-                    <td className="py-3 pr-6">{actual}</td>
-                    <td className="py-3 pr-6 text-[#6B7280]">{target}</td>
+                    <td className="py-3 pr-6">{fmt(actual)}</td>
+                    <td className="py-3 pr-6 text-[#6B7280]">{fmt(target)}</td>
                     <td className="py-3 pr-6">
                       <div className="flex items-center gap-2">
                         <div className="flex-1 bg-[#F3F4F6] rounded-full h-1.5 max-w-[80px]">
@@ -96,6 +143,15 @@ export default function Health() {
           </table>
         </div>
       </ErrorBoundary>
+      <AISummary loading={loading} summary={
+        `Overall health score is ${healthScore}% — ${healthStatus.label} status. ` +
+        `${metrics.map(m => {
+          const pct = Math.round((m.actual / m.target) * 100)
+          return `${m.label}: ${m.actual} of ${m.target} target (${pct}%)`
+        }).join(', ')}. ` +
+        `Churn risk is ${churnRisk.label}. ` +
+        `${healthScore >= 80 ? 'The campaign is performing well across all key metrics.' : healthScore >= 60 ? 'Performance is moderate — focus on the metrics showing yellow to avoid slipping into red.' : 'Performance is below target across multiple metrics — review ad spend allocation and sales follow-up urgently.'}`
+      } />
     </div>
   )
 }

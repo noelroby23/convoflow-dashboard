@@ -98,38 +98,38 @@ export function useClients() {
 }
 
 export function useFunnelByDate() {
-  const { currentClientId, dateRange } = useDashboard()
+  const { currentClientId, dateRange, refreshKey } = useDashboard()
   return useSupabaseQuery(
     () => supabase.rpc('funnel_summary_by_date', {
       p_client_id: currentClientId,
       p_from: dateRange.from,
       p_to: dateRange.to,
     }),
-    [currentClientId, dateRange.from, dateRange.to],
+    [currentClientId, dateRange.from, dateRange.to, refreshKey],
     fallbackFunnel
   )
 }
 
 export function useFunnelSummary() {
-  const { currentClientId } = useDashboard()
+  const { currentClientId, refreshKey } = useDashboard()
   return useSupabaseQuery(
     () => supabase.from('funnel_summary').select('*').eq('client_id', currentClientId).single(),
-    [currentClientId],
+    [currentClientId, refreshKey],
     fallbackFunnel
   )
 }
 
 export function useAdPerformance() {
-  const { currentClientId } = useDashboard()
+  const { currentClientId, refreshKey } = useDashboard()
   return useSupabaseQuery(
     () => supabase.from('ad_performance').select('*').eq('client_id', currentClientId),
-    [currentClientId],
+    [currentClientId, refreshKey],
     fallbackAds
   )
 }
 
 export function useContactDetails(stageFilter = null) {
-  const { currentClientId } = useDashboard()
+  const { currentClientId, refreshKey } = useDashboard()
   const filtered = stageFilter
     ? fallbackContacts.filter(c => stageFilter.includes(c.current_stage))
     : fallbackContacts
@@ -140,38 +140,38 @@ export function useContactDetails(stageFilter = null) {
       if (stageFilter) query = query.in('current_stage', stageFilter)
       return query
     },
-    [currentClientId, JSON.stringify(stageFilter)],
+    [currentClientId, JSON.stringify(stageFilter), refreshKey],
     filtered
   )
 }
 
 export function useAllContacts() {
-  const { currentClientId } = useDashboard()
+  const { currentClientId, refreshKey } = useDashboard()
   return useSupabaseQuery(
     () => supabase.from('contact_details').select('*').eq('client_id', currentClientId).order('created_at', { ascending: false }),
-    [currentClientId],
+    [currentClientId, refreshKey],
     fallbackContacts
   )
 }
 
 export function useDailyMetrics() {
-  const { currentClientId, dateRange } = useDashboard()
+  const { currentClientId, dateRange, refreshKey } = useDashboard()
   return useSupabaseQuery(
     () => supabase.from('daily_metrics').select('*')
       .eq('client_id', currentClientId)
       .gte('date', dateRange.from)
       .lte('date', dateRange.to)
       .order('date', { ascending: true }),
-    [currentClientId, dateRange.from, dateRange.to],
+    [currentClientId, dateRange.from, dateRange.to, refreshKey],
     fallbackDailyMetrics
   )
 }
 
 export function useSalesRepPerformance() {
-  const { currentClientId } = useDashboard()
+  const { currentClientId, refreshKey } = useDashboard()
   return useSupabaseQuery(
     () => supabase.from('sales_rep_performance').select('*').eq('client_id', currentClientId),
-    [currentClientId],
+    [currentClientId, refreshKey],
     fallbackSalesReps
   )
 }

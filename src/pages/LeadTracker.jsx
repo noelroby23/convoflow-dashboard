@@ -1,13 +1,25 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAllContacts } from '../hooks/useDashboardData'
+import { useDashboard } from '../store/dashboard'
+import { leadsReport } from '../lib/reports/generators'
 import StatusBadge from '../components/ui/StatusBadge'
 import ErrorBoundary from '../components/ui/ErrorBoundary'
-import { ChevronDown, ChevronUp, Search, Download } from 'lucide-react'
+import AudioTranscriptViewer from '../components/ui/AudioTranscriptViewer'
+import { ChevronDown, ChevronUp, Search, Download, Layers, Megaphone } from 'lucide-react'
+
+const formatStage = (s) => s ? s.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : ''
 import { exportCsv } from '../lib/exportCsv'
+import AISummary from '../components/ui/AISummary'
 
 export default function LeadTracker() {
   const { data: contacts, loading } = useAllContacts()
+  const setReportBuilder = useDashboard(s => s.setReportBuilder)
   const [expandedId, setExpandedId] = useState(null)
+
+  useEffect(() => {
+    setReportBuilder(() => leadsReport(contacts))
+    return () => setReportBuilder(null)
+  }, [contacts, setReportBuilder])
   const [stageFilter, setStageFilter] = useState('all')
   const [adFilter, setAdFilter] = useState('all')
   const [search, setSearch] = useState('')
@@ -23,6 +35,7 @@ export default function LeadTracker() {
   })
 
   return (
+    <>
     <ErrorBoundary>
       {/* Filters */}
       <div className="flex items-center gap-3 mb-4">
@@ -35,14 +48,38 @@ export default function LeadTracker() {
             className="w-full pl-9 pr-3 py-2 text-sm border border-[#E5E7EB] rounded-lg focus:outline-none focus:border-[#EC4899]"
           />
         </div>
-        <select value={stageFilter} onChange={e => setStageFilter(e.target.value)} className="text-sm border border-[#E5E7EB] rounded-lg px-3 py-2 focus:outline-none focus:border-[#EC4899]">
-          <option value="all">All Stages</option>
-          {uniqueStages.map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
-        <select value={adFilter} onChange={e => setAdFilter(e.target.value)} className="text-sm border border-[#E5E7EB] rounded-lg px-3 py-2 focus:outline-none focus:border-[#EC4899]">
-          <option value="all">All Ads</option>
-          {uniqueAds.map(a => <option key={a} value={a}>{a}</option>)}
-        </select>
+        <div className="relative">
+          <Layers size={14} className={`absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none ${stageFilter !== 'all' ? 'text-[#EC4899]' : 'text-[#9CA3AF]'}`} />
+          <ChevronDown size={14} className={`absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none ${stageFilter !== 'all' ? 'text-[#EC4899]' : 'text-[#6B7280]'}`} />
+          <select
+            value={stageFilter}
+            onChange={e => setStageFilter(e.target.value)}
+            className={`appearance-none text-sm font-medium rounded-lg pl-9 pr-8 py-2 cursor-pointer transition-all focus:outline-none focus:ring-2 focus:ring-pink-100 ${
+              stageFilter !== 'all'
+                ? 'border border-[#EC4899] bg-pink-50 text-[#EC4899]'
+                : 'border border-[#E5E7EB] bg-white text-[#333333] hover:border-[#9CA3AF] hover:bg-[#F9FAFB]'
+            }`}
+          >
+            <option value="all">All Stages</option>
+            {uniqueStages.map(s => <option key={s} value={s}>{formatStage(s)}</option>)}
+          </select>
+        </div>
+        <div className="relative">
+          <Megaphone size={14} className={`absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none ${adFilter !== 'all' ? 'text-[#EC4899]' : 'text-[#9CA3AF]'}`} />
+          <ChevronDown size={14} className={`absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none ${adFilter !== 'all' ? 'text-[#EC4899]' : 'text-[#6B7280]'}`} />
+          <select
+            value={adFilter}
+            onChange={e => setAdFilter(e.target.value)}
+            className={`appearance-none text-sm font-medium rounded-lg pl-9 pr-8 py-2 cursor-pointer transition-all focus:outline-none focus:ring-2 focus:ring-pink-100 max-w-[200px] truncate ${
+              adFilter !== 'all'
+                ? 'border border-[#EC4899] bg-pink-50 text-[#EC4899]'
+                : 'border border-[#E5E7EB] bg-white text-[#333333] hover:border-[#9CA3AF] hover:bg-[#F9FAFB]'
+            }`}
+          >
+            <option value="all">All Ads</option>
+            {uniqueAds.map(a => <option key={a} value={a}>{a}</option>)}
+          </select>
+        </div>
         <span className="text-xs text-[#6B7280] ml-auto">{filtered.length} leads</span>
         <button
           onClick={() => exportCsv(filtered.map(c => ({
@@ -129,25 +166,11 @@ export default function LeadTracker() {
                           {contact.dq_reason && <div className="flex justify-between"><span className="text-[#6B7280]">DQ Reason</span><span className="text-[#DC2626]">{contact.dq_reason}</span></div>}
                         </div>
                         <div className="col-span-2">
-                          {contact.call_summary && (
-                            <>
-                              <p className="text-xs font-semibold text-[#6B7280] mb-2">SARAH'S CALL SUMMARY</p>
-                              <div className="bg-white border border-[#E5E7EB] rounded-lg p-3 text-sm text-[#333333] leading-relaxed mb-3">
-                                {contact.call_summary}
-                              </div>
-                            </>
-                          )}
-                          {contact.call_transcript && (
-                            <>
-                              <p className="text-xs font-semibold text-[#6B7280] mb-2">TRANSCRIPT</p>
-                              <div className="bg-white border border-[#E5E7EB] rounded-lg p-3 text-xs text-[#6B7280] max-h-40 overflow-y-auto leading-relaxed">
-                                {contact.call_transcript}
-                              </div>
-                            </>
-                          )}
-                          {!contact.call_summary && !contact.call_transcript && (
-                            <p className="text-sm text-[#9CA3AF]">No call data available for this lead yet.</p>
-                          )}
+                          <AudioTranscriptViewer
+                            recordingUrl={contact.call_recording_url}
+                            transcript={contact.call_transcript}
+                            summary={contact.call_summary}
+                          />
                         </div>
                       </div>
                     </td>
@@ -159,5 +182,24 @@ export default function LeadTracker() {
         </table>
       </div>
     </ErrorBoundary>
+
+    <LeadSummary contacts={contacts} loading={loading} />
+    </>
+  )
+}
+
+function LeadSummary({ contacts, loading }) {
+  if (loading || !contacts?.length) return null
+  const active = contacts.filter(c => ['active', 'proposal_sent', 'follow_up_meeting'].includes(c.current_stage)).length
+  const dq = contacts.filter(c => c.current_stage === 'disqualified').length
+  const hotLeads = contacts.filter(c => (c.lead_quality_score ?? 0) >= 7).length
+  const closed = contacts.filter(c => c.current_stage === 'closed_won').length
+  return (
+    <AISummary summary={
+      `There are ${contacts.length} total leads in the tracker. ` +
+      `${active} are currently active in the pipeline, ${closed} have closed, and ${dq} were disqualified. ` +
+      `${hotLeads} leads have a quality score of 7 or above — these are your highest-priority follow-ups. ` +
+      `${dq > contacts.length * 0.3 ? `Disqualification rate is high at ${((dq / contacts.length) * 100).toFixed(0)}% — review lead source quality.` : 'Disqualification rate is within normal range.'}`
+    } />
   )
 }

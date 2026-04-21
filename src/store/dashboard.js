@@ -24,9 +24,20 @@ export const useDashboard = create(
       currentClientId: 'convoflow-uk',
       currentClientName: 'ConvoFlow UK',
       dateRange: { preset: 'last_7_days', ...getPresetRange('last_7_days') },
+      refreshKey: 0,
+      reportBuilder: null,
+      reportContent: null,
+      isReportOpen: false,
       setClient: (id, name) => set({ currentClientId: id, currentClientName: name }),
       setDatePreset: (preset) => set({ dateRange: { preset, ...getPresetRange(preset) } }),
       setCustomDateRange: (from, to) => set({ dateRange: { preset: 'custom', from, to } }),
+      refresh: () => set(state => ({ refreshKey: state.refreshKey + 1 })),
+      setReportBuilder: (fn) => set({ reportBuilder: fn }),
+      openReport: () => set(state => {
+        const content = state.reportBuilder?.()
+        return content ? { reportContent: content, isReportOpen: true } : {}
+      }),
+      closeReport: () => set({ isReportOpen: false }),
     }),
     {
       name: 'convoflow-dashboard-store',

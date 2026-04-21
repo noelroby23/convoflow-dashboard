@@ -1,13 +1,22 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAdPerformance } from '../hooks/useDashboardData'
+import { useDashboard } from '../store/dashboard'
+import { creativeReport } from '../lib/reports/generators'
 import ErrorBoundary from '../components/ui/ErrorBoundary'
+import AISummary from '../components/ui/AISummary'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { ChevronDown, ChevronUp, Download } from 'lucide-react'
 import { exportCsv } from '../lib/exportCsv'
 
 export default function AdCreatives() {
   const { data: ads, loading, error } = useAdPerformance()
+  const setReportBuilder = useDashboard(s => s.setReportBuilder)
   const [expandedId, setExpandedId] = useState(null)
+
+  useEffect(() => {
+    setReportBuilder(() => creativeReport(ads))
+    return () => setReportBuilder(null)
+  }, [ads, setReportBuilder])
   const [sortKey, setSortKey] = useState('total_spend')
   const [sortDir, setSortDir] = useState('desc')
 
@@ -84,6 +93,7 @@ export default function AdCreatives() {
   }
 
   return (
+    <>
     <ErrorBoundary>
       <div className="flex justify-end mb-3">
         <button onClick={handleExport} className="flex items-center gap-2 px-3 py-1.5 text-sm border border-[#E5E7EB] rounded-lg text-[#6B7280] hover:bg-[#F3F4F6] transition-colors">
@@ -179,5 +189,24 @@ export default function AdCreatives() {
         </table>
       </div>
     </ErrorBoundary>
+
+    <AdsSummary ads={ads} loading={loading} />
+  </>
+  )
+}
+
+function AdsSummary({ ads, loading }) {
+  if (!ads?.length) return null
+  const best = [...ads].sort((a, b) => (a.cost_per_lead ?? 999) - (b.cost_per_lead ?? 999))[0]
+  const worst = [...ads].sort((a, b) => (b.cost_per_lead ?? 0) - (a.cost_per_lead ?? 0))[0]
+  const highFreq = ads.filter(a => (a.avg_frequency ?? 0) > 1.5)
+  const activeCount = ads.filter(a => a.status === 'active').length
+  return (
+    <AISummary loading={loading} summary={
+      `You have ${activeCount} active ad${activeCount !== 1 ? 's' : ''} running this period. ` +
+      `${best?.ad_name} is your best performer with a CPL of AED ${Number(best?.cost_per_lead ?? 0).toFixed(0)}, ${(best?.cost_per_lead ?? 0) <= 85 ? 'within' : 'above'} the AED 85 target. ` +
+      `${worst?.ad_name !== best?.ad_name ? `${worst?.ad_name} has the highest CPL at AED ${Number(worst?.cost_per_lead ?? 0).toFixed(0)} — consider pausing it if performance doesn't improve. ` : ''}` +
+      `${highFreq.length > 0 ? `${highFreq.map(a => a.ad_name).join(', ')} ${highFreq.length === 1 ? 'has' : 'have'} frequency above 1.5 — watch for creative fatigue.` : 'All ads are within healthy frequency ranges.'}`
+    } />
   )
 }

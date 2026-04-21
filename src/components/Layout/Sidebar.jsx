@@ -22,14 +22,8 @@ export default function Sidebar({ onLogout }) {
   return (
     <div className="fixed left-0 top-0 h-full w-[220px] bg-white border-r border-[#E5E7EB] flex flex-col z-40">
       {/* Logo */}
-      <div className="px-5 py-4 border-b border-[#E5E7EB]">
-        <div className="flex items-center gap-1.5">
-          <img src="/convoflow-logo.png" alt="ConvoFlow" className="w-16 h-16 object-contain" />
-          <div>
-            <p className="text-sm font-bold text-[#EC4899] leading-none">ConvoFlow</p>
-            <p className="text-[10px] text-[#9CA3AF] mt-0.5">Dashboard</p>
-          </div>
-        </div>
+      <div className="px-4 py-3 border-b border-[#E5E7EB] flex items-center justify-center">
+        <img src="/convoflow-logo-v2.jpg" alt="ConvoFlow" className="max-h-20 w-auto object-contain" />
       </div>
 
       {/* Client selector */}

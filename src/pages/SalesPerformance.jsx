@@ -1,12 +1,21 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import KPICard from '../components/ui/KPICard'
 import Tabs from '../components/ui/Tabs'
 import ErrorBoundary from '../components/ui/ErrorBoundary'
+import AISummary from '../components/ui/AISummary'
 import { useSalesRepPerformance } from '../hooks/useDashboardData'
+import { useDashboard } from '../store/dashboard'
+import { salesReport } from '../lib/reports/generators'
 
 export default function SalesPerformance() {
   const [activeTab, setActiveTab] = useState('overview')
   const { data: salesReps, loading } = useSalesRepPerformance()
+  const setReportBuilder = useDashboard(s => s.setReportBuilder)
+
+  useEffect(() => {
+    setReportBuilder(() => salesReport(salesReps))
+    return () => setReportBuilder(null)
+  }, [salesReps, setReportBuilder])
 
   // Compute team totals from real data
   const totalMeetings = salesReps?.reduce((sum, r) => sum + (r.meetings_scheduled ?? 0), 0) ?? 0
@@ -98,6 +107,14 @@ export default function SalesPerformance() {
               </div>
             </div>
           </ErrorBoundary>
+
+          <AISummary loading={loading} summary={
+            `The sales team handled ${totalMeetings} meetings this period with ${totalShows} shows and ${totalNoShows} no-shows. ` +
+            `Overall show rate is ${totalMeetings > 0 ? ((totalShows / totalMeetings) * 100).toFixed(0) : 0}% — ` +
+            `${totalMeetings > 0 && (totalShows / totalMeetings) >= 0.75 ? 'on target.' : 'below the 75% target. Consider adding pre-meeting reminders.'} ` +
+            `The team closed ${totalCloses} deal${totalCloses !== 1 ? 's' : ''} this period. ` +
+            `${totalNoShows > 3 ? `No-shows are elevated at ${totalNoShows} — review follow-up sequences after booking.` : 'No-show volume is manageable.'}`
+          } />
         </>
       )}
 
