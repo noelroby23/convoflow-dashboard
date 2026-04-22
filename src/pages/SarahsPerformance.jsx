@@ -6,7 +6,7 @@ import AISummary from '../components/ui/AISummary'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import { useDashboard } from '../store/dashboard'
 import { sarahReport } from '../lib/reports/generators'
-import { useFunnelByDate, useAllContacts } from '../hooks/useDashboardData'
+import { useFunnelSummary, useAllContacts } from '../hooks/useDashboardData'
 
 const OUTCOME_COLORS = {
   'Meeting Booked': '#16A34A',
@@ -20,44 +20,53 @@ const OUTCOME_COLORS = {
   'Callback': '#8B5CF6',
 }
 
+const RADIAN = Math.PI / 180
+const CustomLabel = ({ cx, cy, midAngle, outerRadius, name, value }) => {
+  const radius = outerRadius + 35
+  const x = cx + radius * Math.cos(-midAngle * RADIAN)
+  const y = cy + radius * Math.sin(-midAngle * RADIAN)
+  return (
+    <text x={x} y={y} fill={OUTCOME_COLORS[name] || '#333'} textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize={11} fontWeight={500}>
+      {`${name} (${value})`}
+    </text>
+  )
+}
+
 export default function SarahsPerformance() {
   const [activeTab, setActiveTab] = useState('overview')
   const setReportBuilder = useDashboard(s => s.setReportBuilder)
-  const { data: funnel, loading: funnelLoading } = useFunnelByDate()
+
+  // Lifetime totals — not date-filtered
+  const { data: funnel, loading: funnelLoading } = useFunnelSummary()
   const { data: contacts, loading: contactsLoading } = useAllContacts()
 
   const meetingsBooked = funnel?.meetings_booked ?? 0
   const showedUp = funnel?.showed_up ?? 0
   const activeOpps = funnel?.active_opportunities ?? 0
-  const closedWon = funnel?.closed_won ?? 0
 
-  // Build real call outcome breakdown from contact stages
+  // Real outcome breakdown from all contact stages
   const stageCounts = {}
   ;(contacts ?? []).forEach(c => {
-    const stage = c.current_stage
-    if (!stage) return
-    stageCounts[stage] = (stageCounts[stage] || 0) + 1
+    if (c.current_stage) stageCounts[c.current_stage] = (stageCounts[c.current_stage] || 0) + 1
   })
 
   const outcomeData = [
-    { name: 'Meeting Booked', value: (stageCounts['meeting_booked'] || 0) },
-    { name: 'Showed Up', value: (stageCounts['showed'] || 0) },
-    { name: 'No Show', value: (stageCounts['no_show'] || 0) },
+    { name: 'Meeting Booked',    value: stageCounts['meeting_booked'] || 0 },
+    { name: 'Showed Up',         value: stageCounts['showed'] || 0 },
+    { name: 'No Show',           value: stageCounts['no_show'] || 0 },
     { name: 'Active / Proposal', value: (stageCounts['active'] || 0) + (stageCounts['closed_won'] || 0) },
-    { name: 'Disqualified', value: (stageCounts['disqualified'] || 0) },
-    { name: 'Not Interested', value: (stageCounts['not_interested'] || 0) },
-    { name: 'Wrong Number', value: (stageCounts['wrong_number'] || 0) },
-    { name: 'Follow Up', value: (stageCounts['follow_up'] || 0) + (stageCounts['contacted'] || 0) + (stageCounts['qualified_no_meeting'] || 0) },
-    { name: 'Callback', value: (stageCounts['callback'] || 0) },
+    { name: 'Disqualified',      value: stageCounts['disqualified'] || 0 },
+    { name: 'Not Interested',    value: stageCounts['not_interested'] || 0 },
+    { name: 'Wrong Number',      value: stageCounts['wrong_number'] || 0 },
+    { name: 'Follow Up',         value: (stageCounts['follow_up'] || 0) + (stageCounts['contacted'] || 0) + (stageCounts['qualified_no_meeting'] || 0) },
+    { name: 'Callback',          value: stageCounts['callback'] || 0 },
   ].filter(d => d.value > 0)
 
-  // Build real DQ reasons from contact dq_reason field
+  // Real DQ reasons from contact dq_reason field
   const dqMap = {}
   ;(contacts ?? [])
     .filter(c => c.current_stage === 'disqualified' && c.dq_reason)
-    .forEach(c => {
-      dqMap[c.dq_reason] = (dqMap[c.dq_reason] || 0) + 1
-    })
+    .forEach(c => { dqMap[c.dq_reason] = (dqMap[c.dq_reason] || 0) + 1 })
   const dqReasons = Object.entries(dqMap)
     .map(([reason, count]) => ({ reason, count }))
     .sort((a, b) => b.count - a.count)
@@ -72,47 +81,22 @@ export default function SarahsPerformance() {
   return (
     <div>
       <Tabs
-        tabs={[
-          { id: 'overview', label: 'Overview' },
-          { id: 'recent-calls', label: 'Recent Calls' },
-        ]}
+        tabs={[{ id: 'overview', label: 'Overview' }, { id: 'recent-calls', label: 'Recent Calls' }]}
         activeTab={activeTab}
         onTabChange={setActiveTab}
       />
 
       {activeTab === 'overview' && (
         <>
-          {/* KPI Cards */}
           <ErrorBoundary>
             <div className="grid grid-cols-4 gap-3 mb-6">
-              <KPICard
-                label="Calls Attempted"
-                value="—"
-                description="Call log integration coming soon"
-              />
-              <KPICard
-                label="Calls Connected"
-                value="—"
-                description="Call log integration coming soon"
-              />
-              <KPICard
-                label="Meetings Booked"
-                value={meetingsBooked}
-                loading={funnelLoading}
-                description="Meetings Sarah booked from her calls"
-                target={15}
-              />
-              <KPICard
-                label="Showed Up"
-                value={showedUp}
-                loading={funnelLoading}
-                description="Leads who attended their booked meeting"
-                target={Math.round(meetingsBooked * 0.75)}
-              />
+              <KPICard label="Calls Attempted" value="—" description="Call log integration coming soon" />
+              <KPICard label="Calls Connected" value="—" description="Call log integration coming soon" />
+              <KPICard label="Meetings Booked" value={meetingsBooked} loading={funnelLoading} description="Total meetings Sarah booked" target={15} />
+              <KPICard label="Showed Up" value={showedUp} loading={funnelLoading} description="Leads who attended their meeting" target={Math.round(meetingsBooked * 0.75)} />
             </div>
           </ErrorBoundary>
 
-          {/* Call Outcome Breakdown */}
           <ErrorBoundary>
             <div className="bg-white rounded-xl border border-[#E5E7EB] p-6 shadow-sm mb-6">
               <h2 className="text-sm font-bold text-[#0F0F1A] mb-4">Lead Outcome Breakdown</h2>
@@ -121,7 +105,7 @@ export default function SarahsPerformance() {
               ) : outcomeData.length === 0 ? (
                 <p className="text-sm text-[#9CA3AF] text-center py-12">No contact data available yet.</p>
               ) : (
-                <ResponsiveContainer width="100%" height={280}>
+                <ResponsiveContainer width="100%" height={340}>
                   <PieChart>
                     <Pie
                       data={outcomeData}
@@ -130,21 +114,20 @@ export default function SarahsPerformance() {
                       innerRadius={70}
                       outerRadius={110}
                       dataKey="value"
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      labelLine={false}
+                      labelLine={true}
+                      label={<CustomLabel />}
                     >
                       {outcomeData.map((entry, i) => (
                         <Cell key={i} fill={OUTCOME_COLORS[entry.name] || '#E5E7EB'} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(v, name) => [v, name]} />
+                    <Tooltip formatter={(v, name) => [`${v} leads`, name]} />
                   </PieChart>
                 </ResponsiveContainer>
               )}
             </div>
           </ErrorBoundary>
 
-          {/* DQ Reasons */}
           <ErrorBoundary>
             <div className="bg-white rounded-xl border border-[#E5E7EB] p-6 shadow-sm">
               <h2 className="text-sm font-bold text-[#0F0F1A] mb-4">Disqualification Reasons</h2>
@@ -166,13 +149,11 @@ export default function SarahsPerformance() {
           <AISummary
             loading={loading}
             summary={
-              `Sarah booked ${meetingsBooked} meetings this period, of which ${showedUp} showed up — a show rate of ${meetingsBooked > 0 ? ((showedUp / meetingsBooked) * 100).toFixed(0) : 0}%. ` +
-              `${meetingsBooked >= 15 ? 'Meetings are on target.' : `Meetings are below the target of 15 — ${15 - meetingsBooked} more needed.`} ` +
+              `Sarah booked ${meetingsBooked} meetings in total, of which ${showedUp} showed up — a show rate of ${meetingsBooked > 0 ? ((showedUp / meetingsBooked) * 100).toFixed(0) : 0}%. ` +
+              `${meetingsBooked >= 15 ? 'Meetings are on target.' : `Meetings are below the 15 target — ${15 - meetingsBooked} more needed.`} ` +
               `${activeOpps} opportunities are currently active in the pipeline. ` +
-              (dqReasons.length > 0
-                ? `Top disqualification reason: ${dqReasons[0].reason} (${dqReasons[0].count} leads). `
-                : '') +
-              `Call-level metrics (attempts, connection rate, qualified rate) will be available once VAPI call log integration is complete.`
+              (dqReasons.length > 0 ? `Top disqualification reason: ${dqReasons[0].reason} (${dqReasons[0].count} leads). ` : '') +
+              `Call-level metrics will be available once VAPI call log integration is complete.`
             }
           />
         </>
