@@ -100,11 +100,15 @@ export function useClients() {
 export function useFunnelByDate() {
   const { currentClientId, dateRange, refreshKey } = useDashboard()
   return useSupabaseQuery(
-    () => supabase.rpc('funnel_summary_by_date', {
-      p_client_id: currentClientId,
-      p_from: dateRange.from,
-      p_to: dateRange.to,
-    }),
+    async () => {
+      const { data, error } = await supabase.rpc('funnel_summary_by_date', {
+        p_client_id: currentClientId,
+        p_from: dateRange.from,
+        p_to: dateRange.to,
+      })
+      // RPC returns a single-row array — unwrap to plain object
+      return { data: Array.isArray(data) ? (data[0] ?? null) : data, error }
+    },
     [currentClientId, dateRange.from, dateRange.to, refreshKey],
     fallbackFunnel
   )
