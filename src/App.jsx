@@ -41,8 +41,8 @@ export default function App() {
 
   const handleLogout = async () => { await supabase.auth.signOut() }
 
-  // DEV BYPASS — remove before deploying to production
-  const DEV_MODE = true
+  // DEV BYPASS — set to true for local dev without auth; keep false in production
+  const DEV_MODE = false
 
   if (!DEV_MODE && session === undefined) {
     return (

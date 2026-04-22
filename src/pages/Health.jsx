@@ -1,30 +1,23 @@
 import { useEffect } from 'react'
-import { useFunnelSummary } from '../hooks/useDashboardData'
+import { useFunnelSummary, useTargets } from '../hooks/useDashboardData'
 import ErrorBoundary from '../components/ui/ErrorBoundary'
 import AISummary from '../components/ui/AISummary'
 import { useDashboard } from '../store/dashboard'
 import { healthReport } from '../lib/reports/generators'
 
-const TARGETS = {
-  total_leads: 100,
-  meetings_booked: 15,
-  showed_up: 12,
-  closed_won: 2,
-  revenue: 96000,
-}
-
 export default function Health() {
   const { data, loading } = useFunnelSummary()
+  const { data: targets } = useTargets()
   const setReportBuilder = useDashboard(s => s.setReportBuilder)
 
   const closedRevenue = data?.closed_revenue ?? 0
 
   const metrics = [
-    { label: 'Total Leads', actual: data?.total_leads ?? 0, target: TARGETS.total_leads },
-    { label: 'Meetings Booked', actual: data?.meetings_booked ?? 0, target: TARGETS.meetings_booked },
-    { label: 'Showed Up', actual: data?.showed_up ?? 0, target: TARGETS.showed_up },
-    { label: 'Closed Won', actual: data?.closed_won ?? 0, target: TARGETS.closed_won },
-    { label: 'Revenue (AED)', actual: closedRevenue, target: TARGETS.revenue, isCurrency: true },
+    { label: 'Total Leads',     actual: data?.total_leads ?? 0,     target: targets?.monthly_leads ?? 100 },
+    { label: 'Meetings Booked', actual: data?.meetings_booked ?? 0, target: targets?.monthly_meetings ?? 30 },
+    { label: 'Showed Up',       actual: data?.showed_up ?? 0,       target: Math.round((targets?.monthly_meetings ?? 30) * ((targets?.show_rate ?? 75) / 100)) },
+    { label: 'Closed Won',      actual: data?.closed_won ?? 0,      target: targets?.monthly_closes ?? 4 },
+    { label: 'Revenue (AED)',   actual: closedRevenue,              target: targets?.monthly_revenue ?? 96000, isCurrency: true },
   ]
 
   const scores = metrics.filter(m => !m.isCurrency).map(m => Math.min((m.actual / m.target) * 100, 100))

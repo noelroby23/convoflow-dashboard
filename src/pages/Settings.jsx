@@ -3,20 +3,26 @@ import { Save, RefreshCw, Bell, Users, Target } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useDashboard } from '../store/dashboard'
 
-const defaultTargets = {
-  'Total Spend (AED)': 8400,
-  'Leads': 100,
-  'Meetings Booked': 15,
-  'Showed Up': 12,
-  'Active Opportunities': 8,
-  'Closed Won': 2,
-  'CPL (AED)': 85,
-  'Cost/Meeting (AED)': 600,
-  'Cost/Active (AED)': 1200,
-  'Show Rate (%)': 75,
-  'Meeting Rate (%)': 18,
-  'ROAS (x)': 4,
-}
+// Maps UI labels to normalized target metric_name keys in Supabase.
+// These metric_names match what the backend (n8n alerts, reports) expects.
+const TARGET_CONFIG = [
+  { key: 'daily_spend',      label: 'Daily Spend (AED)',       default: 420 },
+  { key: 'monthly_leads',    label: 'Monthly Leads',           default: 100 },
+  { key: 'monthly_meetings', label: 'Monthly Meetings',        default: 30 },
+  { key: 'monthly_closes',   label: 'Monthly Closes',          default: 4 },
+  { key: 'weekly_leads',     label: 'Weekly Leads',            default: 28 },
+  { key: 'weekly_meetings',  label: 'Weekly Meetings',         default: 8 },
+  { key: 'weekly_shows',     label: 'Weekly Shows',            default: 6 },
+  { key: 'weekly_closes',    label: 'Weekly Closes',           default: 1 },
+  { key: 'cpl_target',       label: 'CPL Target (AED)',        default: 85 },
+  { key: 'cost_per_meeting', label: 'Cost / Meeting (AED)',    default: 600 },
+  { key: 'cost_per_active',  label: 'Cost / Active Opp (AED)', default: 1200 },
+  { key: 'show_rate',        label: 'Show Rate (%)',           default: 75 },
+  { key: 'meeting_rate',     label: 'Meeting Rate (%)',        default: 18 },
+  { key: 'roas_target',      label: 'ROAS Target (x)',         default: 4 },
+]
+
+const defaultTargets = Object.fromEntries(TARGET_CONFIG.map(t => [t.key, t.default]))
 
 const syncSources = [
   { name: 'Meta Ads', lastSync: '2 min ago', status: 'live', description: 'Facebook & Instagram ad data' },
@@ -55,48 +61,46 @@ export default function Settings() {
   const [targets, setTargets] = useState(defaultTargets)
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [loadError, setLoadError] = useState(null)
 
   useEffect(() => {
-    supabase.from('targets').select('*').eq('client_id', currentClientId).single()
-      .then(({ data }) => {
-        if (data) {
-          setTargets(prev => ({
-            ...prev,
-            'Total Spend (AED)': data.total_spend ?? prev['Total Spend (AED)'],
-            'Leads': data.leads ?? prev['Leads'],
-            'Meetings Booked': data.meetings_booked ?? prev['Meetings Booked'],
-            'Showed Up': data.showed_up ?? prev['Showed Up'],
-            'Active Opportunities': data.active_opportunities ?? prev['Active Opportunities'],
-            'Closed Won': data.closed_won ?? prev['Closed Won'],
-            'CPL (AED)': data.cpl ?? prev['CPL (AED)'],
-            'Cost/Meeting (AED)': data.cost_per_meeting ?? prev['Cost/Meeting (AED)'],
-            'Cost/Active (AED)': data.cost_per_active ?? prev['Cost/Active (AED)'],
-            'Show Rate (%)': data.show_rate ?? prev['Show Rate (%)'],
-            'Meeting Rate (%)': data.meeting_rate ?? prev['Meeting Rate (%)'],
-            'ROAS (x)': data.roas ?? prev['ROAS (x)'],
-          }))
+    supabase
+      .from('targets')
+      .select('metric_name, target_value')
+      .eq('client_id', currentClientId)
+      .then(({ data, error }) => {
+        if (error) {
+          setLoadError(error.message)
+          return
+        }
+        if (data && data.length) {
+          setTargets(prev => {
+            const next = { ...prev }
+            for (const row of data) {
+              next[row.metric_name] = Number(row.target_value)
+            }
+            return next
+          })
         }
       })
   }, [currentClientId])
 
   const handleSave = async () => {
     setSaving(true)
-    await supabase.from('targets').upsert({
+    setLoadError(null)
+    const rows = TARGET_CONFIG.map(t => ({
       client_id: currentClientId,
-      total_spend: targets['Total Spend (AED)'],
-      leads: targets['Leads'],
-      meetings_booked: targets['Meetings Booked'],
-      showed_up: targets['Showed Up'],
-      active_opportunities: targets['Active Opportunities'],
-      closed_won: targets['Closed Won'],
-      cpl: targets['CPL (AED)'],
-      cost_per_meeting: targets['Cost/Meeting (AED)'],
-      cost_per_active: targets['Cost/Active (AED)'],
-      show_rate: targets['Show Rate (%)'],
-      meeting_rate: targets['Meeting Rate (%)'],
-      roas: targets['ROAS (x)'],
-    }, { onConflict: 'client_id' })
+      metric_name: t.key,
+      target_value: Number(targets[t.key] ?? t.default),
+    }))
+    const { error } = await supabase
+      .from('targets')
+      .upsert(rows, { onConflict: 'client_id,metric_name' })
     setSaving(false)
+    if (error) {
+      setLoadError(error.message)
+      return
+    }
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
@@ -121,13 +125,18 @@ export default function Settings() {
           </button>
         </div>
         <div className="p-6">
+          {loadError && (
+            <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+              {loadError}
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-2">
-            {Object.entries(targets).map(([key, val]) => (
+            {TARGET_CONFIG.map(({ key, label }) => (
               <div key={key} className="flex items-center justify-between py-1.5 border-b border-[#F3F4F6] last:border-0">
-                <label className="text-sm font-medium text-[#333333]">{key}</label>
+                <label className="text-sm font-medium text-[#333333]">{label}</label>
                 <input
                   type="number"
-                  value={val}
+                  value={targets[key] ?? ''}
                   onChange={e => setTargets(prev => ({ ...prev, [key]: Number(e.target.value) }))}
                   className="w-28 text-right text-sm border border-[#E5E7EB] rounded-lg px-3 py-1.5 text-[#0F0F1A] font-semibold focus:outline-none focus:border-[#EC4899] focus:ring-1 focus:ring-pink-100"
                 />

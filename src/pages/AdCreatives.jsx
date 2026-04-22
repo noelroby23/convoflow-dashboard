@@ -44,6 +44,22 @@ export default function AdCreatives() {
     return 'text-[#333333]'
   }
 
+  // Hook rate thresholds per spec: <25% kill, 25-30% marginal, 30-50% healthy, >50% exceptional
+  const getHookRateColor = (rate) => {
+    if (rate == null) return 'text-[#9CA3AF]'
+    if (rate >= 30) return 'text-[#16A34A] font-semibold'
+    if (rate >= 25) return 'text-[#F59E0B] font-semibold'
+    return 'text-[#DC2626] font-semibold'
+  }
+
+  // Watch-through: >40% = ad body holds viewers well, 20-40% = ok, <20% = weak body
+  const getWatchThroughColor = (rate) => {
+    if (rate == null) return 'text-[#9CA3AF]'
+    if (rate >= 40) return 'text-[#16A34A] font-semibold'
+    if (rate >= 20) return 'text-[#333333]'
+    return 'text-[#F59E0B]'
+  }
+
   const cols = [
     { key: 'ad_name', label: 'Ad Name' },
     { key: 'status', label: 'Status' },
@@ -56,6 +72,8 @@ export default function AdCreatives() {
     { key: 'cost_per_active', label: 'Cost/Active' },
     { key: 'avg_frequency', label: 'Frequency' },
     { key: 'avg_ctr', label: 'CTR %' },
+    { key: 'hook_rate_pct', label: 'Hook Rate' },
+    { key: 'watch_through_pct', label: 'Watch-Thru' },
   ]
 
   if (loading) return (
@@ -89,6 +107,8 @@ export default function AdCreatives() {
       'Cost/Active': ad.cost_per_active,
       'Frequency': ad.avg_frequency,
       'CTR %': ad.avg_ctr,
+      'Hook Rate %': ad.hook_rate_pct,
+      'Watch-Through %': ad.watch_through_pct,
     })), 'ad-performance')
   }
 
@@ -143,13 +163,19 @@ export default function AdCreatives() {
                   <td className="px-4 py-3">{ad.cost_per_active ? `AED ${Number(ad.cost_per_active).toFixed(0)}` : '∞'}</td>
                   <td className={`px-4 py-3 ${getFreqColor(ad.avg_frequency)}`}>{ad.avg_frequency ? Number(ad.avg_frequency).toFixed(2) : '—'}</td>
                   <td className="px-4 py-3">{ad.avg_ctr ? `${Number(ad.avg_ctr).toFixed(2)}%` : '—'}</td>
+                  <td className={`px-4 py-3 ${getHookRateColor(ad.hook_rate_pct)}`} title={ad.hook_rate_pct == null ? 'No video data yet' : ''}>
+                    {ad.hook_rate_pct != null ? `${Number(ad.hook_rate_pct).toFixed(1)}%` : '—'}
+                  </td>
+                  <td className={`px-4 py-3 ${getWatchThroughColor(ad.watch_through_pct)}`}>
+                    {ad.watch_through_pct != null ? `${Number(ad.watch_through_pct).toFixed(1)}%` : '—'}
+                  </td>
                   <td className="px-4 py-3 text-[#6B7280]">
                     {expandedId === ad.ad_id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                   </td>
                 </tr>
                 {expandedId === ad.ad_id && (
                   <tr key={`${ad.ad_id}-expanded`} className="border-t border-[#F3F4F6] bg-[#FAFAFA]">
-                    <td colSpan={12} className="px-6 py-4">
+                    <td colSpan={14} className="px-6 py-4">
                       <div className="grid grid-cols-2 gap-6">
                         <div>
                           <p className="text-xs font-semibold text-[#6B7280] mb-3">PERFORMANCE BREAKDOWN</p>
@@ -177,9 +203,31 @@ export default function AdCreatives() {
                             <div className="flex justify-between"><span className="text-[#6B7280]">CTR</span><span className="font-medium">{ad.avg_ctr ? `${Number(ad.avg_ctr).toFixed(2)}%` : '—'}</span></div>
                             <div className="flex justify-between"><span className="text-[#6B7280]">Cost per Lead</span><span className={getCPLColor(ad.cost_per_lead)}>{ad.cost_per_lead ? `AED ${Number(ad.cost_per_lead).toFixed(0)}` : '—'}</span></div>
                             <div className="flex justify-between"><span className="text-[#6B7280]">Cost per Active</span><span className="font-medium">{ad.cost_per_active ? `AED ${Number(ad.cost_per_active).toFixed(0)}` : '∞'}</span></div>
+                            <div className="flex justify-between pt-2 border-t border-[#E5E7EB]"><span className="text-[#6B7280]">Hook Rate</span><span className={getHookRateColor(ad.hook_rate_pct)}>{ad.hook_rate_pct != null ? `${Number(ad.hook_rate_pct).toFixed(1)}%` : '—'}</span></div>
+                            <div className="flex justify-between"><span className="text-[#6B7280]">Watch-Through (to 100%)</span><span className={getWatchThroughColor(ad.watch_through_pct)}>{ad.watch_through_pct != null ? `${Number(ad.watch_through_pct).toFixed(1)}%` : '—'}</span></div>
                           </div>
                         </div>
                       </div>
+                      {(ad.total_video_plays_3s ?? 0) > 0 && (
+                        <div className="mt-5 pt-4 border-t border-[#E5E7EB]">
+                          <p className="text-xs font-semibold text-[#6B7280] mb-3">VIDEO RETENTION FUNNEL</p>
+                          <ResponsiveContainer width="100%" height={120}>
+                            <BarChart data={[
+                              { name: '3-sec', value: ad.total_video_plays_3s ?? 0 },
+                              { name: '25%', value: ad.total_video_plays_25pct ?? 0 },
+                              { name: '50%', value: ad.total_video_plays_50pct ?? 0 },
+                              { name: '75%', value: ad.total_video_plays_75pct ?? 0 },
+                              { name: '100%', value: ad.total_video_plays_100pct ?? 0 },
+                            ]}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
+                              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                              <YAxis tick={{ fontSize: 11 }} />
+                              <Tooltip />
+                              <Bar dataKey="value" fill="#2563EB" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 )}
@@ -197,16 +245,30 @@ export default function AdCreatives() {
 
 function AdsSummary({ ads, loading }) {
   if (!ads?.length) return null
-  const best = [...ads].sort((a, b) => (a.cost_per_lead ?? 999) - (b.cost_per_lead ?? 999))[0]
-  const worst = [...ads].sort((a, b) => (b.cost_per_lead ?? 0) - (a.cost_per_lead ?? 0))[0]
+  const withCPL = ads.filter(a => a.cost_per_lead != null)
+  const best = withCPL.length ? [...withCPL].sort((a, b) => a.cost_per_lead - b.cost_per_lead)[0] : null
+  const worst = withCPL.length ? [...withCPL].sort((a, b) => b.cost_per_lead - a.cost_per_lead)[0] : null
   const highFreq = ads.filter(a => (a.avg_frequency ?? 0) > 1.5)
   const activeCount = ads.filter(a => a.status === 'active').length
+
+  // Hook rate analysis — only for ads with video data captured
+  const withHook = ads.filter(a => a.hook_rate_pct != null)
+  const killZone = withHook.filter(a => a.hook_rate_pct < 25)
+  const bestHook = withHook.length ? [...withHook].sort((a, b) => b.hook_rate_pct - a.hook_rate_pct)[0] : null
+
+  const hookSummary = !withHook.length
+    ? ''
+    : killZone.length > 0
+      ? `${killZone.length} creative${killZone.length !== 1 ? 's have' : ' has'} hook rate below the 25% kill threshold (${killZone.map(a => `${a.ad_name}: ${a.hook_rate_pct}%`).join(', ')}). `
+      : `Hook rates are healthy. Top performer: ${bestHook?.ad_name} at ${bestHook?.hook_rate_pct}%. `
+
   return (
     <AISummary loading={loading} summary={
       `You have ${activeCount} active ad${activeCount !== 1 ? 's' : ''} running this period. ` +
-      `${best?.ad_name} is your best performer with a CPL of AED ${Number(best?.cost_per_lead ?? 0).toFixed(0)}, ${(best?.cost_per_lead ?? 0) <= 85 ? 'within' : 'above'} the AED 85 target. ` +
-      `${worst?.ad_name !== best?.ad_name ? `${worst?.ad_name} has the highest CPL at AED ${Number(worst?.cost_per_lead ?? 0).toFixed(0)} — consider pausing it if performance doesn't improve. ` : ''}` +
-      `${highFreq.length > 0 ? `${highFreq.map(a => a.ad_name).join(', ')} ${highFreq.length === 1 ? 'has' : 'have'} frequency above 1.5 — watch for creative fatigue.` : 'All ads are within healthy frequency ranges.'}`
+      (best ? `${best.ad_name} is your best performer with a CPL of AED ${Number(best.cost_per_lead).toFixed(0)}, ${best.cost_per_lead <= 85 ? 'within' : 'above'} the AED 85 target. ` : '') +
+      (worst && worst.ad_name !== best?.ad_name ? `${worst.ad_name} has the highest CPL at AED ${Number(worst.cost_per_lead).toFixed(0)} — consider pausing it if performance doesn't improve. ` : '') +
+      hookSummary +
+      (highFreq.length > 0 ? `${highFreq.map(a => a.ad_name).join(', ')} ${highFreq.length === 1 ? 'has' : 'have'} frequency above 1.5 — watch for creative fatigue.` : 'All ads are within healthy frequency ranges.')
     } />
   )
 }
