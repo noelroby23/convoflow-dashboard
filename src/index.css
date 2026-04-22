@@ -1,0 +1,84 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Hide number input spinners */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type=number] { -moz-appearance: textfield; }
+
+:root {
+  --cf-pink: #EC4899;
+  --cf-dark: #0F0F1A;
+  --cf-text: #333333;
+  --cf-gray: #6B7280;
+  --cf-light-gray: #9CA3AF;
+  --cf-green: #16A34A;
+  --cf-red: #DC2626;
+  --cf-amber: #F59E0B;
+  --cf-blue: #2563EB;
+  --cf-bg: #FAFAFA;
+  --cf-card: #FFFFFF;
+  --cf-border: #E5E7EB;
+  --cf-subtle: #F3F4F6;
+  --cf-radius: 12px;
+  --cf-radius-sm: 8px;
+}
+
+* {
+  font-family: 'Outfit', sans-serif;
+}
+
+body {
+  background: var(--cf-bg);
+  color: var(--cf-text);
+}
+
+/* Skeleton animation */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 6px;
+}
+
+@media print {
+  body { background: white !important; font-size: 11px !important; }
+  .no-print { display: none !important; }
+  .print-expand { overflow: visible !important; max-height: none !important; }
+  nav, aside, header { display: none !important; }
+  main { margin-left: 0 !important; padding: 16px !important; }
+  .shadow-sm, .shadow-md { box-shadow: none !important; }
+  @page { margin: 1.2cm; size: A4 landscape; }
+
+  /* Force grids to 3 columns max so cards don't overflow */
+  .grid { display: grid !important; }
+  .grid-cols-6 { grid-template-columns: repeat(3, 1fr) !important; }
+  .grid-cols-4 { grid-template-columns: repeat(2, 1fr) !important; }
+  .grid-cols-3 { grid-template-columns: repeat(3, 1fr) !important; }
+  .grid-cols-2 { grid-template-columns: repeat(2, 1fr) !important; }
+
+  /* Scale down large number text so it fits in narrower cards */
+  .text-3xl { font-size: 1.4rem !important; }
+  .text-4xl { font-size: 1.6rem !important; }
+  .text-2xl { font-size: 1.2rem !important; }
+
+  /* Prevent any content from overflowing card boundaries */
+  * { overflow: visible !important; box-sizing: border-box !important; }
+  .rounded-xl, .rounded-lg { border-radius: 8px !important; }
+
+  /* Don't break cards across pages */
+  .bg-white.rounded-xl { break-inside: avoid !important; }
+
+  /* When printing the AI Report modal, hide everything except the modal */
+  body.printing-report > #root > * { display: none !important; }
+  body.printing-report .report-modal-overlay { display: flex !important; position: static !important; background: white !important; }
+  body.printing-report .report-modal-card { box-shadow: none !important; max-height: none !important; overflow: visible !important; }
+  body.printing-report .report-modal-footer { display: none !important; }
+}
