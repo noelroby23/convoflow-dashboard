@@ -21,7 +21,7 @@ const getPresetRange = (preset) => {
 export const useDashboard = create(
   persist(
     (set) => ({
-      currentClientId: 'convoflow-uk',
+      currentClientId: 'ca5a5257-9217-4d06-990e-b789cb233ac0',
       currentClientName: 'ConvoFlow UK',
       dateRange: { preset: 'last_7_days', ...getPresetRange('last_7_days') },
       refreshKey: 0,
@@ -40,7 +40,7 @@ export const useDashboard = create(
       closeReport: () => set({ isReportOpen: false }),
     }),
     {
-      name: 'convoflow-dashboard-store',
+      name: 'convoflow-dashboard-store-v2',
       partialize: (state) => ({ currentClientId: state.currentClientId, dateRange: state.dateRange }),
     }
   )
