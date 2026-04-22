@@ -59,23 +59,35 @@ export default function App() {
 
   const protectedSession = DEV_MODE ? true : session
 
+  // Routes. Aliases cover differences between Mark's Layout link paths and
+  // backend naming — any unknown path falls back to /overview via catch-all.
+  const routes = [
+    { path: '/home', component: <Overview /> },
+    { path: '/overview', component: <Overview /> },
+    { path: '/creative-performance', component: <AdCreatives /> },
+    { path: '/creatives', component: <AdCreatives /> },
+    { path: '/ad-creatives', component: <AdCreatives /> },
+    { path: '/sarahs-performance', component: <SarahsPerformance /> },
+    { path: '/sarah', component: <SarahsPerformance /> },
+    { path: '/sales-performance', component: <SalesPerformance /> },
+    { path: '/sales', component: <SalesPerformance /> },
+    { path: '/revenue', component: <Revenue /> },
+    { path: '/week-over-week', component: <Trends /> },
+    { path: '/trends', component: <Trends /> },
+    { path: '/target-progress', component: <Health /> },
+    { path: '/health', component: <Health /> },
+    { path: '/lead-tracker', component: <LeadTracker /> },
+    { path: '/leads', component: <LeadTracker /> },
+    { path: '/settings', component: <Settings /> },
+  ]
+
   return (
     <BrowserRouter>
       <ReportModal />
       <Routes>
-        <Route path="/login" element={(DEV_MODE || session) ? <Navigate to="/home" replace /> : <Login />} />
-        <Route path="/" element={<Navigate to="/home" replace />} />
-        {[
-          { path: '/home', component: <Overview /> },
-          { path: '/creative-performance', component: <AdCreatives /> },
-          { path: '/sarahs-performance', component: <SarahsPerformance /> },
-          { path: '/sales-performance', component: <SalesPerformance /> },
-          { path: '/revenue', component: <Revenue /> },
-          { path: '/week-over-week', component: <Trends /> },
-          { path: '/target-progress', component: <Health /> },
-          { path: '/lead-tracker', component: <LeadTracker /> },
-          { path: '/settings', component: <Settings /> },
-        ].map(({ path, component }) => (
+        <Route path="/login" element={(DEV_MODE || session) ? <Navigate to="/overview" replace /> : <Login />} />
+        <Route path="/" element={<Navigate to="/overview" replace />} />
+        {routes.map(({ path, component }) => (
           <Route
             key={path}
             path={path}
@@ -86,6 +98,8 @@ export default function App() {
             }
           />
         ))}
+        {/* Catch-all: prevents blank pages from any sidebar link mismatches */}
+        <Route path="*" element={<Navigate to="/overview" replace />} />
       </Routes>
     </BrowserRouter>
   )
