@@ -4,25 +4,70 @@ import Tabs from '../components/ui/Tabs'
 import ErrorBoundary from '../components/ui/ErrorBoundary'
 import AISummary from '../components/ui/AISummary'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
-import { mockSarahKPIs, mockCallOutcomes } from '../data/mockData'
 import { useDashboard } from '../store/dashboard'
 import { sarahReport } from '../lib/reports/generators'
+import { useFunnelByDate, useAllContacts } from '../hooks/useDashboardData'
 
-const DQ_REASONS = [
-  { reason: 'Budget too low', count: 11 },
-  { reason: 'Wrong timing', count: 6 },
-  { reason: 'Not ICP', count: 4 },
-  { reason: 'Already has solution', count: 3 },
-]
+const OUTCOME_COLORS = {
+  'Meeting Booked': '#16A34A',
+  'Showed Up': '#22C55E',
+  'No Show': '#F97316',
+  'Active / Proposal': '#2563EB',
+  'Disqualified': '#DC2626',
+  'Not Interested': '#9CA3AF',
+  'Wrong Number': '#D1D5DB',
+  'Follow Up': '#FBBF24',
+  'Callback': '#8B5CF6',
+}
 
 export default function SarahsPerformance() {
   const [activeTab, setActiveTab] = useState('overview')
   const setReportBuilder = useDashboard(s => s.setReportBuilder)
+  const { data: funnel, loading: funnelLoading } = useFunnelByDate()
+  const { data: contacts, loading: contactsLoading } = useAllContacts()
+
+  const meetingsBooked = funnel?.meetings_booked ?? 0
+  const showedUp = funnel?.showed_up ?? 0
+  const activeOpps = funnel?.active_opportunities ?? 0
+  const closedWon = funnel?.closed_won ?? 0
+
+  // Build real call outcome breakdown from contact stages
+  const stageCounts = {}
+  ;(contacts ?? []).forEach(c => {
+    const stage = c.current_stage
+    if (!stage) return
+    stageCounts[stage] = (stageCounts[stage] || 0) + 1
+  })
+
+  const outcomeData = [
+    { name: 'Meeting Booked', value: (stageCounts['meeting_booked'] || 0) },
+    { name: 'Showed Up', value: (stageCounts['showed'] || 0) },
+    { name: 'No Show', value: (stageCounts['no_show'] || 0) },
+    { name: 'Active / Proposal', value: (stageCounts['active'] || 0) + (stageCounts['closed_won'] || 0) },
+    { name: 'Disqualified', value: (stageCounts['disqualified'] || 0) },
+    { name: 'Not Interested', value: (stageCounts['not_interested'] || 0) },
+    { name: 'Wrong Number', value: (stageCounts['wrong_number'] || 0) },
+    { name: 'Follow Up', value: (stageCounts['follow_up'] || 0) + (stageCounts['contacted'] || 0) + (stageCounts['qualified_no_meeting'] || 0) },
+    { name: 'Callback', value: (stageCounts['callback'] || 0) },
+  ].filter(d => d.value > 0)
+
+  // Build real DQ reasons from contact dq_reason field
+  const dqMap = {}
+  ;(contacts ?? [])
+    .filter(c => c.current_stage === 'disqualified' && c.dq_reason)
+    .forEach(c => {
+      dqMap[c.dq_reason] = (dqMap[c.dq_reason] || 0) + 1
+    })
+  const dqReasons = Object.entries(dqMap)
+    .map(([reason, count]) => ({ reason, count }))
+    .sort((a, b) => b.count - a.count)
+
+  const loading = funnelLoading || contactsLoading
 
   useEffect(() => {
-    setReportBuilder(() => sarahReport(mockSarahKPIs, DQ_REASONS))
+    setReportBuilder(() => sarahReport({ meetingsBooked, showedUp, activeOpps }, dqReasons))
     return () => setReportBuilder(null)
-  }, [setReportBuilder])
+  }, [meetingsBooked, showedUp, activeOpps, setReportBuilder])
 
   return (
     <div>
@@ -40,56 +85,96 @@ export default function SarahsPerformance() {
           {/* KPI Cards */}
           <ErrorBoundary>
             <div className="grid grid-cols-4 gap-3 mb-6">
-              <KPICard label="Calls Attempted" value={mockSarahKPIs.callsAttempted} description="Total outbound call attempts Sarah made" />
-              <KPICard label="Calls Connected" value={mockSarahKPIs.callsConnected} description="Calls where Sarah actually reached the lead" />
-              <KPICard label="Qualified Rate" value={mockSarahKPIs.qualifiedRate} suffix="%" description="% of connected calls that were qualified" target={20} />
-              <KPICard label="Meetings Booked" value={mockSarahKPIs.meetingsBooked} description="Meetings Sarah booked from her calls" target={15} />
+              <KPICard
+                label="Calls Attempted"
+                value="—"
+                description="Call log integration coming soon"
+              />
+              <KPICard
+                label="Calls Connected"
+                value="—"
+                description="Call log integration coming soon"
+              />
+              <KPICard
+                label="Meetings Booked"
+                value={meetingsBooked}
+                loading={funnelLoading}
+                description="Meetings Sarah booked from her calls"
+                target={15}
+              />
+              <KPICard
+                label="Showed Up"
+                value={showedUp}
+                loading={funnelLoading}
+                description="Leads who attended their booked meeting"
+                target={Math.round(meetingsBooked * 0.75)}
+              />
             </div>
           </ErrorBoundary>
 
-          {/* Outcome breakdown */}
+          {/* Call Outcome Breakdown */}
           <ErrorBoundary>
             <div className="bg-white rounded-xl border border-[#E5E7EB] p-6 shadow-sm mb-6">
-              <h2 className="text-sm font-bold text-[#0F0F1A] mb-4">Call Outcome Breakdown</h2>
-              <ResponsiveContainer width="100%" height={280}>
-                <PieChart>
-                  <Pie
-                    data={mockCallOutcomes}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={70}
-                    outerRadius={110}
-                    dataKey="value"
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    labelLine={false}
-                  >
-                    {mockCallOutcomes.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
+              <h2 className="text-sm font-bold text-[#0F0F1A] mb-4">Lead Outcome Breakdown</h2>
+              {contactsLoading ? (
+                <div className="skeleton h-64 w-full" />
+              ) : outcomeData.length === 0 ? (
+                <p className="text-sm text-[#9CA3AF] text-center py-12">No contact data available yet.</p>
+              ) : (
+                <ResponsiveContainer width="100%" height={280}>
+                  <PieChart>
+                    <Pie
+                      data={outcomeData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={70}
+                      outerRadius={110}
+                      dataKey="value"
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      labelLine={false}
+                    >
+                      {outcomeData.map((entry, i) => (
+                        <Cell key={i} fill={OUTCOME_COLORS[entry.name] || '#E5E7EB'} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(v, name) => [v, name]} />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </ErrorBoundary>
 
-          {/* DQ reasons */}
+          {/* DQ Reasons */}
           <ErrorBoundary>
             <div className="bg-white rounded-xl border border-[#E5E7EB] p-6 shadow-sm">
               <h2 className="text-sm font-bold text-[#0F0F1A] mb-4">Disqualification Reasons</h2>
-              {DQ_REASONS.map(({ reason, count }) => (
-                <div key={reason} className="flex items-center justify-between py-2 border-b border-[#F3F4F6] last:border-0">
-                  <span className="text-sm text-[#333333]">{reason}</span>
-                  <span className="text-sm font-semibold text-[#DC2626]">{count}</span>
-                </div>
-              ))}
+              {contactsLoading ? (
+                <div className="space-y-3">{[...Array(3)].map((_, i) => <div key={i} className="skeleton h-8 w-full" />)}</div>
+              ) : dqReasons.length === 0 ? (
+                <p className="text-sm text-[#9CA3AF] text-center py-6">No disqualified leads with recorded reasons yet.</p>
+              ) : (
+                dqReasons.map(({ reason, count }) => (
+                  <div key={reason} className="flex items-center justify-between py-2 border-b border-[#F3F4F6] last:border-0">
+                    <span className="text-sm text-[#333333]">{reason}</span>
+                    <span className="text-sm font-semibold text-[#DC2626]">{count}</span>
+                  </div>
+                ))
+              )}
             </div>
           </ErrorBoundary>
 
-          <AISummary summary={
-            `Sarah attempted ${mockSarahKPIs.callsAttempted} calls this period, connecting with ${mockSarahKPIs.callsConnected} leads — a connection rate of ${((mockSarahKPIs.callsConnected / mockSarahKPIs.callsAttempted) * 100).toFixed(0)}%. ` +
-            `Of those connected, ${mockSarahKPIs.qualifiedRate}% were qualified, resulting in ${mockSarahKPIs.meetingsBooked} meetings booked. ` +
-            `The top disqualification reason is budget — 11 leads were disqualified for being under budget. ` +
-            `${mockSarahKPIs.qualifiedRate >= 20 ? 'Qualified rate is on target.' : 'Qualified rate is below the 20% target — review Sarah\'s qualification script.'}`
-          } />
+          <AISummary
+            loading={loading}
+            summary={
+              `Sarah booked ${meetingsBooked} meetings this period, of which ${showedUp} showed up — a show rate of ${meetingsBooked > 0 ? ((showedUp / meetingsBooked) * 100).toFixed(0) : 0}%. ` +
+              `${meetingsBooked >= 15 ? 'Meetings are on target.' : `Meetings are below the target of 15 — ${15 - meetingsBooked} more needed.`} ` +
+              `${activeOpps} opportunities are currently active in the pipeline. ` +
+              (dqReasons.length > 0
+                ? `Top disqualification reason: ${dqReasons[0].reason} (${dqReasons[0].count} leads). `
+                : '') +
+              `Call-level metrics (attempts, connection rate, qualified rate) will be available once VAPI call log integration is complete.`
+            }
+          />
         </>
       )}
 
