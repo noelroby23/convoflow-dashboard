@@ -1,5 +1,13 @@
 import { formatReport, metricStatus } from './buildReport'
 
+function formatDashboardValue(value) {
+  if (value === null || value === undefined) return '—'
+  if (typeof value !== 'number') return value
+  if (value >= 1000) return value.toLocaleString('en-US', { maximumFractionDigits: 0 })
+  if (Number.isInteger(value)) return value.toString()
+  return value.toFixed(1)
+}
+
 // ─── Home / Overview ────────────────────────────────────────────────────────
 export function homeReport(funnel, pipeline) {
   const leads = funnel?.total_leads ?? 0
@@ -14,28 +22,32 @@ export function homeReport(funnel, pipeline) {
   const meetingRate = funnel?.meeting_rate ?? (leads > 0 ? +((meetings / leads) * 100).toFixed(1) : 0)
   const roas = funnel?.roas ?? (spend > 0 ? +(revenue / spend).toFixed(1) : 0)
   const pipelineValue = funnel?.pipeline_value ?? 0
+  const cplDisplay = formatDashboardValue(cpl)
+  const showRateDisplay = formatDashboardValue(showRate)
+  const meetingRateDisplay = formatDashboardValue(meetingRate)
+  const roasDisplay = formatDashboardValue(roas)
 
   const recommendations = []
-  if (cpl > 85) recommendations.push(`CPL is AED ${cpl} — pause ads with CPL above AED 120 and increase budget on best performers.`)
-  if (showRate < 75 && showRate > 0) recommendations.push(`Show rate is ${showRate}% against a 75% target — add WhatsApp reminders 24h and 1h before each meeting.`)
-  if (roas < 4 && closed > 0) recommendations.push(`ROAS is ${roas}x against a 4x target — prioritise closing the ${active} active opportunities in the pipeline.`)
+  if (cpl > 85) recommendations.push(`CPL is AED ${cplDisplay} — pause ads with CPL above AED 120 and increase budget on best performers.`)
+  if (showRate < 75 && showRate > 0) recommendations.push(`Show rate is ${showRateDisplay}% against a 75% target — add WhatsApp reminders 24h and 1h before each meeting.`)
+  if (roas < 4 && closed > 0) recommendations.push(`ROAS is ${roasDisplay}x against a 4x target — prioritise closing the ${active} active opportunities in the pipeline.`)
   if (active > 0) recommendations.push(`${active} active opportunities worth AED ${pipelineValue.toLocaleString()} — follow up within 24h to keep deals warm.`)
   if (recommendations.length === 0) recommendations.push('Performance is on track. Continue current strategy and monitor CPL daily.')
 
   return formatReport({
     title: 'Home — Performance Overview',
-    summary: `This period you generated ${leads} leads at AED ${cpl} CPL against a target of AED 85. Sarah booked ${meetings} meetings of which ${showed} showed up — a show rate of ${showRate}%. ${active} opportunities are active in the pipeline worth AED ${pipelineValue.toLocaleString()}. ${closed > 0 ? `You closed ${closed} deal${closed > 1 ? 's' : ''} generating AED ${revenue.toLocaleString()} in revenue and a ROAS of ${roas}x.` : 'No deals have closed yet — focus on progressing active opportunities to improve ROAS.'}`,
+    summary: `This period you generated ${leads} leads at AED ${cplDisplay} CPL against a target of AED 85. Sarah booked ${meetings} meetings of which ${showed} showed up — a show rate of ${showRateDisplay}%. ${active} opportunities are active in the pipeline worth AED ${pipelineValue.toLocaleString()}. ${closed > 0 ? `You closed ${closed} deal${closed > 1 ? 's' : ''} generating AED ${revenue.toLocaleString()} in revenue and a ROAS of ${roasDisplay}x.` : 'No deals have closed yet — focus on progressing active opportunities to improve ROAS.'}`,
     metrics: [
       { label: 'Total Leads', value: leads, target: 100, unit: '', status: metricStatus(leads, 100) },
-      { label: 'CPL', value: `AED ${cpl}`, target: 85, prefix: 'AED ', status: metricStatus(cpl, 85, true) },
+      { label: 'CPL', value: `AED ${cplDisplay}`, target: 85, prefix: 'AED ', status: metricStatus(cpl, 85, true) },
       { label: 'Meetings Booked', value: meetings, target: 15, status: metricStatus(meetings, 15) },
-      { label: 'Show Rate', value: `${showRate}%`, target: 75, status: metricStatus(showRate, 75) },
-      { label: 'Meeting Rate', value: `${meetingRate}%`, target: 18, status: metricStatus(meetingRate, 18) },
-      { label: 'ROAS', value: `${roas}x`, target: 4, status: metricStatus(roas, 4) },
+      { label: 'Show Rate', value: `${showRateDisplay}%`, target: 75, status: metricStatus(showRate, 75) },
+      { label: 'Meeting Rate', value: `${meetingRateDisplay}%`, target: 18, status: metricStatus(meetingRate, 18) },
+      { label: 'ROAS', value: `${roasDisplay}x`, target: 4, status: metricStatus(roas, 4) },
     ],
     insights: [
-      cpl > 85 ? { severity: 'critical', text: `CPL of AED ${cpl} is above the AED 85 target` } : { severity: 'info', text: `CPL of AED ${cpl} is within target` },
-      showRate > 0 && showRate < 75 ? { severity: 'warning', text: `Show rate of ${showRate}% is below the 75% target` } : null,
+      cpl > 85 ? { severity: 'critical', text: `CPL of AED ${cplDisplay} is above the AED 85 target` } : { severity: 'info', text: `CPL of AED ${cplDisplay} is within target` },
+      showRate > 0 && showRate < 75 ? { severity: 'warning', text: `Show rate of ${showRateDisplay}% is below the 75% target` } : null,
       active > 0 ? { severity: 'info', text: `${active} active opportunities — total pipeline value AED ${pipelineValue.toLocaleString()}` } : null,
       pipeline?.length > 0 ? { severity: 'info', text: `${pipeline.length} leads currently in the active pipeline table` } : null,
     ].filter(Boolean),

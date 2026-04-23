@@ -28,8 +28,10 @@ export default function InsightsFeed({ insights = [] }) {
   const [flashingIdx, setFlashingIdx] = useState(null)
   const flashCount = useRef(0)
   const flashTimer = useRef(null)
-
   const visible = insights.filter((_, i) => !dismissed.includes(i))
+
+  useEffect(() => () => { if (flashTimer.current) clearInterval(flashTimer.current) }, [])
+
   if (visible.length === 0) return null
 
   const startFlash = (i) => {
@@ -47,23 +49,24 @@ export default function InsightsFeed({ insights = [] }) {
     }, 180)
   }
 
-  useEffect(() => () => { if (flashTimer.current) clearInterval(flashTimer.current) }, [])
-
   return (
     <div className="flex flex-wrap gap-2 mb-6">
       {visible.map((insight, i) => {
         const isFlashing = flashingIdx === i
+        const severity = insight.severity in colors ? insight.severity : 'info'
+        const message = insight.title ?? insight.text ?? 'Insight available'
+
         return (
           <div
             key={i}
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium cursor-pointer transition-colors duration-100 ${colors[insight.severity]} ${isFlashing ? `${flashBg} text-white border-red-500` : bgColors[insight.severity]}`}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium cursor-pointer transition-colors duration-100 ${colors[severity]} ${isFlashing ? `${flashBg} text-white border-red-500` : bgColors[severity]}`}
             onClick={() => {
               startFlash(i)
               if (insight.href) setTimeout(() => navigate(insight.href), 600)
             }}
           >
-            {icons[insight.severity]}
-            <span>{insight.title}</span>
+            {icons[severity]}
+            <span>{message}</span>
             <button
               className="ml-1 opacity-60 hover:opacity-100"
               onClick={(e) => { e.stopPropagation(); setDismissed([...dismissed, i]) }}

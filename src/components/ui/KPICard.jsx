@@ -1,6 +1,24 @@
 import { TrendingUp, TrendingDown, Minus, ChevronDown, ChevronUp } from 'lucide-react'
 import { useState } from 'react'
 
+function getTargetStatus(value, target, inverse) {
+  if (target === null) {
+    return {
+      onTarget: null,
+      borderColor: '#E5E7EB',
+      statusColor: '#16A34A',
+    }
+  }
+
+  const onTarget = inverse ? value <= target : value >= target
+
+  return {
+    onTarget,
+    borderColor: onTarget ? '#16A34A' : '#DC2626',
+    statusColor: onTarget ? '#16A34A' : '#DC2626',
+  }
+}
+
 export default function KPICard({
   label,
   value,
@@ -16,7 +34,6 @@ export default function KPICard({
   onClick = null,
   loading = false,
   empty = false,
-  successTone = 'green',
 }) {
   const [showRec, setShowRec] = useState(false)
 
@@ -39,13 +56,7 @@ export default function KPICard({
     )
   }
 
-  // Determine if on target
-  const onTarget = target !== null
-    ? (inverse ? value <= target : value >= target)
-    : null
-
-  const successColor = successTone === 'red' ? '#EF4444' : '#16A34A'
-  const borderColor = onTarget === null ? '#E5E7EB' : onTarget ? successColor : '#DC2626'
+  const { onTarget, borderColor, statusColor } = getTargetStatus(value, target, inverse)
 
   // Trend direction: positive outcome = green, negative outcome = red
   // For inverse metrics (costs): going down is good, going up is bad
@@ -90,7 +101,7 @@ export default function KPICard({
         <p className="text-xs text-[#6B7280]">
           Target: {prefix}{typeof target === 'number' && target >= 1000 ? target.toLocaleString() : target}{suffix}
           {onTarget
-            ? <span className="ml-1 font-medium" style={{ color: successColor }}>✓ On track</span>
+            ? <span className="ml-1 font-medium" style={{ color: statusColor }}>✓ On track</span>
             : <span className="ml-1 text-[#DC2626] font-medium">✗ Off target</span>
           }
         </p>
