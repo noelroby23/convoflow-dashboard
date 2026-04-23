@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
-import { useFunnelByDate, useContactDetails } from '../hooks/useDashboardData'
+import { useContactDetails, useTargets } from '../hooks/useDashboardData'
+import { useDashboardOverview } from '../hooks/useDashboardOverview'
 import KPICard from '../components/ui/KPICard'
 import InsightsFeed from '../components/ui/InsightsFeed'
 import Funnel from '../components/ui/Funnel'
@@ -12,36 +13,44 @@ import { homeReport } from '../lib/reports/generators'
 
 export default function Overview() {
   const navigate = useNavigate()
+  const dateRange = useDashboard(s => s.dateRange)
   const setReportBuilder = useDashboard(s => s.setReportBuilder)
-  const { data: funnel, loading: funnelLoading } = useFunnelByDate()
+  const { data: overview, loading: overviewLoading } = useDashboardOverview(dateRange.from, dateRange.to)
+  const { data: targets } = useTargets()
   const { data: activePipeline, loading: pipelineLoading } = useContactDetails(['active', 'proposal_sent', 'follow_up_meeting', 'meeting_booked'])
 
   useEffect(() => {
-    setReportBuilder(() => homeReport(funnel, activePipeline))
+    setReportBuilder(() => homeReport(overview, activePipeline))
     return () => setReportBuilder(null)
-  }, [funnel, activePipeline, setReportBuilder])
+  }, [overview, activePipeline, setReportBuilder])
 
-  // Derived calculations
-  const totalLeads = funnel?.total_leads ?? 0
-  const meetingsBooked = funnel?.meetings_booked ?? 0
-  const showedUp = funnel?.showed_up ?? 0
-  const activeOpps = funnel?.active_opportunities ?? 0
-  const closedWon = funnel?.closed_won ?? 0
-  const totalSpend = funnel?.total_spend ?? 0
-  const closedRevenue = funnel?.closed_revenue ?? 0
-
-  const cpl = totalLeads > 0 ? +(totalSpend / totalLeads).toFixed(1) : 0
-  const costPerMeeting = meetingsBooked > 0 ? +(totalSpend / meetingsBooked).toFixed(1) : 0
-  const costPerActive = activeOpps > 0 ? +(totalSpend / activeOpps).toFixed(1) : 0
-  const showRate = (meetingsBooked > 0) ? +((showedUp / meetingsBooked) * 100).toFixed(1) : 0
-  const meetingRate = (totalLeads > 0) ? +((meetingsBooked / totalLeads) * 100).toFixed(1) : 0
-  const roas = totalSpend > 0 ? +(closedRevenue / totalSpend).toFixed(1) : 0
+  const totalLeads = overview?.total_leads ?? 0
+  const meetingsBooked = overview?.meetings_booked ?? 0
+  const showedUp = overview?.showed_up ?? 0
+  const activeOpps = overview?.active_opportunities ?? 0
+  const closedWon = overview?.closed_won ?? 0
+  const totalSpend = overview?.total_spend ?? 0
+  const closedRevenue = overview?.closed_revenue ?? 0
+  const cpl = overview?.cost_per_lead ?? 0
+  const costPerMeeting = overview?.cost_per_meeting ?? 0
+  const costPerActive = overview?.cost_per_active ?? 0
+  const showRate = overview?.show_rate ?? 0
+  const meetingRate = overview?.meeting_rate ?? 0
+  const roas = overview?.roas ?? 0
+  const cplTarget = targets?.cpl_target ?? 85
+  const costPerMeetingTarget = targets?.cost_per_meeting ?? 600
+  const costPerActiveTarget = targets?.cost_per_active ?? 1200
+  const showRateTarget = targets?.show_rate ?? 75
+  const meetingRateTarget = targets?.meeting_rate ?? 18
+  const roasTarget = targets?.roas_target ?? 4
+  const formattedSpend = Number(totalSpend).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const formattedCpl = Number(cpl).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
   // Build insights dynamically
   const insights = []
-  if (cpl > 85) insights.push({ severity: 'critical', title: `CPL is AED ${cpl} — above AED 85 target`, href: '/creative-performance' })
-  if (showRate < 75 && showRate > 0) insights.push({ severity: 'warning', title: `Show rate at ${showRate}% — target is 75%`, href: '/sales-performance' })
-  if (activeOpps > 0) insights.push({ severity: 'info', title: `${activeOpps} active opportunities — total value AED ${(funnel?.pipeline_value ?? 0).toLocaleString()}`, href: '/revenue' })
+  if (cpl > cplTarget) insights.push({ severity: 'critical', title: `CPL is AED ${formattedCpl} — above AED ${cplTarget} target`, href: '/creative-performance' })
+  if (showRate < showRateTarget && showRate > 0) insights.push({ severity: 'warning', title: `Show rate at ${showRate}% — target is ${showRateTarget}%`, href: '/sales-performance' })
+  if (activeOpps > 0) insights.push({ severity: 'info', title: `${activeOpps} active opportunities — total value AED ${(overview?.pipeline_value ?? 0).toLocaleString()}`, href: '/revenue' })
 
   return (
     <div>
@@ -52,31 +61,31 @@ export default function Overview() {
       <h2 className="text-xs font-semibold uppercase tracking-wide text-[#6B7280] mb-3">Volume</h2>
       <ErrorBoundary>
         <div className="grid grid-cols-6 gap-3 mb-6">
-          <KPICard label="Total Spend" value={totalSpend} prefix="AED " inverse={true} loading={funnelLoading} description="What you spent on ads this period" />
-          <KPICard label="Total Leads" value={totalLeads} loading={funnelLoading} description="People who raised their hand interested in you" />
-          <KPICard label="Meetings Booked" value={meetingsBooked} loading={funnelLoading} description="Sales conversations Sarah booked" />
-          <KPICard label="Showed Up" value={showedUp} loading={funnelLoading} description="People who actually attended their meeting" />
-          <KPICard label="Active Opportunities" value={activeOpps} loading={funnelLoading} description="Leads your sales team is currently working" />
-          <KPICard label="Closed Won" value={closedWon} loading={funnelLoading} description="New customers who signed and paid" />
+          <KPICard label="Total Spend" value={totalSpend} prefix="AED " decimals={2} inverse={true} loading={overviewLoading} description="What you spent on ads this period" />
+          <KPICard label="Total Leads" value={totalLeads} loading={overviewLoading} description="People who raised their hand interested in you" />
+          <KPICard label="Meetings Booked" value={meetingsBooked} loading={overviewLoading} description="Sales conversations Sarah booked" />
+          <KPICard label="Showed Up" value={showedUp} loading={overviewLoading} description="People who actually attended their meeting" />
+          <KPICard label="Active Opportunities" value={activeOpps} loading={overviewLoading} description="Leads your sales team is currently working" />
+          <KPICard label="Closed Won" value={closedWon} loading={overviewLoading} description="New customers who signed and paid" />
         </div>
       </ErrorBoundary>
 
       <h2 className="text-xs font-semibold uppercase tracking-wide text-[#6B7280] mb-3">Unit Economics</h2>
       <ErrorBoundary>
         <div className="grid grid-cols-6 gap-3 mb-6">
-          <KPICard label="Cost per Lead" value={cpl} prefix="AED " inverse={true} loading={funnelLoading} description="What each interested person costs you" target={85} recommendation="If CPL is above target, pause underperforming ads." />
-          <KPICard label="Cost per Meeting" value={costPerMeeting} prefix="AED " inverse={true} loading={funnelLoading} description="What each booked sales conversation costs you" target={600} />
-          <KPICard label="Cost per Active Opp" value={costPerActive} prefix="AED " inverse={true} loading={funnelLoading} description="What it costs to get each real engaged buyer" target={1200} />
-          <KPICard label="Show Rate" value={showRate} suffix="%" loading={funnelLoading} description="Out of 10 booked meetings, how many show up" target={75} recommendation="Add WhatsApp reminders 24h and 1h before meetings." />
-          <KPICard label="Meeting Rate" value={meetingRate} suffix="%" loading={funnelLoading} description="Out of 100 interested people, how many book" target={18} />
-          <KPICard label="ROAS" value={roas} suffix="x" loading={funnelLoading} description="For every AED spent, how many you make back" target={4} recommendation="Close active opportunities to improve ROAS." />
+          <KPICard label="Cost per Lead" value={cpl} prefix="AED " decimals={2} inverse={true} loading={overviewLoading} description="What each interested person costs you" target={cplTarget} recommendation="If CPL is above target, pause underperforming ads." successTone="red" />
+          <KPICard label="Cost per Meeting" value={costPerMeeting} prefix="AED " decimals={2} inverse={true} loading={overviewLoading} description="What each booked sales conversation costs you" target={costPerMeetingTarget} successTone="red" />
+          <KPICard label="Cost per Active Opp" value={costPerActive} prefix="AED " decimals={2} inverse={true} loading={overviewLoading} description="What it costs to get each real engaged buyer" target={costPerActiveTarget} successTone="red" />
+          <KPICard label="Show Rate" value={showRate} suffix="%" loading={overviewLoading} description="Out of 10 booked meetings, how many show up" target={showRateTarget} recommendation="Add WhatsApp reminders 24h and 1h before meetings." successTone="red" />
+          <KPICard label="Meeting Rate" value={meetingRate} suffix="%" loading={overviewLoading} description="Out of 100 interested people, how many book" target={meetingRateTarget} successTone="red" />
+          <KPICard label="ROAS" value={roas} suffix="x" loading={overviewLoading} description="For every AED spent, how many you make back" target={roasTarget} recommendation="Close active opportunities to improve ROAS." successTone="red" />
         </div>
       </ErrorBoundary>
 
       <ErrorBoundary>
         <div className="bg-white rounded-xl border border-[#E5E7EB] p-6 shadow-sm mb-6">
           <h2 className="text-sm font-bold text-[#0F0F1A] mb-4">Pipeline Funnel</h2>
-          <Funnel data={funnel} loading={funnelLoading} />
+          <Funnel data={overview} loading={overviewLoading} />
         </div>
       </ErrorBoundary>
 
@@ -102,7 +111,7 @@ export default function Overview() {
                   <tr key={lead.contact_id} className="border-b border-[#F3F4F6] hover:bg-[#FAFAFA] cursor-pointer" onClick={() => navigate('/lead-tracker')}>
                     <td className="py-3 pr-4 font-medium text-[#0F0F1A]">{lead.full_name}</td>
                     <td className="py-3 pr-4 text-[#6B7280]">{lead.company || '—'}</td>
-                    <td className="py-3 pr-4"><StatusBadge stage={lead.current_stage} /></td>
+                    <td className="py-3 pr-4"><StatusBadge stage={lead.current_stage} successTone="red" /></td>
                     <td className="py-3 pr-4 text-[#6B7280]">{lead.source_ad || '—'}</td>
                     <td className="py-3 pr-4 text-[#6B7280]">{lead.created_at ? new Date(lead.created_at).toLocaleDateString() : '—'}</td>
                     <td className="py-3 font-medium text-[#0F0F1A]">{lead.deal_value ? `AED ${Number(lead.deal_value).toLocaleString()}` : '—'}</td>
@@ -114,12 +123,12 @@ export default function Overview() {
         </div>
       </ErrorBoundary>
       <AISummary summary={
-        `This period you generated ${totalLeads} leads at a cost of AED ${cpl} per lead, against a target of AED 85. ` +
+        `This period you spent AED ${formattedSpend} and generated ${totalLeads} leads at a cost of AED ${formattedCpl} per lead, against a target of AED ${cplTarget}. ` +
         `Sarah booked ${meetingsBooked} meetings, of which ${showedUp} showed up — a show rate of ${showRate}%. ` +
-        `${activeOpps} opportunities are currently active in the pipeline with a total value of AED ${(funnel?.pipeline_value ?? 0).toLocaleString()}. ` +
+        `${activeOpps} opportunities are currently active in the pipeline with a total value of AED ${(overview?.pipeline_value ?? 0).toLocaleString()}. ` +
         `${closedWon > 0 ? `You closed ${closedWon} deal${closedWon > 1 ? 's' : ''}, generating AED ${closedRevenue.toLocaleString()} in revenue and a ROAS of ${roas}x.` : 'No deals have closed yet this period — focus on progressing active opportunities.'}` +
-        (showRate > 0 && showRate < 75 ? ` Show rate is below the 75% target — consider adding WhatsApp reminders before meetings.` : '')
-      } loading={funnelLoading} />
+        (showRate > 0 && showRate < showRateTarget ? ` Show rate is below the ${showRateTarget}% target — consider adding WhatsApp reminders before meetings.` : '')
+      } loading={overviewLoading} />
     </div>
   )
 }

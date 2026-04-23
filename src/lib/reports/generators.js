@@ -9,10 +9,10 @@ export function homeReport(funnel, pipeline) {
   const closed = funnel?.closed_won ?? 0
   const spend = funnel?.total_spend ?? 0
   const revenue = funnel?.closed_revenue ?? 0
-  const cpl = leads > 0 ? +(spend / leads).toFixed(1) : 0
-  const showRate = meetings > 0 ? +((showed / meetings) * 100).toFixed(1) : 0
-  const meetingRate = leads > 0 ? +((meetings / leads) * 100).toFixed(1) : 0
-  const roas = spend > 0 ? +(revenue / spend).toFixed(1) : 0
+  const cpl = funnel?.cost_per_lead ?? (leads > 0 ? +(spend / leads).toFixed(1) : 0)
+  const showRate = funnel?.show_rate ?? (meetings > 0 ? +((showed / meetings) * 100).toFixed(1) : 0)
+  const meetingRate = funnel?.meeting_rate ?? (leads > 0 ? +((meetings / leads) * 100).toFixed(1) : 0)
+  const roas = funnel?.roas ?? (spend > 0 ? +(revenue / spend).toFixed(1) : 0)
   const pipelineValue = funnel?.pipeline_value ?? 0
 
   const recommendations = []
