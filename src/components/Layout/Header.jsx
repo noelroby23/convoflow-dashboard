@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useDashboard } from '../../store/dashboard'
 import { FileDown, RefreshCw } from 'lucide-react'
+import { toast } from 'sonner'
+import { triggerRefresh } from '../../lib/triggerRefresh'
 
 const pageTitles = {
   '/home': 'Home',
@@ -28,12 +30,43 @@ export default function Header() {
   const title = pageTitles[location.pathname] || 'Dashboard'
   const isSettings = location.pathname === '/settings'
   const showDatePresets = location.pathname === '/home' || location.pathname === '/week-over-week'
-  const [spinning, setSpinning] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
 
-  const handleRefresh = () => {
-    setSpinning(true)
-    refresh()
-    setTimeout(() => setSpinning(false), 800)
+  const handleRefresh = async () => {
+    setRefreshing(true)
+
+    try {
+      const { ok, data } = await triggerRefresh('all')
+      const refreshStatus = data?.status
+
+      if (!ok) {
+        toast.error(`Refresh failed: ${data?.error || 'Unknown error'}`)
+        return
+      }
+
+      if (refreshStatus === 'accepted') {
+        toast.success('Refreshing data from Meta and GHL...')
+        await new Promise(resolve => setTimeout(resolve, 8000))
+        refresh()
+        toast.success('Data updated')
+        return
+      }
+
+      if (refreshStatus === 'partial') {
+        toast.warning('Partial refresh — some sources failed')
+        refresh()
+        return
+      }
+
+      if (refreshStatus === 'duplicate_recent_request') {
+        toast.info('Just refreshed, please wait a minute before trying again')
+        return
+      }
+
+      toast.error(`Refresh failed: ${data?.error || 'Unknown error'}`)
+    } finally {
+      setRefreshing(false)
+    }
   }
 
   return (
@@ -63,9 +96,10 @@ export default function Header() {
           <>
             <button
               onClick={handleRefresh}
-              className="no-print flex items-center gap-1.5 px-3 py-1.5 text-xs border border-[#E5E7EB] rounded-lg text-[#6B7280] hover:bg-[#F3F4F6] transition-colors"
+              disabled={refreshing}
+              className="no-print flex items-center gap-1.5 px-3 py-1.5 text-xs border border-[#E5E7EB] rounded-lg text-[#6B7280] hover:bg-[#F3F4F6] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <RefreshCw size={13} className={spinning ? 'animate-spin' : ''} />
+              <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} />
               Refresh
             </button>
             <button

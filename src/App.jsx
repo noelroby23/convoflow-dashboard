@@ -14,6 +14,7 @@ import SarahsPerformance from './pages/SarahsPerformance'
 import SalesPerformance from './pages/SalesPerformance'
 import Revenue from './pages/Revenue'
 import ReportModal from './components/ui/ReportModal'
+import { Toaster } from 'sonner'
 
 function ProtectedRoute({ session, children }) {
   if (session === null) return <Navigate to="/login" replace />
@@ -83,6 +84,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <Toaster richColors position="top-right" />
       <ReportModal />
       <Routes>
         <Route path="/login" element={(DEV_MODE || session) ? <Navigate to="/overview" replace /> : <Login />} />
