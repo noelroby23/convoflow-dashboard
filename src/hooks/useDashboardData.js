@@ -54,6 +54,8 @@ const fallbackDailyMetrics = mockTrendsData.map(d => ({
 }))
 
 const getDateRangeDays = (from, to) => {
+  if (!from || !to) return []
+
   const days = []
   const start = new Date(`${from}T00:00:00Z`)
   const end = new Date(`${to}T00:00:00Z`)
@@ -162,6 +164,10 @@ export function useTrendMetricsByDate() {
   const { currentClientId, dateRange, refreshKey } = useDashboard()
   return useSupabaseQuery(
     async () => {
+      if (!dateRange.from || !dateRange.to || !currentClientId) {
+        return { data: [], error: null }
+      }
+
       const days = getDateRangeDays(dateRange.from, dateRange.to)
 
       // TODO(n8n WF2): add ghl_created_at: body.dateAdded || null in the
