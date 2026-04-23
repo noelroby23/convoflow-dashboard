@@ -15,6 +15,7 @@ import SalesPerformance from './pages/SalesPerformance'
 import Revenue from './pages/Revenue'
 import ReportModal from './components/ui/ReportModal'
 import { Toaster } from 'sonner'
+import { DailyAISummaryProvider } from './context/DailyAISummaryContext'
 
 function ProtectedRoute({ session, children }) {
   if (session === null) return <Navigate to="/login" replace />
@@ -83,26 +84,28 @@ export default function App() {
   ]
 
   return (
-    <BrowserRouter>
-      <Toaster richColors position="top-right" />
-      <ReportModal />
-      <Routes>
-        <Route path="/login" element={(DEV_MODE || session) ? <Navigate to="/overview" replace /> : <Login />} />
-        <Route path="/" element={<Navigate to="/overview" replace />} />
-        {routes.map(({ path, component }) => (
-          <Route
-            key={path}
-            path={path}
-            element={
-              <ProtectedRoute session={protectedSession}>
-                <Layout onLogout={handleLogout}>{component}</Layout>
-              </ProtectedRoute>
-            }
-          />
-        ))}
-        {/* Catch-all: prevents blank pages from any sidebar link mismatches */}
-        <Route path="*" element={<Navigate to="/overview" replace />} />
-      </Routes>
-    </BrowserRouter>
+    <DailyAISummaryProvider>
+      <BrowserRouter>
+        <Toaster richColors position="top-right" />
+        <ReportModal />
+        <Routes>
+          <Route path="/login" element={(DEV_MODE || session) ? <Navigate to="/overview" replace /> : <Login />} />
+          <Route path="/" element={<Navigate to="/overview" replace />} />
+          {routes.map(({ path, component }) => (
+            <Route
+              key={path}
+              path={path}
+              element={
+                <ProtectedRoute session={protectedSession}>
+                  <Layout onLogout={handleLogout}>{component}</Layout>
+                </ProtectedRoute>
+              }
+            />
+          ))}
+          {/* Catch-all: prevents blank pages from any sidebar link mismatches */}
+          <Route path="*" element={<Navigate to="/overview" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </DailyAISummaryProvider>
   )
 }

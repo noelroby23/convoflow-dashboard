@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Save, RefreshCw, Bell, Users, Target } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useDashboard } from '../store/dashboard'
+import { useDailyAISummary } from '../context/DailyAISummaryContext'
 
 // Maps UI labels to normalized target metric_name keys in Supabase.
 // These metric_names match what the backend (n8n alerts, reports) expects.
@@ -44,11 +45,20 @@ const alertRules = [
   { id: 'sync_fail', label: 'Sync failure', description: 'Alert on any data source sync failure' },
 ]
 
-function Toggle({ defaultOn = true }) {
-  const [on, setOn] = useState(defaultOn)
+function Toggle({ defaultOn = true, checked, onChange }) {
+  const [internalOn, setInternalOn] = useState(defaultOn)
+  const isControlled = checked !== undefined
+  const on = isControlled ? checked : internalOn
+
+  const handleToggle = () => {
+    const next = !on
+    if (!isControlled) setInternalOn(next)
+    onChange?.(next)
+  }
+
   return (
     <button
-      onClick={() => setOn(!on)}
+      onClick={handleToggle}
       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${on ? 'bg-[#EC4899]' : 'bg-[#E5E7EB]'}`}
     >
       <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-6' : 'translate-x-1'}`} />
@@ -58,6 +68,7 @@ function Toggle({ defaultOn = true }) {
 
 export default function Settings() {
   const { currentClientId } = useDashboard()
+  const { isEnabled, setIsEnabled } = useDailyAISummary()
   const [targets, setTargets] = useState(defaultTargets)
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -143,6 +154,16 @@ export default function Settings() {
               </div>
             ))}
           </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm border border-[#E5E7EB] overflow-hidden">
+        <div className="px-6 py-4 border-b border-[#E5E7EB] flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-[#0F0F1A]">Daily AI Summary Popup</h2>
+            <p className="mt-1 text-sm text-[#6B7280]">Show yesterday&apos;s key metrics when the dashboard first opens.</p>
+          </div>
+          <Toggle checked={isEnabled} onChange={setIsEnabled} />
         </div>
       </div>
 

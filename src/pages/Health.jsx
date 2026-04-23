@@ -11,13 +11,18 @@ export default function Health() {
   const setReportBuilder = useDashboard(s => s.setReportBuilder)
 
   const closedRevenue = data?.closed_revenue ?? 0
+  const leadsTarget = targets?.monthly_leads ?? 100
+  const meetingsTarget = targets?.monthly_meetings ?? 30
+  const showRateTarget = targets?.show_rate ?? 75
+  const closesTarget = targets?.monthly_closes ?? 4
+  const revenueTarget = targets?.monthly_revenue ?? (closesTarget * 10000)
 
   const metrics = [
-    { label: 'Total Leads',     actual: data?.total_leads ?? 0,     target: targets?.monthly_leads ?? 100 },
-    { label: 'Meetings Booked', actual: data?.meetings_booked ?? 0, target: targets?.monthly_meetings ?? 30 },
-    { label: 'Showed Up',       actual: data?.showed_up ?? 0,       target: Math.round((targets?.monthly_meetings ?? 30) * ((targets?.show_rate ?? 75) / 100)) },
-    { label: 'Closed Won',      actual: data?.closed_won ?? 0,      target: targets?.monthly_closes ?? 4 },
-    { label: 'Revenue (AED)',   actual: closedRevenue,              target: targets?.monthly_revenue ?? 96000, isCurrency: true },
+    { label: 'Total Leads',     actual: data?.total_leads ?? 0,     target: leadsTarget },
+    { label: 'Meetings Booked', actual: data?.meetings_booked ?? 0, target: meetingsTarget },
+    { label: 'Showed Up',       actual: data?.showed_up ?? 0,       target: Math.round(meetingsTarget * (showRateTarget / 100)) },
+    { label: 'Closed Won',      actual: data?.closed_won ?? 0,      target: closesTarget },
+    { label: 'Revenue (AED)',   actual: closedRevenue,              target: revenueTarget, isCurrency: true },
   ]
 
   const scores = metrics.filter(m => !m.isCurrency).map(m => Math.min((m.actual / m.target) * 100, 100))
@@ -28,9 +33,15 @@ export default function Health() {
     : { label: 'RED', color: '#DC2626', bg: 'bg-red-100 text-red-700' }
 
   useEffect(() => {
-    setReportBuilder(() => healthReport(data, healthScore, healthStatus))
+    setReportBuilder(() => healthReport(data, healthScore, healthStatus, {
+      total_leads: leadsTarget,
+      meetings_booked: meetingsTarget,
+      showed_up: Math.round(meetingsTarget * (showRateTarget / 100)),
+      closed_won: closesTarget,
+      revenue: revenueTarget,
+    }))
     return () => setReportBuilder(null)
-  }, [data, healthScore, setReportBuilder])
+  }, [data, healthScore, healthStatus, leadsTarget, meetingsTarget, showRateTarget, closesTarget, revenueTarget, setReportBuilder])
 
   const churnRisk = healthScore >= 80 ? { label: 'LOW', bg: 'bg-green-100 text-green-700' }
     : healthScore >= 60 ? { label: 'MEDIUM', bg: 'bg-amber-100 text-amber-700' }

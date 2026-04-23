@@ -7,6 +7,7 @@ import Funnel from '../components/ui/Funnel'
 import ErrorBoundary from '../components/ui/ErrorBoundary'
 import StatusBadge from '../components/ui/StatusBadge'
 import AISummary from '../components/ui/AISummary'
+import DailyAISummaryModal from '../components/ui/DailyAISummaryModal'
 import { useNavigate } from 'react-router-dom'
 import { useDashboard } from '../store/dashboard'
 import { homeReport } from '../lib/reports/generators'
@@ -54,6 +55,8 @@ export default function Overview() {
 
   return (
     <div>
+      <DailyAISummaryModal />
+
       <ErrorBoundary>
         <InsightsFeed insights={insights} />
       </ErrorBoundary>

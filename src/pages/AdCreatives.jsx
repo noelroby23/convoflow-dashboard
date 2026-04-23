@@ -21,21 +21,55 @@ const FILTER_CHIPS = [
 function classifyAd(ad) {
   const cpl = Number(ad.cost_per_lead ?? 0)
   const leads = Number(ad.total_leads ?? 0)
-  const freq = Number(ad.avg_frequency ?? 0)
-  const hook = ad.hook_rate_pct != null ? Number(ad.hook_rate_pct) : null
-  const isActive = ad.status === 'active'
+  const spend = Number(ad.total_spend ?? 0)
+  const isActive = getAdStatusDisplay(ad.status).label === 'ACTIVE'
 
-  // Best: active, CPL <= 85, has leads
-  if (isActive && cpl > 0 && cpl <= 85 && leads > 0) return 'best'
-  // Immediate action: active but CPL way above target or hook rate in kill zone
-  if (isActive && ((cpl > 150 && leads > 0) || (hook != null && hook < 25))) return 'action'
-  // Needs removal: inactive, zero leads, spent money
-  if (!isActive && leads === 0 && Number(ad.total_spend ?? 0) > 0) return 'removal'
-  // Needs revamp: active, CPL 85-150, or freq > 2
-  if (isActive && ((cpl > 85 && cpl <= 150) || freq > 2.0)) return 'revamp'
-  // Worst: active, highest CPL with leads but not qualifying for action
-  if (isActive && cpl > 150 && leads > 0) return 'worst'
+  if (spend > 300 && leads === 0) return 'action'
+  if (spend > 200 && leads === 0 && !isActive) return 'removal'
+  if (leads > 0 && cpl <= 85) return 'best'
+  if (leads > 0 && cpl > 200) return 'worst'
+  if (leads > 0 && cpl > 85 && cpl <= 200) return 'revamp'
+
   return null
+}
+
+function getAdStatusDisplay(status) {
+  const normalized = String(status ?? '').trim().toUpperCase()
+
+  if (normalized === 'ACTIVE') {
+    return {
+      label: 'ACTIVE',
+      badge: 'bg-green-100 text-green-700',
+      dot: 'bg-green-500',
+      isActive: true,
+    }
+  }
+
+  return {
+    label: 'OFF',
+    badge: 'bg-gray-100 text-gray-500',
+    dot: 'bg-gray-400',
+    isActive: false,
+  }
+}
+
+function getHookRateValue(ad) {
+  return ad.hook_rate_pct ?? ad.hook_rate ?? null
+}
+
+function getWatchThroughValue(ad) {
+  return ad.watch_through_pct ?? ad.watch_through_rate ?? null
+}
+
+function formatDecimal(value, digits = 2) {
+  if (value == null) return '—'
+  return Number(value).toFixed(digits)
+}
+
+function matchesFilter(ad, filterId) {
+  if (filterId === 'all') return true
+  if (filterId === 'active') return getAdStatusDisplay(ad.status).isActive
+  return classifyAd(ad) === filterId
 }
 
 export default function AdCreatives() {
@@ -63,16 +97,12 @@ export default function AdCreatives() {
   }) : []
 
   const filtered = sorted.filter(ad => {
-    if (activeFilter === 'all') return true
-    if (activeFilter === 'active') return ad.status === 'active'
-    return classifyAd(ad) === activeFilter
+    return matchesFilter(ad, activeFilter)
   })
 
   // Count per filter for badge numbers
   const counts = ads ? FILTER_CHIPS.reduce((acc, chip) => {
-    if (chip.id === 'all') acc[chip.id] = ads.length
-    else if (chip.id === 'active') acc[chip.id] = ads.filter(a => a.status === 'active').length
-    else acc[chip.id] = ads.filter(a => classifyAd(a) === chip.id).length
+    acc[chip.id] = ads.filter(a => matchesFilter(a, chip.id)).length
     return acc
   }, {}) : {}
 
@@ -156,15 +186,13 @@ export default function AdCreatives() {
         {FILTER_CHIPS.map(chip => (
           <button
             key={chip.id}
-            onClick={() => setActiveFilter(chip.id)}
+            onClick={() => setActiveFilter(current => current === chip.id ? 'all' : chip.id)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${chip.color} ${activeFilter === chip.id ? 'shadow-sm ring-2 ring-offset-1 ring-current opacity-100' : 'opacity-70 hover:opacity-100'}`}
           >
             {chip.label}
-            {counts[chip.id] != null && counts[chip.id] > 0 && (
-              <span className="ml-0.5 bg-current bg-opacity-20 rounded-full px-1.5 py-0.5 text-[10px] font-bold">
-                {counts[chip.id]}
-              </span>
-            )}
+            <span className="ml-0.5 bg-current bg-opacity-20 rounded-full px-1.5 py-0.5 text-[10px] font-bold">
+              {counts[chip.id] ?? 0}
+            </span>
           </button>
         ))}
         <button onClick={handleExport} className="ml-auto flex items-center gap-2 px-3 py-1.5 text-sm border border-[#E5E7EB] rounded-lg text-[#6B7280] hover:bg-[#F3F4F6] transition-colors">
@@ -193,6 +221,9 @@ export default function AdCreatives() {
             <tbody>
               {filtered.map((ad) => {
                 const classification = classifyAd(ad)
+                const statusDisplay = getAdStatusDisplay(ad.status)
+                const hookRate = getHookRateValue(ad)
+                const watchThrough = getWatchThroughValue(ad)
                 const rowAccent = classification === 'action' ? 'border-l-2 border-l-red-400' :
                                   classification === 'best' ? 'border-l-2 border-l-green-400' :
                                   classification === 'revamp' ? 'border-l-2 border-l-purple-400' : ''
@@ -200,7 +231,7 @@ export default function AdCreatives() {
                   <>
                     <tr
                       key={ad.ad_id}
-                      className={`border-t border-[#F3F4F6] hover:bg-[#FAFAFA] cursor-pointer transition-colors ${ad.status === 'paused' ? 'opacity-60' : ''} ${rowAccent}`}
+                      className={`border-t border-[#F3F4F6] hover:bg-[#FAFAFA] cursor-pointer transition-colors ${!statusDisplay.isActive ? 'opacity-60' : ''} ${rowAccent}`}
                       onClick={() => setExpandedId(expandedId === ad.ad_id ? null : ad.ad_id)}
                     >
                       <td className="px-4 py-3 font-medium text-[#0F0F1A]">
@@ -213,9 +244,9 @@ export default function AdCreatives() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${ad.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${ad.status === 'active' ? 'bg-green-500' : 'bg-gray-400'}`} />
-                          {ad.status === 'active' ? 'ACTIVE' : 'OFF'}
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusDisplay.badge}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${statusDisplay.dot}`} />
+                          {statusDisplay.label}
                         </span>
                       </td>
                       <td className="px-4 py-3">{ad.total_spend ? `AED ${Number(ad.total_spend).toLocaleString()}` : '—'}</td>
@@ -227,10 +258,10 @@ export default function AdCreatives() {
                         {ad.active_opportunities ?? '—'}
                       </td>
                       <td className="px-4 py-3">{ad.cost_per_active ? `AED ${Number(ad.cost_per_active).toFixed(0)}` : '∞'}</td>
-                      <td className={`px-4 py-3 ${getFreqColor(ad.avg_frequency)}`}>{ad.avg_frequency ? Number(ad.avg_frequency).toFixed(2) : '—'}</td>
-                      <td className="px-4 py-3">{ad.avg_ctr ? `${Number(ad.avg_ctr).toFixed(2)}%` : '—'}</td>
-                      <td className={`px-4 py-3 ${getHookRateColor(ad.hook_rate_pct)}`}>{ad.hook_rate_pct != null ? `${Number(ad.hook_rate_pct).toFixed(1)}%` : '—'}</td>
-                      <td className={`px-4 py-3 ${getWatchThroughColor(ad.watch_through_pct)}`}>{ad.watch_through_pct != null ? `${Number(ad.watch_through_pct).toFixed(1)}%` : '—'}</td>
+                      <td className={`px-4 py-3 ${getFreqColor(ad.avg_frequency)}`}>{formatDecimal(ad.avg_frequency)}</td>
+                      <td className="px-4 py-3">{ad.avg_ctr != null ? `${formatDecimal(ad.avg_ctr)}%` : '—'}</td>
+                      <td className={`px-4 py-3 ${getHookRateColor(hookRate)}`}>{hookRate != null ? `${formatDecimal(hookRate)}%` : '—'}</td>
+                      <td className={`px-4 py-3 ${getWatchThroughColor(watchThrough)}`}>{watchThrough != null ? `${formatDecimal(watchThrough)}%` : '—'}</td>
                       <td className="px-4 py-3 text-[#6B7280]">
                         {expandedId === ad.ad_id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                       </td>
@@ -261,12 +292,12 @@ export default function AdCreatives() {
                               <p className="text-xs font-semibold text-[#6B7280] mb-3">AD DETAILS</p>
                               <div className="space-y-2 text-sm">
                                 <div className="flex justify-between"><span className="text-[#6B7280]">Total Impressions</span><span className="font-medium">{ad.total_impressions ? Number(ad.total_impressions).toLocaleString() : '—'}</span></div>
-                                <div className="flex justify-between"><span className="text-[#6B7280]">Avg Frequency</span><span className={getFreqColor(ad.avg_frequency)}>{ad.avg_frequency ? Number(ad.avg_frequency).toFixed(2) : '—'}</span></div>
-                                <div className="flex justify-between"><span className="text-[#6B7280]">CTR</span><span className="font-medium">{ad.avg_ctr ? `${Number(ad.avg_ctr).toFixed(2)}%` : '—'}</span></div>
+                                <div className="flex justify-between"><span className="text-[#6B7280]">Avg Frequency</span><span className={getFreqColor(ad.avg_frequency)}>{formatDecimal(ad.avg_frequency)}</span></div>
+                                <div className="flex justify-between"><span className="text-[#6B7280]">CTR</span><span className="font-medium">{ad.avg_ctr != null ? `${formatDecimal(ad.avg_ctr)}%` : '—'}</span></div>
                                 <div className="flex justify-between"><span className="text-[#6B7280]">Cost per Lead</span><span className={getCPLColor(ad.cost_per_lead)}>{ad.cost_per_lead ? `AED ${Number(ad.cost_per_lead).toFixed(0)}` : '—'}</span></div>
                                 <div className="flex justify-between"><span className="text-[#6B7280]">Cost per Active</span><span className="font-medium">{ad.cost_per_active ? `AED ${Number(ad.cost_per_active).toFixed(0)}` : '∞'}</span></div>
-                                <div className="flex justify-between pt-2 border-t border-[#E5E7EB]"><span className="text-[#6B7280]">Hook Rate</span><span className={getHookRateColor(ad.hook_rate_pct)}>{ad.hook_rate_pct != null ? `${Number(ad.hook_rate_pct).toFixed(1)}%` : '—'}</span></div>
-                                <div className="flex justify-between"><span className="text-[#6B7280]">Watch-Through</span><span className={getWatchThroughColor(ad.watch_through_pct)}>{ad.watch_through_pct != null ? `${Number(ad.watch_through_pct).toFixed(1)}%` : '—'}</span></div>
+                                <div className="flex justify-between pt-2 border-t border-[#E5E7EB]"><span className="text-[#6B7280]">Hook Rate</span><span className={getHookRateColor(hookRate)}>{hookRate != null ? `${formatDecimal(hookRate)}%` : '—'}</span></div>
+                                <div className="flex justify-between"><span className="text-[#6B7280]">Watch-Through</span><span className={getWatchThroughColor(watchThrough)}>{watchThrough != null ? `${formatDecimal(watchThrough)}%` : '—'}</span></div>
                               </div>
                             </div>
                           </div>

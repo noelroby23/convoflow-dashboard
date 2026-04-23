@@ -234,8 +234,15 @@ export function trendsReport(chartData, ads) {
 }
 
 // ─── Health / Target Progress ────────────────────────────────────────────────
-export function healthReport(data, healthScore, healthStatus) {
-  const TARGETS = { total_leads: 100, meetings_booked: 15, showed_up: 12, closed_won: 2, revenue: 96000 }
+export function healthReport(data, healthScore, healthStatus, targets = {}) {
+  const TARGETS = {
+    total_leads: 100,
+    meetings_booked: 15,
+    showed_up: 12,
+    closed_won: 2,
+    revenue: 40000,
+    ...targets,
+  }
   const leads = data?.total_leads ?? 0
   const meetings = data?.meetings_booked ?? 0
   const showed = data?.showed_up ?? 0

@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
-import { useAllContacts } from '../hooks/useDashboardData'
+import { useLeadTrackerContacts } from '../hooks/useDashboardData'
 import { useDashboard } from '../store/dashboard'
 import { leadsReport } from '../lib/reports/generators'
-import StatusBadge from '../components/ui/StatusBadge'
 import ErrorBoundary from '../components/ui/ErrorBoundary'
 import AudioTranscriptViewer from '../components/ui/AudioTranscriptViewer'
 import { ChevronDown, ChevronUp, Search, Download, Layers, Megaphone, Flame } from 'lucide-react'
@@ -40,8 +39,73 @@ const PRIORITY_FILTERS = [
   { id: 'cold',      label: '❄️ Cold' },
 ]
 
+const STAGE_FILTERS = [
+  { id: 'all', label: 'All Stages' },
+  { id: 'meeting_booked', label: 'Meeting Booked' },
+  { id: 'showed_up', label: 'Showed Up' },
+  { id: 'active_opportunities', label: 'Active Opportunities' },
+  { id: 'closed_won', label: 'Closed Won' },
+  { id: 'closed_lost', label: 'Closed Lost' },
+  { id: 'no_show', label: 'No Show' },
+  { id: 'contacted', label: 'Contacted' },
+  { id: 'follow_up', label: 'Follow Up' },
+  { id: 'callback', label: 'Callback' },
+  { id: 'qualified_no_meeting', label: 'Qualified No Meeting' },
+  { id: 'disqualified', label: 'Disqualified' },
+  { id: 'not_interested', label: 'Not Interested' },
+  { id: 'wrong_number', label: 'Wrong Number' },
+]
+
+function applyFunnelFilter(data, filter) {
+  switch (filter) {
+    case 'all':
+      return data
+    case 'meeting_booked':
+      return data.filter(c => c.funnel_meeting_booked)
+    case 'showed_up':
+      return data.filter(c => c.funnel_showed_up)
+    case 'active_opportunities':
+      return data.filter(c => c.funnel_active_opp)
+    case 'closed_won':
+      return data.filter(c => c.funnel_closed_won)
+    case 'closed_lost':
+      return data.filter(c => c.funnel_closed_lost)
+    case 'no_show':
+      return data.filter(c => c.funnel_no_show)
+    case 'contacted':
+    case 'follow_up':
+    case 'callback':
+    case 'qualified_no_meeting':
+    case 'disqualified':
+    case 'not_interested':
+    case 'wrong_number':
+      return data.filter(c => c.current_stage === filter)
+    default:
+      return data
+  }
+}
+
+function getStageCounts(data) {
+  return {
+    all: data.length,
+    meeting_booked: data.filter(c => c.funnel_meeting_booked).length,
+    showed_up: data.filter(c => c.funnel_showed_up).length,
+    active_opportunities: data.filter(c => c.funnel_active_opp).length,
+    closed_won: data.filter(c => c.funnel_closed_won).length,
+    closed_lost: data.filter(c => c.funnel_closed_lost).length,
+    no_show: data.filter(c => c.funnel_no_show).length,
+    contacted: data.filter(c => c.current_stage === 'contacted').length,
+    follow_up: data.filter(c => c.current_stage === 'follow_up').length,
+    callback: data.filter(c => c.current_stage === 'callback').length,
+    qualified_no_meeting: data.filter(c => c.current_stage === 'qualified_no_meeting').length,
+    disqualified: data.filter(c => c.current_stage === 'disqualified').length,
+    not_interested: data.filter(c => c.current_stage === 'not_interested').length,
+    wrong_number: data.filter(c => c.current_stage === 'wrong_number').length,
+  }
+}
+
 export default function LeadTracker() {
-  const { data: contacts, loading } = useAllContacts()
+  const { data: contacts, loading } = useLeadTrackerContacts()
   const setReportBuilder = useDashboard(s => s.setReportBuilder)
   const [expandedId, setExpandedId] = useState(null)
   const [stageFilter, setStageFilter] = useState('all')
@@ -55,15 +119,14 @@ export default function LeadTracker() {
     return () => setReportBuilder(null)
   }, [contacts, setReportBuilder])
 
-  const uniqueAds = contacts ? [...new Set(contacts.map(c => c.source_ad).filter(Boolean))] : []
-  const uniqueStages = contacts ? [...new Set(contacts.map(c => c.current_stage).filter(Boolean))] : []
+  const uniqueAds = contacts ? [...new Set(contacts.map(c => c.ad_name || c.source_ad).filter(Boolean))] : []
+  const stageCounts = contacts ? getStageCounts(contacts) : {}
 
-  let filtered = (contacts ?? []).filter(c => {
-    const matchStage = stageFilter === 'all' || c.current_stage === stageFilter
-    const matchAd = adFilter === 'all' || c.source_ad === adFilter
+  let filtered = applyFunnelFilter(contacts ?? [], stageFilter).filter(c => {
+    const matchAd = adFilter === 'all' || (c.ad_name || c.source_ad) === adFilter
     const matchPriority = priorityFilter === 'all' || getPriority(c) === priorityFilter
     const matchSearch = !search || [c.full_name, c.email, c.company, c.phone].some(f => f?.toLowerCase().includes(search.toLowerCase()))
-    return matchStage && matchAd && matchPriority && matchSearch
+    return matchAd && matchPriority && matchSearch
   })
 
   if (sortByPriority) {
@@ -129,7 +192,9 @@ export default function LeadTracker() {
           <select value={stageFilter} onChange={e => setStageFilter(e.target.value)}
             className={`appearance-none text-sm font-medium rounded-lg pl-9 pr-8 py-2 cursor-pointer transition-all focus:outline-none ${stageFilter !== 'all' ? 'border border-[#EC4899] bg-pink-50 text-[#EC4899]' : 'border border-[#E5E7EB] bg-white text-[#333333] hover:border-[#9CA3AF]'}`}>
             <option value="all">All Stages</option>
-            {uniqueStages.map(s => <option key={s} value={s}>{formatStage(s)}</option>)}
+            {STAGE_FILTERS.filter(s => s.id !== 'all').map(stage => (
+              <option key={stage.id} value={stage.id}>{stage.label} ({stageCounts[stage.id] ?? 0})</option>
+            ))}
           </select>
         </div>
         <div className="relative">
@@ -145,8 +210,8 @@ export default function LeadTracker() {
         <button
           onClick={() => exportCsv(filtered.map(c => ({
             'Name': c.full_name, 'Company': c.company, 'Email': c.email, 'Phone': c.phone,
-            'Stage': c.current_stage, 'Priority': getPriority(c), 'Source Ad': c.source_ad,
-            'Date': c.created_at, 'Quality Score': c.lead_quality_score, 'Deal Value': c.deal_value,
+            'Stage': c.stage_label || formatStage(c.current_stage), 'Priority': getPriority(c), 'Source Ad': c.ad_name || c.source_ad,
+            'Date': c.ghl_created_at || c.created_at, 'Quality Score': c.lead_quality_score, 'Deal Value': c.deal_value,
             'Meeting Date': c.meeting_date, 'Follow-up Attempts': c.follow_up_attempts,
             'Assigned To': c.assigned_to, 'DQ Reason': c.dq_reason, 'Call Summary': c.call_summary,
           })), 'leads')}
@@ -188,15 +253,19 @@ export default function LeadTracker() {
                     key={contact.contact_id}
                     className={`border-t border-[#F3F4F6] hover:bg-[#FAFAFA] cursor-pointer ${priority === 'immediate' ? 'border-l-2 border-l-red-400' : ''}`}
                     onClick={() => setExpandedId(expandedId === contact.contact_id ? null : contact.contact_id)}
-                  >
-                    <td className="px-4 py-3 font-medium text-[#0F0F1A]">{contact.full_name}</td>
-                    <td className="px-4 py-3 text-[#6B7280]">{contact.company || '—'}</td>
-                    <td className="px-4 py-3 text-[#6B7280]">{contact.source_ad || '—'}</td>
-                    <td className="px-4 py-3 text-[#6B7280]">{contact.created_at ? new Date(contact.created_at).toLocaleDateString() : '—'}</td>
-                    <td className="px-4 py-3"><StatusBadge stage={contact.current_stage} /></td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${priorityConfig.color}`}>
-                        {priorityConfig.label}
+                    >
+                      <td className="px-4 py-3 font-medium text-[#0F0F1A]">{contact.full_name}</td>
+                      <td className="px-4 py-3 text-[#6B7280]">{contact.company || '—'}</td>
+                      <td className="px-4 py-3 text-[#6B7280]">{contact.ad_name || contact.source_ad || '—'}</td>
+                      <td className="px-4 py-3 text-[#6B7280]">{(contact.ghl_created_at || contact.created_at) ? new Date(contact.ghl_created_at || contact.created_at).toLocaleDateString() : '—'}</td>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#F3F4F6] text-[#374151]">
+                          {contact.stage_label || formatStage(contact.current_stage) || 'Unknown'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${priorityConfig.color}`}>
+                          {priorityConfig.label}
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -220,6 +289,7 @@ export default function LeadTracker() {
                             <div className="flex justify-between"><span className="text-[#6B7280]">Phone</span><span>{contact.phone || '—'}</span></div>
                             <div className="flex justify-between"><span className="text-[#6B7280]">Meeting Date</span><span>{contact.meeting_date ? new Date(contact.meeting_date).toLocaleDateString() : '—'}</span></div>
                             <div className="flex justify-between"><span className="text-[#6B7280]">Deal Value</span><span className="font-medium">{contact.deal_value ? `AED ${Number(contact.deal_value).toLocaleString()}` : '—'}</span></div>
+                            <div className="flex justify-between"><span className="text-[#6B7280]">Pipeline</span><span>{contact.ghl_pipeline_name || '—'}</span></div>
                             <div className="flex justify-between"><span className="text-[#6B7280]">Follow-up Attempts</span><span>{contact.follow_up_attempts ?? '—'}</span></div>
                             <div className="flex justify-between"><span className="text-[#6B7280]">Assigned To</span><span>{contact.assigned_to || '—'}</span></div>
                             {contact.dq_reason && <div className="flex justify-between"><span className="text-[#6B7280]">DQ Reason</span><span className="text-[#DC2626]">{contact.dq_reason}</span></div>}

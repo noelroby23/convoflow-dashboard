@@ -43,6 +43,7 @@ export default function SarahsPerformance() {
   const meetingsBooked = funnel?.meetings_booked ?? 0
   const showedUp = funnel?.showed_up ?? 0
   const activeOpps = funnel?.active_opportunities ?? 0
+  const totalContacts = contacts?.length ?? 0
 
   // Real outcome breakdown from all contact stages
   const stageCounts = {}
@@ -61,6 +62,11 @@ export default function SarahsPerformance() {
     { name: 'Follow Up',         value: (stageCounts['follow_up'] || 0) + (stageCounts['contacted'] || 0) + (stageCounts['qualified_no_meeting'] || 0) },
     { name: 'Callback',          value: stageCounts['callback'] || 0 },
   ].filter(d => d.value > 0)
+
+  const disqualifiedCount = stageCounts['disqualified'] || 0
+  const notInterestedCount = stageCounts['not_interested'] || 0
+  const disqualifiedPct = totalContacts > 0 ? Math.round((disqualifiedCount / totalContacts) * 100) : 0
+  const notInterestedPct = totalContacts > 0 ? Math.round((notInterestedCount / totalContacts) * 100) : 0
 
   // Real DQ reasons from contact dq_reason field
   const dqMap = {}
@@ -89,11 +95,13 @@ export default function SarahsPerformance() {
       {activeTab === 'overview' && (
         <>
           <ErrorBoundary>
-            <div className="grid grid-cols-4 gap-3 mb-6">
+            <div className="grid grid-cols-6 gap-3 mb-6">
               <KPICard label="Calls Attempted" value="—" description="Call log integration coming soon" />
               <KPICard label="Calls Connected" value="—" description="Call log integration coming soon" />
               <KPICard label="Meetings Booked" value={meetingsBooked} loading={funnelLoading} description="Total meetings Sarah booked" target={15} />
               <KPICard label="Showed Up" value={showedUp} loading={funnelLoading} description="Leads who attended their meeting" target={Math.round(meetingsBooked * 0.75)} />
+              <KPICard label="Not Interested" value={notInterestedCount} loading={contactsLoading} description={`${notInterestedPct}% of leads were qualified but chose not to proceed.`} inverse={true} />
+              <KPICard label="Disqualified" value={disqualifiedCount} loading={contactsLoading} description={`${disqualifiedPct}% of leads did not meet fit criteria.`} inverse={true} />
             </div>
           </ErrorBoundary>
 

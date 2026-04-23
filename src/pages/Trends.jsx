@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useDailyMetrics, useAdPerformance } from '../hooks/useDashboardData'
+import { useTrendMetricsByDate, useAdPerformance } from '../hooks/useDashboardData'
 import ErrorBoundary from '../components/ui/ErrorBoundary'
 import AISummary from '../components/ui/AISummary'
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
@@ -10,12 +10,12 @@ import { trendsReport } from '../lib/reports/generators'
 const FREQ_CEILING = 2.5
 
 export default function Trends() {
-  const { data: metrics, loading } = useDailyMetrics()
+  const { data: metrics, loading } = useTrendMetricsByDate()
   const { data: ads } = useAdPerformance()
   const setReportBuilder = useDashboard(s => s.setReportBuilder)
 
   const chartData = (metrics ?? []).map(d => ({
-    date: format(new Date(d.date), 'MMM d'),
+    date: format(new Date(`${d.date}T00:00:00Z`), 'MMM d'),
     spend: Number(d.spend ?? 0),
     leads: Number(d.leads ?? 0),
     cpl: d.leads > 0 ? +(d.spend / d.leads).toFixed(1) : 0,
@@ -28,7 +28,7 @@ export default function Trends() {
   const weeklyData = (() => {
     const weeks = {}
     chartData.forEach(d => {
-      const weekKey = format(startOfWeek(new Date(d.rawDate), { weekStartsOn: 1 }), 'MMM d')
+      const weekKey = format(startOfWeek(new Date(`${d.rawDate}T00:00:00Z`), { weekStartsOn: 1 }), 'MMM d')
       if (!weeks[weekKey]) weeks[weekKey] = { week: weekKey, spend: 0, leads: 0, meetings: 0, frequency: [], days: 0 }
       weeks[weekKey].spend += d.spend
       weeks[weekKey].leads += d.leads
@@ -36,12 +36,14 @@ export default function Trends() {
       weeks[weekKey].frequency.push(d.frequency)
       weeks[weekKey].days++
     })
-    return Object.values(weeks).map(w => ({
-      ...w,
-      cpl: w.leads > 0 ? +(w.spend / w.leads).toFixed(0) : null,
-      costPerMeeting: w.meetings > 0 ? +(w.spend / w.meetings).toFixed(0) : null,
-      avgFrequency: w.frequency.length ? +(w.frequency.reduce((a, b) => a + b, 0) / w.frequency.length).toFixed(2) : null,
-    }))
+    return Object.values(weeks)
+      .map(w => ({
+        ...w,
+        cpl: w.leads > 0 ? +(w.spend / w.leads).toFixed(0) : null,
+        costPerMeeting: w.meetings > 0 ? +(w.spend / w.meetings).toFixed(0) : null,
+        avgFrequency: w.frequency.length ? +(w.frequency.reduce((a, b) => a + b, 0) / w.frequency.length).toFixed(2) : null,
+      }))
+      .filter(w => w.spend > 0 || w.leads > 0 || w.meetings > 0 || (w.avgFrequency ?? 0) > 0)
   })()
 
   useEffect(() => {
