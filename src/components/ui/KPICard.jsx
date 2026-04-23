@@ -6,6 +6,7 @@ export default function KPICard({
   value,
   prefix = '',
   suffix = '',
+  decimals = null,
   target = null,
   inverse = false,
   trend = null,
@@ -15,6 +16,7 @@ export default function KPICard({
   onClick = null,
   loading = false,
   empty = false,
+  successTone = 'green',
 }) {
   const [showRec, setShowRec] = useState(false)
 
@@ -42,7 +44,8 @@ export default function KPICard({
     ? (inverse ? value <= target : value >= target)
     : null
 
-  const borderColor = onTarget === null ? '#E5E7EB' : onTarget ? '#16A34A' : '#DC2626'
+  const successColor = successTone === 'red' ? '#EF4444' : '#16A34A'
+  const borderColor = onTarget === null ? '#E5E7EB' : onTarget ? successColor : '#DC2626'
 
   // Trend direction: positive outcome = green, negative outcome = red
   // For inverse metrics (costs): going down is good, going up is bad
@@ -53,6 +56,12 @@ export default function KPICard({
   const formatValue = (v) => {
     if (v === null || v === undefined) return '—'
     if (typeof v === 'number') {
+      if (typeof decimals === 'number') {
+        return v.toLocaleString('en-US', {
+          minimumFractionDigits: decimals,
+          maximumFractionDigits: decimals,
+        })
+      }
       if (v >= 1000) return v.toLocaleString('en-US', { maximumFractionDigits: 0 })
       if (Number.isInteger(v)) return v.toString()
       return v.toFixed(1)
@@ -81,7 +90,7 @@ export default function KPICard({
         <p className="text-xs text-[#6B7280]">
           Target: {prefix}{typeof target === 'number' && target >= 1000 ? target.toLocaleString() : target}{suffix}
           {onTarget
-            ? <span className="ml-1 text-[#16A34A] font-medium">✓ On track</span>
+            ? <span className="ml-1 font-medium" style={{ color: successColor }}>✓ On track</span>
             : <span className="ml-1 text-[#DC2626] font-medium">✗ Off target</span>
           }
         </p>

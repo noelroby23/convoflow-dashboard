@@ -10,10 +10,18 @@ const stageConfig = {
   closed_won: { label: 'Closed Won', classes: 'bg-green-100 text-green-800' },
 }
 
-export default function StatusBadge({ stage }) {
+export default function StatusBadge({ stage, successTone = 'green' }) {
   const config = stageConfig[stage] || { label: stage, classes: 'bg-gray-100 text-gray-600' }
+  const classes = successTone === 'red'
+    ? config.classes.replace(/bg-green-100|text-green-700|text-green-800/g, (token) => {
+        if (token === 'bg-green-100') return 'bg-red-100'
+        if (token === 'text-green-700') return 'text-red-700'
+        return 'text-red-800'
+      })
+    : config.classes
+
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.classes}`}>
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${classes}`}>
       {config.label}
     </span>
   )
