@@ -427,9 +427,11 @@ export default function AdCreatives() {
                     {expandedId === ad.ad_id && (
                       <tr key={`${ad.ad_id}-expanded`} className="border-t border-[#F3F4F6] bg-[#FAFAFA]">
                         <td colSpan={14} className="px-6 py-4">
-                          <div className="grid grid-cols-1 lg:grid-cols-[200px_1fr_280px] gap-6 items-start">
-                            <ExpandedCreativePreview ad={ad} />
-                            <div>
+                          <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr_240px] gap-4 items-start overflow-x-hidden">
+                            <div className="min-w-0">
+                              <ExpandedCreativePreview ad={ad} />
+                            </div>
+                            <div className="min-w-0">
                               <p className="text-xs font-semibold text-[#6B7280] mb-3">PERFORMANCE BREAKDOWN</p>
                               <ResponsiveContainer width="100%" height={140}>
                                 <BarChart data={[
@@ -446,39 +448,39 @@ export default function AdCreatives() {
                                   <Bar dataKey="value" fill="#EC4899" radius={[4, 4, 0, 0]} />
                                 </BarChart>
                               </ResponsiveContainer>
+                              {(ad.total_video_plays_3s ?? 0) > 0 && (
+                                <div className="mt-5 pt-4 border-t border-[#E5E7EB]">
+                                  <p className="text-xs font-semibold text-[#6B7280] mb-3">VIDEO RETENTION FUNNEL</p>
+                                  <ResponsiveContainer width="100%" height={120}>
+                                    <BarChart data={[
+                                      { name: '3-sec', value: ad.total_video_plays_3s ?? 0 },
+                                      { name: '25%', value: ad.total_video_plays_25pct ?? 0 },
+                                      { name: '50%', value: ad.total_video_plays_50pct ?? 0 },
+                                      { name: '75%', value: ad.total_video_plays_75pct ?? 0 },
+                                      { name: '100%', value: ad.total_video_plays_100pct ?? 0 },
+                                    ]}>
+                                      <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
+                                      <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                                      <YAxis tick={{ fontSize: 11 }} />
+                                      <Tooltip />
+                                      <Bar dataKey="value" fill="#2563EB" radius={[4, 4, 0, 0]} />
+                                    </BarChart>
+                                  </ResponsiveContainer>
+                                </div>
+                              )}
                             </div>
-                            <div>
+                            <div className="min-w-0">
                               <p className="text-xs font-semibold text-[#6B7280] mb-3">AD DETAILS</p>
                               <div className="space-y-2 text-sm">
                                 {detailRows.map(({ label, value, className, bordered }) => (
-                                  <div key={label} className={`flex justify-between gap-4 ${bordered ? 'pt-2 border-t border-[#E5E7EB]' : ''}`}>
-                                    <span className="text-[#6B7280]">{label}</span>
-                                    <span className={className}>{value || '—'}</span>
+                                  <div key={label} className={`flex items-start justify-between gap-4 ${bordered ? 'pt-2 border-t border-[#E5E7EB]' : ''}`}>
+                                    <span className="text-[#6B7280] min-w-0">{label}</span>
+                                    <span className={`${className} text-right shrink-0`}>{value || '—'}</span>
                                   </div>
                                 ))}
                               </div>
                             </div>
                           </div>
-                          {(ad.total_video_plays_3s ?? 0) > 0 && (
-                            <div className="mt-5 pt-4 border-t border-[#E5E7EB]">
-                              <p className="text-xs font-semibold text-[#6B7280] mb-3">VIDEO RETENTION FUNNEL</p>
-                              <ResponsiveContainer width="100%" height={120}>
-                                <BarChart data={[
-                                  { name: '3-sec', value: ad.total_video_plays_3s ?? 0 },
-                                  { name: '25%', value: ad.total_video_plays_25pct ?? 0 },
-                                  { name: '50%', value: ad.total_video_plays_50pct ?? 0 },
-                                  { name: '75%', value: ad.total_video_plays_75pct ?? 0 },
-                                  { name: '100%', value: ad.total_video_plays_100pct ?? 0 },
-                                ]}>
-                                  <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
-                                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                                  <YAxis tick={{ fontSize: 11 }} />
-                                  <Tooltip />
-                                  <Bar dataKey="value" fill="#2563EB" radius={[4, 4, 0, 0]} />
-                                </BarChart>
-                              </ResponsiveContainer>
-                            </div>
-                          )}
                         </td>
                       </tr>
                     )}
