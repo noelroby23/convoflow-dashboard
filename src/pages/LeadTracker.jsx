@@ -213,7 +213,7 @@ function buildLeadJourney(contact) {
       label: 'Call Recorded',
       timestamp: contact.first_call_at || null,
       sortAt: parseTimestamp(contact.first_call_at)?.getTime() ?? null,
-      detail: 'A VAPI call recording is available for this lead.',
+      detail: 'A call recording is available for this lead.',
       tone: 'blue',
       icon: Phone,
       fallbackOrder: 20,
