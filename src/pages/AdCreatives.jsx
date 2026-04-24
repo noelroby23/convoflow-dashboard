@@ -145,7 +145,7 @@ function ExpandedCreativePreview({ ad }) {
     <div>
       <p className="text-xs font-semibold text-[#6B7280] mb-3">CREATIVE PREVIEW</p>
       <div className="rounded-xl border border-[#E5E7EB] bg-white p-4">
-        <div className="relative w-[200px] max-w-full">
+        <div className="relative w-full max-w-[200px]">
           {showImage ? (
             <img
               src={expandedCreativeUrl}
@@ -154,10 +154,10 @@ function ExpandedCreativePreview({ ad }) {
                 e.target.style.display = 'none'
                 setImageBroken(true)
               }}
-              className="w-[200px] max-w-full rounded-lg object-cover border border-gray-200 bg-[#F9FAFB]"
+              className="w-full rounded-lg object-cover border border-gray-200 bg-[#F9FAFB]"
             />
           ) : (
-            <div className="w-[200px] aspect-square max-w-full rounded-lg border border-gray-200 bg-[#F3F4F6] flex items-center justify-center">
+            <div className="w-full aspect-square rounded-lg border border-gray-200 bg-[#F3F4F6] flex items-center justify-center">
               {isVideo ? <Play size={36} className="text-[#9CA3AF] ml-1" /> : <FileText size={36} className="text-[#9CA3AF]" />}
             </div>
           )}
@@ -427,57 +427,59 @@ export default function AdCreatives() {
                     {expandedId === ad.ad_id && (
                       <tr key={`${ad.ad_id}-expanded`} className="border-t border-[#F3F4F6] bg-[#FAFAFA]">
                         <td colSpan={14} className="px-6 py-4">
-                          <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr_240px] gap-4 items-start overflow-x-hidden">
-                            <div className="min-w-0">
-                              <ExpandedCreativePreview ad={ad} />
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-xs font-semibold text-[#6B7280] mb-3">PERFORMANCE BREAKDOWN</p>
-                              <ResponsiveContainer width="100%" height={140}>
-                                <BarChart data={[
-                                  { name: 'Leads', value: ad.total_leads ?? 0 },
-                                  { name: 'Meetings', value: ad.meetings_booked ?? 0 },
-                                  { name: 'Showed', value: ad.showed_up ?? 0 },
-                                  { name: 'Active', value: ad.active_opportunities ?? 0 },
-                                  { name: 'Closed', value: ad.closed_won ?? 0 },
-                                ]}>
-                                  <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
-                                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                                  <YAxis tick={{ fontSize: 11 }} />
-                                  <Tooltip />
-                                  <Bar dataKey="value" fill="#EC4899" radius={[4, 4, 0, 0]} />
-                                </BarChart>
-                              </ResponsiveContainer>
-                              {(ad.total_video_plays_3s ?? 0) > 0 && (
-                                <div className="mt-5 pt-4 border-t border-[#E5E7EB]">
-                                  <p className="text-xs font-semibold text-[#6B7280] mb-3">VIDEO RETENTION FUNNEL</p>
-                                  <ResponsiveContainer width="100%" height={120}>
-                                    <BarChart data={[
-                                      { name: '3-sec', value: ad.total_video_plays_3s ?? 0 },
-                                      { name: '25%', value: ad.total_video_plays_25pct ?? 0 },
-                                      { name: '50%', value: ad.total_video_plays_50pct ?? 0 },
-                                      { name: '75%', value: ad.total_video_plays_75pct ?? 0 },
-                                      { name: '100%', value: ad.total_video_plays_100pct ?? 0 },
-                                    ]}>
-                                      <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
-                                      <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                                      <YAxis tick={{ fontSize: 11 }} />
-                                      <Tooltip />
-                                      <Bar dataKey="value" fill="#2563EB" radius={[4, 4, 0, 0]} />
-                                    </BarChart>
-                                  </ResponsiveContainer>
-                                </div>
-                              )}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-xs font-semibold text-[#6B7280] mb-3">AD DETAILS</p>
-                              <div className="space-y-2 text-sm">
-                                {detailRows.map(({ label, value, className, bordered }) => (
-                                  <div key={label} className={`flex items-start justify-between gap-4 ${bordered ? 'pt-2 border-t border-[#E5E7EB]' : ''}`}>
-                                    <span className="text-[#6B7280] min-w-0">{label}</span>
-                                    <span className={`${className} text-right shrink-0`}>{value || '—'}</span>
+                          <div className="w-full overflow-hidden">
+                            <div className="grid grid-cols-1 md:grid-cols-[1fr_2fr_1fr] gap-4 items-start">
+                              <div className="min-w-0 overflow-hidden">
+                                <ExpandedCreativePreview ad={ad} />
+                              </div>
+                              <div className="min-w-0 overflow-hidden">
+                                <p className="text-xs font-semibold text-[#6B7280] mb-3">PERFORMANCE BREAKDOWN</p>
+                                <ResponsiveContainer width="100%" height={140}>
+                                  <BarChart data={[
+                                    { name: 'Leads', value: ad.total_leads ?? 0 },
+                                    { name: 'Meetings', value: ad.meetings_booked ?? 0 },
+                                    { name: 'Showed', value: ad.showed_up ?? 0 },
+                                    { name: 'Active', value: ad.active_opportunities ?? 0 },
+                                    { name: 'Closed', value: ad.closed_won ?? 0 },
+                                  ]}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
+                                    <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                                    <YAxis tick={{ fontSize: 11 }} />
+                                    <Tooltip />
+                                    <Bar dataKey="value" fill="#EC4899" radius={[4, 4, 0, 0]} />
+                                  </BarChart>
+                                </ResponsiveContainer>
+                                {(ad.total_video_plays_3s ?? 0) > 0 && (
+                                  <div className="mt-5 pt-4 border-t border-[#E5E7EB]">
+                                    <p className="text-xs font-semibold text-[#6B7280] mb-3">VIDEO RETENTION FUNNEL</p>
+                                    <ResponsiveContainer width="100%" height={120}>
+                                      <BarChart data={[
+                                        { name: '3-sec', value: ad.total_video_plays_3s ?? 0 },
+                                        { name: '25%', value: ad.total_video_plays_25pct ?? 0 },
+                                        { name: '50%', value: ad.total_video_plays_50pct ?? 0 },
+                                        { name: '75%', value: ad.total_video_plays_75pct ?? 0 },
+                                        { name: '100%', value: ad.total_video_plays_100pct ?? 0 },
+                                      ]}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
+                                        <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                                        <YAxis tick={{ fontSize: 11 }} />
+                                        <Tooltip />
+                                        <Bar dataKey="value" fill="#2563EB" radius={[4, 4, 0, 0]} />
+                                      </BarChart>
+                                    </ResponsiveContainer>
                                   </div>
-                                ))}
+                                )}
+                              </div>
+                              <div className="min-w-0 overflow-hidden">
+                                <p className="text-xs font-semibold text-[#6B7280] mb-3">AD DETAILS</p>
+                                <div className="space-y-2">
+                                  {detailRows.map(({ label, value, className, bordered }) => (
+                                    <div key={label} className={`flex justify-between items-center gap-2 ${bordered ? 'pt-2 border-t border-[#E5E7EB]' : ''}`}>
+                                      <span className="text-xs text-[#6B7280] whitespace-nowrap">{label}</span>
+                                      <span className={`${className} text-xs text-right whitespace-nowrap`}>{value || '—'}</span>
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
                             </div>
                           </div>
