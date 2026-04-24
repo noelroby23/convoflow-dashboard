@@ -144,6 +144,7 @@ export function useAdPerformance() {
 
         return {
           ...row,
+          meta_ad_id: row.meta_ad_id ?? creative?.meta_ad_id ?? null,
           creative_url: row.creative_url ?? creative?.creative_url ?? null,
           creative_type: row.creative_type ?? creative?.creative_type ?? null,
         }

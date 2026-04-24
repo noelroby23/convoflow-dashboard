@@ -5,7 +5,7 @@ import { creativeReport } from '../lib/reports/generators'
 import ErrorBoundary from '../components/ui/ErrorBoundary'
 import AISummary from '../components/ui/AISummary'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { ChevronDown, ChevronUp, Download, Play, FileText } from 'lucide-react'
+import { ChevronDown, ChevronUp, Download, Play, FileText, ExternalLink } from 'lucide-react'
 import { exportCsv } from '../lib/exportCsv'
 
 const FILTER_CHIPS = [
@@ -66,6 +66,16 @@ function formatDecimal(value, digits = 2) {
   return Number(value).toFixed(digits)
 }
 
+function formatWholeNumber(value) {
+  if (value == null) return '—'
+  return Number(value).toLocaleString()
+}
+
+function formatCurrency(value) {
+  if (value == null) return '—'
+  return `AED ${Number(value).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+}
+
 function matchesFilter(ad, filterId) {
   if (filterId === 'all') return true
   if (filterId === 'active') return getAdStatusDisplay(ad.status).isActive
@@ -106,6 +116,58 @@ function CreativeThumbnail({ ad }) {
   return (
     <div className="w-10 h-10 md:w-12 md:h-12 rounded-lg border border-gray-200 bg-[#F3F4F6] flex items-center justify-center flex-shrink-0">
       {isVideo ? <Play size={16} className="text-[#9CA3AF] ml-0.5" /> : <FileText size={16} className="text-[#9CA3AF]" />}
+    </div>
+  )
+}
+
+function ExpandedCreativePreview({ ad }) {
+  const [imageBroken, setImageBroken] = useState(false)
+  const showImage = ad.creative_url && !imageBroken
+  const isVideo = ad.creative_type === 'VIDEO'
+  const adsManagerUrl = ad.meta_ad_id
+    ? `https://business.facebook.com/ads/manager/?act=646790754850237&selected_ad_ids=${encodeURIComponent(ad.meta_ad_id)}`
+    : null
+
+  return (
+    <div>
+      <p className="text-xs font-semibold text-[#6B7280] mb-3">CREATIVE PREVIEW</p>
+      <div className="rounded-xl border border-[#E5E7EB] bg-white p-4">
+        {showImage ? (
+          <img
+            src={ad.creative_url}
+            alt={ad.ad_name}
+            onError={(e) => {
+              e.target.style.display = 'none'
+              setImageBroken(true)
+            }}
+            className="w-40 h-40 rounded-lg object-cover border border-gray-200 bg-[#F9FAFB]"
+          />
+        ) : (
+          <div className="w-40 h-40 rounded-lg border border-gray-200 bg-[#F3F4F6] flex items-center justify-center">
+            {isVideo ? <Play size={32} className="text-[#9CA3AF] ml-1" /> : <FileText size={32} className="text-[#9CA3AF]" />}
+          </div>
+        )}
+
+        <div className="mt-4">
+          <p className="text-sm font-bold text-[#0F0F1A] leading-snug">{ad.ad_name}</p>
+          <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+            <CreativeTypeBadge creativeType={ad.creative_type} />
+          </div>
+          <p className="text-xs text-[#9CA3AF] mt-2">{ad.campaign_name || '—'}</p>
+
+          {isVideo && adsManagerUrl && (
+            <a
+              href={adsManagerUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-[#E5E7EB] px-3 py-1.5 text-xs font-medium text-[#2563EB] hover:bg-[#EFF6FF] transition-colors"
+            >
+              View in Ads Manager
+              <ExternalLink size={12} />
+            </a>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
@@ -262,6 +324,18 @@ export default function AdCreatives() {
                 const statusDisplay = getAdStatusDisplay(ad.status)
                 const hookRate = getHookRateValue(ad)
                 const watchThrough = getWatchThroughValue(ad)
+                const isVideo = ad.creative_type === 'VIDEO'
+                const detailRows = [
+                  { label: 'Total Impressions', value: formatWholeNumber(ad.total_impressions), className: 'font-medium' },
+                  { label: 'Avg Frequency', value: formatDecimal(ad.avg_frequency), className: getFreqColor(ad.avg_frequency) },
+                  { label: 'CTR', value: ad.avg_ctr != null ? `${formatDecimal(ad.avg_ctr)}%` : '—', className: 'font-medium' },
+                  { label: 'Cost per Lead', value: formatCurrency(ad.cost_per_lead), className: getCPLColor(ad.cost_per_lead) },
+                  { label: 'Cost per Active', value: formatCurrency(ad.cost_per_active), className: 'font-medium' },
+                  ...(isVideo ? [
+                    { label: 'Hook Rate', value: hookRate != null ? `${formatDecimal(hookRate)}%` : '—', className: getHookRateColor(hookRate), bordered: true },
+                    { label: 'Watch-Through', value: watchThrough != null ? `${formatDecimal(watchThrough)}%` : '—', className: getWatchThroughColor(watchThrough) },
+                  ] : []),
+                ]
                 const rowAccent = classification === 'action' ? 'border-l-2 border-l-red-400' :
                                   classification === 'best' ? 'border-l-2 border-l-green-400' :
                                   classification === 'revamp' ? 'border-l-2 border-l-purple-400' : ''
@@ -313,7 +387,8 @@ export default function AdCreatives() {
                     {expandedId === ad.ad_id && (
                       <tr key={`${ad.ad_id}-expanded`} className="border-t border-[#F3F4F6] bg-[#FAFAFA]">
                         <td colSpan={14} className="px-6 py-4">
-                          <div className="grid grid-cols-2 gap-6">
+                          <div className="grid grid-cols-1 xl:grid-cols-[200px_minmax(0,1fr)_280px] gap-6 items-start">
+                            <ExpandedCreativePreview ad={ad} />
                             <div>
                               <p className="text-xs font-semibold text-[#6B7280] mb-3">PERFORMANCE BREAKDOWN</p>
                               <ResponsiveContainer width="100%" height={140}>
@@ -335,13 +410,12 @@ export default function AdCreatives() {
                             <div>
                               <p className="text-xs font-semibold text-[#6B7280] mb-3">AD DETAILS</p>
                               <div className="space-y-2 text-sm">
-                                <div className="flex justify-between"><span className="text-[#6B7280]">Total Impressions</span><span className="font-medium">{ad.total_impressions ? Number(ad.total_impressions).toLocaleString() : '—'}</span></div>
-                                <div className="flex justify-between"><span className="text-[#6B7280]">Avg Frequency</span><span className={getFreqColor(ad.avg_frequency)}>{formatDecimal(ad.avg_frequency)}</span></div>
-                                <div className="flex justify-between"><span className="text-[#6B7280]">CTR</span><span className="font-medium">{ad.avg_ctr != null ? `${formatDecimal(ad.avg_ctr)}%` : '—'}</span></div>
-                                <div className="flex justify-between"><span className="text-[#6B7280]">Cost per Lead</span><span className={getCPLColor(ad.cost_per_lead)}>{ad.cost_per_lead ? `AED ${Number(ad.cost_per_lead).toFixed(0)}` : '—'}</span></div>
-                                <div className="flex justify-between"><span className="text-[#6B7280]">Cost per Active</span><span className="font-medium">{ad.cost_per_active ? `AED ${Number(ad.cost_per_active).toFixed(0)}` : '∞'}</span></div>
-                                <div className="flex justify-between pt-2 border-t border-[#E5E7EB]"><span className="text-[#6B7280]">Hook Rate</span><span className={getHookRateColor(hookRate)}>{hookRate != null ? `${formatDecimal(hookRate)}%` : '—'}</span></div>
-                                <div className="flex justify-between"><span className="text-[#6B7280]">Watch-Through</span><span className={getWatchThroughColor(watchThrough)}>{watchThrough != null ? `${formatDecimal(watchThrough)}%` : '—'}</span></div>
+                                {detailRows.map(({ label, value, className, bordered }) => (
+                                  <div key={label} className={`flex justify-between gap-4 ${bordered ? 'pt-2 border-t border-[#E5E7EB]' : ''}`}>
+                                    <span className="text-[#6B7280]">{label}</span>
+                                    <span className={className}>{value || '—'}</span>
+                                  </div>
+                                ))}
                               </div>
                             </div>
                           </div>
