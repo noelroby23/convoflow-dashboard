@@ -8,8 +8,10 @@ import { useDailyAISummary } from '../context/DailyAISummaryContext'
 // These metric_names match what the backend (n8n alerts, reports) expects.
 const TARGET_CONFIG = [
   { key: 'daily_spend',      label: 'Daily Spend (AED)',       default: 420 },
+  { key: 'monthly_spend',    label: 'Monthly Spend (AED)',     default: 33000 },
   { key: 'monthly_leads',    label: 'Monthly Leads',           default: 100 },
   { key: 'monthly_meetings', label: 'Monthly Meetings',        default: 30 },
+  { key: 'active_opportunities', label: 'Active Opportunities', default: 10 },
   { key: 'monthly_closes',   label: 'Monthly Closes',          default: 4 },
   { key: 'weekly_leads',     label: 'Weekly Leads',            default: 28 },
   { key: 'weekly_meetings',  label: 'Weekly Meetings',         default: 8 },
