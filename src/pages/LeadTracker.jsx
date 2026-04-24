@@ -4,7 +4,7 @@ import { useLeadTrackerContacts } from '../hooks/useDashboardData'
 import { useDashboard } from '../store/dashboard'
 import { leadsReport } from '../lib/reports/generators'
 import ErrorBoundary from '../components/ui/ErrorBoundary'
-import { ChevronDown, ChevronUp, Search, Download, Layers, Megaphone, Flame, FileText, Volume2, MessageSquare, Route as RouteIcon, UserPlus, Phone, CalendarCheck, CheckCircle2, Flag, XCircle } from 'lucide-react'
+import { ChevronDown, ChevronUp, Search, Download, Layers, Megaphone, Flame, FileText, Volume2, MessageSquare, Route as RouteIcon, Phone, CalendarCheck, CheckCircle2, XCircle } from 'lucide-react'
 import { exportCsv } from '../lib/exportCsv'
 import AISummary from '../components/ui/AISummary'
 
@@ -61,9 +61,6 @@ const KNOWN_STAGE_VALUES = new Set(STAGE_FILTERS.filter(stage => stage.id !== 'a
 
 const hasText = (value) => typeof value === 'string' && value.trim().length > 0
 
-const POSITIVE_STAGES = new Set(['meeting_booked', 'showed', 'active', 'closed_won'])
-const NEGATIVE_STAGES = new Set(['disqualified', 'not_interested', 'wrong_number', 'closed_lost'])
-
 const TIMELINE_TONES = {
   blue: {
     dot: 'border-blue-200 bg-blue-50',
@@ -99,73 +96,61 @@ function formatTimestamp(value) {
   })
 }
 
-function getStageTone(stage) {
-  if (POSITIVE_STAGES.has(stage)) return 'green'
-  if (NEGATIVE_STAGES.has(stage)) return 'red'
-  return 'blue'
-}
-
 function sortJourneyEvents(events) {
-  return [...events].sort((a, b) => {
-    if (a.sortAt && b.sortAt && a.sortAt !== b.sortAt) return b.sortAt - a.sortAt
-    if (a.sortAt && !b.sortAt) return -1
-    if (!a.sortAt && b.sortAt) return 1
-    return b.fallbackOrder - a.fallbackOrder
-  })
+  const timestamped = events
+    .filter(event => event.sortAt !== null)
+    .sort((a, b) => b.sortAt - a.sortAt)
+
+  const untimestamped = events
+    .filter(event => event.sortAt === null)
+    .sort((a, b) => b.fallbackOrder - a.fallbackOrder)
+
+  if (!timestamped.length) return untimestamped
+  if (!untimestamped.length) return timestamped
+
+  return [timestamped[0], ...untimestamped, ...timestamped.slice(1)]
 }
 
 function buildLeadJourney(contact) {
   const events = []
+  const leadEnteredAt = contact.ghl_created_at || contact.created_at || null
 
-  if (contact.created_at) {
-    events.push({
-      key: 'form-submitted',
-      label: 'Form Submitted',
-      timestamp: contact.created_at,
-      sortAt: parseTimestamp(contact.created_at)?.getTime() ?? null,
-      detail: 'Lead submitted from Meta and entered the funnel.',
-      tone: 'blue',
-      icon: FileText,
-      fallbackOrder: 10,
-    })
-  }
-
-  if (contact.ghl_created_at) {
-    events.push({
-      key: 'ghl-created',
-      label: 'GHL Contact Created',
-      timestamp: contact.ghl_created_at,
-      sortAt: parseTimestamp(contact.ghl_created_at)?.getTime() ?? null,
-      detail: 'Lead synced into GoHighLevel.',
-      tone: 'blue',
-      icon: UserPlus,
-      fallbackOrder: 20,
-    })
-  }
+  events.push({
+    key: 'lead-entered',
+    label: 'Lead Entered',
+    timestamp: leadEnteredAt,
+    sortAt: parseTimestamp(leadEnteredAt)?.getTime() ?? null,
+    detail: 'Lead entered the funnel from Meta ads.',
+    tone: 'blue',
+    icon: FileText,
+    fallbackOrder: 10,
+  })
 
   if (hasText(contact.call_recording_url)) {
     events.push({
       key: 'call-recorded',
       label: 'Call Recorded',
-      timestamp: null,
-      sortAt: null,
+      timestamp: contact.first_call_at || null,
+      sortAt: parseTimestamp(contact.first_call_at)?.getTime() ?? null,
       detail: 'A VAPI call recording is available for this lead.',
       tone: 'blue',
       icon: Phone,
-      fallbackOrder: 40,
+      fallbackOrder: 20,
     })
   }
 
   if (contact.funnel_meeting_booked) {
+    const meetingTimestamp = contact.meeting_booked_at || contact.meeting_date || null
+
     events.push({
       key: 'meeting-booked',
       label: 'Meeting Booked',
-      timestamp: contact.meeting_date || contact.status_updated_at,
-      sortAt: parseTimestamp(contact.meeting_date || contact.status_updated_at)?.getTime() ?? null,
+      timestamp: meetingTimestamp,
+      sortAt: parseTimestamp(meetingTimestamp)?.getTime() ?? null,
       detail: contact.meeting_date ? `Scheduled for ${new Date(contact.meeting_date).toLocaleString([], { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}.` : 'Lead progressed to a booked meeting.',
       tone: 'green',
       icon: CalendarCheck,
-      fallbackOrder: 60,
+      fallbackOrder: 40,
     })
   }
 
@@ -173,38 +158,68 @@ function buildLeadJourney(contact) {
     events.push({
       key: 'showed-up',
       label: 'Showed Up',
-      timestamp: contact.status_updated_at,
-      sortAt: parseTimestamp(contact.status_updated_at)?.getTime() ?? null,
+      timestamp: contact.showed_at || null,
+      sortAt: parseTimestamp(contact.showed_at)?.getTime() ?? null,
       detail: 'Lead attended the booked meeting.',
+      tone: 'green',
+      icon: CheckCircle2,
+      fallbackOrder: 50,
+    })
+  }
+
+  if (contact.funnel_no_show) {
+    events.push({
+      key: 'no-show',
+      label: 'No Show',
+      timestamp: null,
+      sortAt: null,
+      detail: 'Lead missed the booked meeting.',
+      tone: 'red',
+      icon: XCircle,
+      fallbackOrder: 55,
+    })
+  }
+
+  if (contact.current_stage === 'disqualified') {
+    events.push({
+      key: 'disqualified',
+      label: 'Disqualified',
+      timestamp: null,
+      sortAt: null,
+      detail: hasText(contact.dq_reason) ? contact.dq_reason : 'Lead exited the funnel without progressing.',
+      tone: 'red',
+      icon: XCircle,
+      fallbackOrder: 58,
+    })
+  }
+
+  if (contact.funnel_closed_won) {
+    const closedWonTimestamp = contact.closed_at || contact.status_updated_at || null
+
+    events.push({
+      key: 'closed-won',
+      label: 'Closed Won',
+      timestamp: closedWonTimestamp,
+      sortAt: parseTimestamp(closedWonTimestamp)?.getTime() ?? null,
+      detail: 'Lead converted into a customer.',
       tone: 'green',
       icon: CheckCircle2,
       fallbackOrder: 70,
     })
   }
 
-  if (contact.funnel_closed_lost || contact.current_stage === 'disqualified') {
+  if (contact.funnel_closed_lost) {
+    const closedLostTimestamp = contact.closed_at || contact.status_updated_at || null
+
     events.push({
-      key: 'disqualified',
-      label: contact.current_stage === 'disqualified' ? 'Disqualified' : 'Closed Lost',
-      timestamp: contact.status_updated_at,
-      sortAt: parseTimestamp(contact.status_updated_at)?.getTime() ?? null,
+      key: 'closed-lost',
+      label: 'Closed Lost',
+      timestamp: closedLostTimestamp,
+      sortAt: parseTimestamp(closedLostTimestamp)?.getTime() ?? null,
       detail: hasText(contact.dq_reason) ? contact.dq_reason : 'Lead exited the funnel without progressing.',
       tone: 'red',
       icon: XCircle,
       fallbackOrder: 80,
-    })
-  }
-
-  if (contact.stage_label || contact.current_stage) {
-    events.push({
-      key: 'current-stage',
-      label: `Current Stage: ${contact.stage_label || formatStage(contact.current_stage)}`,
-      timestamp: contact.status_updated_at,
-      sortAt: parseTimestamp(contact.status_updated_at)?.getTime() ?? null,
-      detail: 'Most recent funnel status recorded for this lead.',
-      tone: getStageTone(contact.current_stage),
-      icon: Flag,
-      fallbackOrder: 90,
     })
   }
 
@@ -496,6 +511,7 @@ export default function LeadTracker() {
                                 {journeyEvents.map((event, index) => {
                                   const tone = TIMELINE_TONES[event.tone] || TIMELINE_TONES.blue
                                   const Icon = event.icon
+                                  const eventTimestamp = formatTimestamp(event.timestamp) ?? '—'
 
                                   return (
                                     <div key={event.key} className="relative pl-10 pb-5 last:pb-0">
@@ -508,9 +524,7 @@ export default function LeadTracker() {
                                       <div className="min-h-7">
                                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                                           <p className="text-sm font-medium text-[#0F0F1A]">{event.label}</p>
-                                          {event.timestamp && (
-                                            <span className="text-xs text-[#9CA3AF]">{formatTimestamp(event.timestamp)}</span>
-                                          )}
+                                          <span className="text-xs text-[#9CA3AF]">{eventTimestamp}</span>
                                         </div>
                                         {event.detail && (
                                           <p className="mt-1 text-sm text-[#6B7280] leading-relaxed">{event.detail}</p>
