@@ -5,7 +5,7 @@ import { creativeReport } from '../lib/reports/generators'
 import ErrorBoundary from '../components/ui/ErrorBoundary'
 import AISummary from '../components/ui/AISummary'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { ChevronDown, ChevronUp, Download } from 'lucide-react'
+import { ChevronDown, ChevronUp, Download, Play, FileText } from 'lucide-react'
 import { exportCsv } from '../lib/exportCsv'
 
 const FILTER_CHIPS = [
@@ -70,6 +70,44 @@ function matchesFilter(ad, filterId) {
   if (filterId === 'all') return true
   if (filterId === 'active') return getAdStatusDisplay(ad.status).isActive
   return classifyAd(ad) === filterId
+}
+
+function CreativeTypeBadge({ creativeType }) {
+  if (creativeType === 'VIDEO') {
+    return <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600">Video</span>
+  }
+
+  if (creativeType === 'SHARE') {
+    return <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-600">Post</span>
+  }
+
+  return null
+}
+
+function CreativeThumbnail({ ad }) {
+  const [imageBroken, setImageBroken] = useState(false)
+  const showImage = ad.creative_url && !imageBroken
+  const isVideo = ad.creative_type === 'VIDEO'
+
+  if (showImage) {
+    return (
+      <img
+        src={ad.creative_url}
+        alt={ad.ad_name}
+        onError={(e) => {
+          e.target.style.display = 'none'
+          setImageBroken(true)
+        }}
+        className="w-10 h-10 md:w-12 md:h-12 rounded-lg object-cover border border-gray-200 flex-shrink-0 bg-[#F9FAFB]"
+      />
+    )
+  }
+
+  return (
+    <div className="w-10 h-10 md:w-12 md:h-12 rounded-lg border border-gray-200 bg-[#F3F4F6] flex items-center justify-center flex-shrink-0">
+      {isVideo ? <Play size={16} className="text-[#9CA3AF] ml-0.5" /> : <FileText size={16} className="text-[#9CA3AF]" />}
+    </div>
+  )
 }
 
 export default function AdCreatives() {
@@ -235,12 +273,18 @@ export default function AdCreatives() {
                       onClick={() => setExpandedId(expandedId === ad.ad_id ? null : ad.ad_id)}
                     >
                       <td className="px-4 py-3 font-medium text-[#0F0F1A]">
-                        <div className="flex items-center gap-2">
-                          {ad.ad_name}
-                          {classification === 'action' && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-100 text-red-600">ACTION</span>}
-                          {classification === 'best' && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-green-100 text-green-600">BEST</span>}
-                          {classification === 'revamp' && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-600">REVAMP</span>}
-                          {classification === 'removal' && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500">REMOVE</span>}
+                        <div className="flex items-center gap-3 min-w-0">
+                          <CreativeThumbnail ad={ad} />
+                          <div className="min-w-0">
+                            <div className="truncate">{ad.ad_name}</div>
+                            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                              <CreativeTypeBadge creativeType={ad.creative_type} />
+                              {classification === 'action' && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-100 text-red-600">ACTION</span>}
+                              {classification === 'best' && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-green-100 text-green-600">BEST</span>}
+                              {classification === 'revamp' && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-600">REVAMP</span>}
+                              {classification === 'removal' && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500">REMOVE</span>}
+                            </div>
+                          </div>
                         </div>
                       </td>
                       <td className="px-4 py-3">

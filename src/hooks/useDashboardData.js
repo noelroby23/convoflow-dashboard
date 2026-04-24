@@ -16,7 +16,7 @@ const fallbackAds = mockAds.map(ad => ({
   total_impressions: ad.impressions, avg_frequency: ad.frequency, avg_ctr: ad.ctr,
   total_leads: ad.leads, meetings_booked: ad.meetings, showed_up: ad.showed,
   active_opportunities: ad.activeOpps, closed_won: ad.closedWon, cost_per_lead: ad.cpl,
-  cost_per_active: ad.costPerActive,
+  cost_per_active: ad.costPerActive, meta_ad_id: null, creative_url: null, creative_type: null,
 }))
 
 const fallbackContacts = mockLeads.map(lead => ({
@@ -117,7 +117,40 @@ export function useFunnelSummary() {
 export function useAdPerformance() {
   const { currentClientId, refreshKey } = useDashboard()
   return useSupabaseQuery(
-    () => supabase.from('ad_performance').select('*').eq('client_id', currentClientId),
+    async () => {
+      const [performanceResult, creativeResult] = await Promise.all([
+        supabase.from('ad_performance').select('*').eq('client_id', currentClientId),
+        supabase.from('ads').select('id, meta_ad_id, creative_url, creative_type').eq('client_id', currentClientId),
+      ])
+
+      if (performanceResult.error || creativeResult.error) {
+        return { data: null, error: performanceResult.error || creativeResult.error }
+      }
+
+      const creativeByMetaAdId = new Map(
+        (creativeResult.data ?? [])
+          .filter(row => row.meta_ad_id)
+          .map(row => [String(row.meta_ad_id), row])
+      )
+      const creativeById = new Map(
+        (creativeResult.data ?? [])
+          .filter(row => row.id)
+          .map(row => [String(row.id), row])
+      )
+
+      const merged = (performanceResult.data ?? []).map(row => {
+        const creative = creativeByMetaAdId.get(String(row.meta_ad_id ?? ''))
+          || creativeById.get(String(row.ad_id ?? row.id ?? ''))
+
+        return {
+          ...row,
+          creative_url: row.creative_url ?? creative?.creative_url ?? null,
+          creative_type: row.creative_type ?? creative?.creative_type ?? null,
+        }
+      })
+
+      return { data: merged, error: null }
+    },
     [currentClientId, refreshKey], fallbackAds
   )
 }
