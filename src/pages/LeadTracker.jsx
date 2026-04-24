@@ -66,6 +66,10 @@ const TIMELINE_TONES = {
     dot: 'border-blue-200 bg-blue-50',
     icon: 'text-blue-600',
   },
+  amber: {
+    dot: 'border-amber-200 bg-amber-50',
+    icon: 'text-amber-600',
+  },
   green: {
     dot: 'border-green-200 bg-green-50',
     icon: 'text-green-600',
@@ -111,9 +115,86 @@ function sortJourneyEvents(events) {
   return [timestamped[0], ...untimestamped, ...timestamped.slice(1)]
 }
 
+function sortNonMilestoneJourney(events) {
+  const order = {
+    'current-stage': 4,
+    'call-recorded': 3,
+    'follow-up-attempts': 2,
+    'lead-entered': 1,
+  }
+
+  return [...events].sort((a, b) => {
+    const rankDiff = (order[b.key] ?? 0) - (order[a.key] ?? 0)
+    if (rankDiff !== 0) return rankDiff
+
+    if (a.sortAt !== null && b.sortAt !== null) return b.sortAt - a.sortAt
+    if (a.sortAt !== null) return -1
+    if (b.sortAt !== null) return 1
+    return 0
+  })
+}
+
+function getCurrentStageEvent(contact) {
+  if (!contact.current_stage) return null
+
+  const stageConfig = {
+    follow_up: {
+      detail: 'Lead has not been reached yet.',
+      tone: 'amber',
+    },
+    contacted: {
+      detail: 'Sarah spoke with this lead.',
+      tone: 'blue',
+    },
+    callback: {
+      detail: 'Lead requested a callback.',
+      tone: 'blue',
+    },
+    qualified_no_meeting: {
+      detail: 'Lead is qualified but no meeting booked yet.',
+      tone: 'blue',
+    },
+    not_interested: {
+      detail: 'Lead declined.',
+      tone: 'red',
+    },
+    disqualified: {
+      detail: hasText(contact.dq_reason) ? contact.dq_reason : 'Lead was disqualified.',
+      tone: 'red',
+    },
+    wrong_number: {
+      detail: 'Phone number was invalid or unreachable.',
+      tone: 'red',
+    },
+  }
+
+  const config = stageConfig[contact.current_stage] || {
+    detail: null,
+    tone: 'blue',
+  }
+
+  return {
+    key: 'current-stage',
+    label: `Current Stage: ${contact.stage_label || formatStage(contact.current_stage)}`,
+    timestamp: contact.status_updated_at || null,
+    sortAt: parseTimestamp(contact.status_updated_at)?.getTime() ?? null,
+    detail: config.detail,
+    tone: config.tone,
+    icon: MessageSquare,
+    fallbackOrder: 30,
+  }
+}
+
 function buildLeadJourney(contact) {
   const events = []
   const leadEnteredAt = contact.ghl_created_at || contact.created_at || null
+  const hasFunnelMilestone = Boolean(
+    contact.funnel_meeting_booked ||
+    contact.funnel_showed_up ||
+    contact.funnel_closed_won ||
+    contact.funnel_closed_lost ||
+    contact.funnel_no_show
+  )
 
   events.push({
     key: 'lead-entered',
@@ -136,6 +217,19 @@ function buildLeadJourney(contact) {
       tone: 'blue',
       icon: Phone,
       fallbackOrder: 20,
+    })
+  }
+
+  if (contact.follow_up_attempts > 0) {
+    events.push({
+      key: 'follow-up-attempts',
+      label: `Follow-Up Attempts: ${contact.follow_up_attempts}`,
+      timestamp: null,
+      sortAt: null,
+      detail: `${contact.follow_up_attempts} call attempts made.`,
+      tone: 'amber',
+      icon: Phone,
+      fallbackOrder: 15,
     })
   }
 
@@ -180,19 +274,6 @@ function buildLeadJourney(contact) {
     })
   }
 
-  if (contact.current_stage === 'disqualified') {
-    events.push({
-      key: 'disqualified',
-      label: 'Disqualified',
-      timestamp: null,
-      sortAt: null,
-      detail: hasText(contact.dq_reason) ? contact.dq_reason : 'Lead exited the funnel without progressing.',
-      tone: 'red',
-      icon: XCircle,
-      fallbackOrder: 58,
-    })
-  }
-
   if (contact.funnel_closed_won) {
     const closedWonTimestamp = contact.closed_at || contact.status_updated_at || null
 
@@ -221,6 +302,12 @@ function buildLeadJourney(contact) {
       icon: XCircle,
       fallbackOrder: 80,
     })
+  }
+
+  if (!hasFunnelMilestone) {
+    const currentStageEvent = getCurrentStageEvent(contact)
+    if (currentStageEvent) events.push(currentStageEvent)
+    return sortNonMilestoneJourney(events)
   }
 
   return sortJourneyEvents(events)
