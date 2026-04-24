@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useFunnelSummary, useTargets } from '../hooks/useDashboardData'
 import ErrorBoundary from '../components/ui/ErrorBoundary'
 import AISummary from '../components/ui/AISummary'
@@ -16,36 +16,39 @@ export default function Health() {
   const showRateTarget = targets?.show_rate ?? 75
   const closesTarget = targets?.monthly_closes ?? 4
   const revenueTarget = targets?.monthly_revenue ?? (closesTarget * 10000)
+  const showedUpTarget = Math.round(meetingsTarget * (showRateTarget / 100))
 
-  const metrics = [
+  const metrics = useMemo(() => [
     { label: 'Total Leads',     actual: data?.total_leads ?? 0,     target: leadsTarget },
     { label: 'Meetings Booked', actual: data?.meetings_booked ?? 0, target: meetingsTarget },
-    { label: 'Showed Up',       actual: data?.showed_up ?? 0,       target: Math.round(meetingsTarget * (showRateTarget / 100)) },
+    { label: 'Showed Up',       actual: data?.showed_up ?? 0,       target: showedUpTarget },
     { label: 'Closed Won',      actual: data?.closed_won ?? 0,      target: closesTarget },
     { label: 'Revenue (AED)',   actual: closedRevenue,              target: revenueTarget, isCurrency: true },
-  ]
+  ], [closedRevenue, closesTarget, data?.closed_won, data?.meetings_booked, data?.showed_up, data?.total_leads, leadsTarget, meetingsTarget, revenueTarget, showedUpTarget])
 
   const scores = metrics.filter(m => !m.isCurrency).map(m => Math.min((m.actual / m.target) * 100, 100))
   const healthScore = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0
 
-  const healthStatus = healthScore >= 80 ? { label: 'GREEN', color: '#16A34A', bg: 'bg-green-100 text-green-700' }
+  const healthStatus = useMemo(() => healthScore >= 80 ? { label: 'GREEN', color: '#16A34A', bg: 'bg-green-100 text-green-700' }
     : healthScore >= 60 ? { label: 'YELLOW', color: '#F59E0B', bg: 'bg-amber-100 text-amber-700' }
-    : { label: 'RED', color: '#DC2626', bg: 'bg-red-100 text-red-700' }
+    : { label: 'RED', color: '#DC2626', bg: 'bg-red-100 text-red-700' }, [healthScore])
+
+  const reportTargets = useMemo(() => ({
+    total_leads: leadsTarget,
+    meetings_booked: meetingsTarget,
+    showed_up: showedUpTarget,
+    closed_won: closesTarget,
+    revenue: revenueTarget,
+  }), [closesTarget, leadsTarget, meetingsTarget, revenueTarget, showedUpTarget])
 
   useEffect(() => {
-    setReportBuilder(() => healthReport(data, healthScore, healthStatus, {
-      total_leads: leadsTarget,
-      meetings_booked: meetingsTarget,
-      showed_up: Math.round(meetingsTarget * (showRateTarget / 100)),
-      closed_won: closesTarget,
-      revenue: revenueTarget,
-    }))
+    setReportBuilder(() => healthReport(data, healthScore, healthStatus, reportTargets))
     return () => setReportBuilder(null)
-  }, [data, healthScore, healthStatus, leadsTarget, meetingsTarget, showRateTarget, closesTarget, revenueTarget, setReportBuilder])
+  }, [data, healthScore, healthStatus, reportTargets, setReportBuilder])
 
-  const churnRisk = healthScore >= 80 ? { label: 'LOW', bg: 'bg-green-100 text-green-700' }
+  const churnRisk = useMemo(() => healthScore >= 80 ? { label: 'LOW', bg: 'bg-green-100 text-green-700' }
     : healthScore >= 60 ? { label: 'MEDIUM', bg: 'bg-amber-100 text-amber-700' }
-    : { label: 'HIGH', bg: 'bg-red-100 text-red-700' }
+    : { label: 'HIGH', bg: 'bg-red-100 text-red-700' }, [healthScore])
 
   const getStatusBadge = (pct) => {
     if (pct >= 80) return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">GREEN</span>
