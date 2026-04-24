@@ -57,6 +57,8 @@ const SARAH_CLIENT_ID = 'ca5a5257-9217-4d06-990e-b789cb233ac0'
 const fallbackSarahStages = {
   stages: [],
   totalLeads: 0,
+  funnelMeetings: 0,
+  funnelConversations: 0,
 }
 
 const getDateRangeDays = (from, to) => {
@@ -167,10 +169,17 @@ export function useSarahStages() {
           .eq('is_test', false),
       ])
 
+      const allRows = stageResult.data ?? []
+      const funnelMeetings = Number(allRows.find(row => row.stage === '_funnel_meetings_booked')?.count ?? 0)
+      const funnelConversations = Number(allRows.find(row => row.stage === '_funnel_conversations')?.count ?? 0)
+      const stages = allRows.filter(row => !row.stage?.startsWith('_funnel_'))
+
       return {
         data: {
-          stages: stageResult.data ?? [],
+          stages,
           totalLeads: totalResult.count ?? 0,
+          funnelMeetings,
+          funnelConversations,
         },
         error: stageResult.error || totalResult.error,
       }
@@ -182,6 +191,8 @@ export function useSarahStages() {
   return {
     stages: data?.stages ?? [],
     totalLeads: data?.totalLeads ?? 0,
+    funnelMeetings: data?.funnelMeetings ?? 0,
+    funnelConversations: data?.funnelConversations ?? 0,
     loading,
     error,
   }

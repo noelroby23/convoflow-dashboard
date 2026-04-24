@@ -27,8 +27,6 @@ const STAGE_TEXT_CLASS = {
   wrong_number: 'text-[#DC2626]',
 }
 
-const CONVERSATION_STAGES = ['contacted', 'callback', 'qualified_no_meeting', 'meeting_booked']
-
 function formatPercent(count, total) {
   if (!total) return '0% of total leads'
 
@@ -38,16 +36,12 @@ function formatPercent(count, total) {
 
 export default function SarahsPerformance() {
   const navigate = useNavigate()
-  const { stages, totalLeads, loading, error } = useSarahStages()
+  const { stages, totalLeads, funnelMeetings, funnelConversations, loading, error } = useSarahStages()
   const { data: targets } = useTargets()
 
-  const stageCounts = {}
-  stages.forEach(({ stage, count }) => {
-    stageCounts[stage] = Number(count ?? 0)
-  })
-
-  const conversations = CONVERSATION_STAGES.reduce((sum, stage) => sum + (stageCounts[stage] || 0), 0)
-  const meetingsBooked = stageCounts.meeting_booked || 0
+  const stageCards = stages.filter(stage => !stage.stage.startsWith('_funnel_'))
+  const conversations = funnelConversations
+  const meetingsBooked = funnelMeetings
   const bookingRate = totalLeads > 0 ? Number(((meetingsBooked / totalLeads) * 100).toFixed(1)) : 0
   const meetingsTarget = targets?.monthly_meetings ? Math.round(targets.monthly_meetings / 2) : 15
 
@@ -65,21 +59,21 @@ export default function SarahsPerformance() {
             label="Conversations"
             value={conversations}
             loading={loading}
-            description="Leads Sarah reached, advanced, or booked into a meeting."
+            description="Leads Sarah spoke with, including those who progressed further."
           />
           <KPICard
             label="Meetings Booked"
             value={meetingsBooked}
             loading={loading}
             target={meetingsTarget}
-            description="Meetings Sarah successfully handed over to sales."
+            description="Total meetings booked by Sarah, including those who showed or closed."
           />
           <KPICard
             label="Booking Rate"
             value={bookingRate}
             suffix="%"
             loading={loading}
-            description="Meetings booked as a share of Sarah's total leads."
+            description="Meetings booked as a share of total leads."
           />
         </div>
       </ErrorBoundary>
@@ -107,11 +101,11 @@ export default function SarahsPerformance() {
                 </div>
               ))}
             </div>
-          ) : !stages.length ? (
+          ) : !stageCards.length ? (
             <p className="text-sm text-[#9CA3AF] text-center py-12">No Sarah stage data available yet.</p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-              {stages.map(({ stage, count, label }) => (
+              {stageCards.map(({ stage, count, label }) => (
                 <button
                   key={stage}
                   type="button"
