@@ -18,7 +18,7 @@ function getTargetStatus(value, target, inverse) {
   const palette = statusLevel === 'green'
     ? { color: '#16A34A', label: 'On track' }
     : statusLevel === 'yellow'
-      ? { color: '#F59E0B', label: 'Near target' }
+      ? { color: '#F59E0B', label: 'Close' }
       : { color: '#DC2626', label: 'Off target' }
 
   return {
@@ -112,7 +112,7 @@ export default function KPICard({
           Target: {prefix}{typeof target === 'number' && target >= 1000 ? target.toLocaleString() : target}{suffix}
           {statusLabel && (
             <span className="ml-1 font-medium" style={{ color: statusColor }}>
-              {onTarget ? '✓' : statusLabel === 'Near target' ? '△' : '✗'} {statusLabel}
+              {onTarget ? '✓' : statusLabel === 'Close' ? '⚠' : '✗'} {statusLabel}
             </span>
           )
           }

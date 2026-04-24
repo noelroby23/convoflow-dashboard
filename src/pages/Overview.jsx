@@ -38,6 +38,10 @@ export default function Overview() {
   const showRate = overview?.show_rate ?? 0
   const meetingRate = overview?.meeting_rate ?? 0
   const roas = overview?.roas ?? 0
+  const leadsTarget = targets?.monthly_leads ?? 100
+  const meetingsTarget = targets?.monthly_meetings ?? 30
+  const showsTarget = targets?.monthly_shows ?? 23
+  const closesTarget = targets?.monthly_closes ?? 4
   const cplTarget = targets?.cpl_target ?? 85
   const costPerMeetingTarget = targets?.cost_per_meeting ?? 600
   const costPerActiveTarget = targets?.cost_per_active ?? 1200
@@ -65,11 +69,11 @@ export default function Overview() {
       <ErrorBoundary>
         <div className="grid grid-cols-6 gap-3 mb-6">
           <KPICard label="Total Spend" value={totalSpend} prefix="AED " inverse={true} loading={overviewLoading} description="What you spent on ads this period" />
-          <KPICard label="Total Leads" value={totalLeads} loading={overviewLoading} description="People who raised their hand interested in you" />
-          <KPICard label="Meetings Booked" value={meetingsBooked} loading={overviewLoading} description="Sales conversations Sarah booked" />
-          <KPICard label="Showed Up" value={showedUp} loading={overviewLoading} description="People who actually attended their meeting" />
+          <KPICard label="Total Leads" value={totalLeads} loading={overviewLoading} description="People who raised their hand interested in you" target={leadsTarget} />
+          <KPICard label="Meetings Booked" value={meetingsBooked} loading={overviewLoading} description="Sales conversations Sarah booked" target={meetingsTarget} />
+          <KPICard label="Showed Up" value={showedUp} loading={overviewLoading} description="People who actually attended their meeting" target={showsTarget} />
           <KPICard label="Active Opportunities" value={activeOpps} loading={overviewLoading} description="Leads your sales team is currently working" />
-          <KPICard label="Closed Won" value={closedWon} loading={overviewLoading} description="New customers who signed and paid" />
+          <KPICard label="Closed Won" value={closedWon} loading={overviewLoading} description="New customers who signed and paid" target={closesTarget} />
         </div>
       </ErrorBoundary>
 
