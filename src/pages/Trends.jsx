@@ -14,7 +14,7 @@ export default function Trends() {
   const { data: ads } = useAdPerformance()
   const setReportBuilder = useDashboard(s => s.setReportBuilder)
 
-  const chartData = (metrics ?? []).map(d => ({
+  const chartData = (metrics ?? []).filter(d => d?.date).map(d => ({
     date: format(new Date(`${d.date}T00:00:00Z`), 'MMM d'),
     spend: Number(d.spend ?? 0),
     leads: Number(d.leads ?? 0),
