@@ -76,6 +76,20 @@ function formatCurrency(value) {
   return `AED ${Number(value).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
 }
 
+function getExpandedCreativeUrl(creativeUrl) {
+  return creativeUrl?.replace(/p64x64/g, 'p480x480') || creativeUrl || null
+}
+
+function getStoryUrl(effectiveObjectStoryId) {
+  if (!effectiveObjectStoryId) return null
+  if (effectiveObjectStoryId.startsWith('http://') || effectiveObjectStoryId.startsWith('https://')) return effectiveObjectStoryId
+
+  const [pageId, postId] = effectiveObjectStoryId.split('_')
+  if (pageId && postId) return `https://www.facebook.com/${pageId}/posts/${postId}`
+
+  return null
+}
+
 function matchesFilter(ad, filterId) {
   if (filterId === 'all') return true
   if (filterId === 'active') return getAdStatusDisplay(ad.status).isActive
@@ -122,47 +136,73 @@ function CreativeThumbnail({ ad }) {
 
 function ExpandedCreativePreview({ ad }) {
   const [imageBroken, setImageBroken] = useState(false)
-  const showImage = ad.creative_url && !imageBroken
+  const expandedCreativeUrl = getExpandedCreativeUrl(ad.creative_url)
+  const showImage = expandedCreativeUrl && !imageBroken
   const isVideo = ad.creative_type === 'VIDEO'
-  const adsManagerUrl = ad.meta_ad_id
-    ? `https://business.facebook.com/ads/manager/?act=646790754850237&selected_ad_ids=${encodeURIComponent(ad.meta_ad_id)}`
-    : null
+  const storyUrl = getStoryUrl(ad.effective_object_story_id)
 
   return (
     <div>
       <p className="text-xs font-semibold text-[#6B7280] mb-3">CREATIVE PREVIEW</p>
       <div className="rounded-xl border border-[#E5E7EB] bg-white p-4">
-        {showImage ? (
-          <img
-            src={ad.creative_url}
-            alt={ad.ad_name}
-            onError={(e) => {
-              e.target.style.display = 'none'
-              setImageBroken(true)
-            }}
-            className="w-40 h-40 rounded-lg object-cover border border-gray-200 bg-[#F9FAFB]"
-          />
-        ) : (
-          <div className="w-40 h-40 rounded-lg border border-gray-200 bg-[#F3F4F6] flex items-center justify-center">
-            {isVideo ? <Play size={32} className="text-[#9CA3AF] ml-1" /> : <FileText size={32} className="text-[#9CA3AF]" />}
-          </div>
-        )}
+        <div className="relative w-[200px] max-w-full">
+          {showImage ? (
+            <img
+              src={expandedCreativeUrl}
+              alt={ad.ad_name}
+              onError={(e) => {
+                e.target.style.display = 'none'
+                setImageBroken(true)
+              }}
+              className="w-[200px] max-w-full rounded-lg object-cover border border-gray-200 bg-[#F9FAFB]"
+            />
+          ) : (
+            <div className="w-[200px] aspect-square max-w-full rounded-lg border border-gray-200 bg-[#F3F4F6] flex items-center justify-center">
+              {isVideo ? <Play size={36} className="text-[#9CA3AF] ml-1" /> : <FileText size={36} className="text-[#9CA3AF]" />}
+            </div>
+          )}
+
+          {isVideo && ad.video_url && (
+            <button
+              type="button"
+              onClick={() => window.open(ad.video_url, '_blank', 'noopener,noreferrer')}
+              className="absolute inset-0 flex items-center justify-center"
+              aria-label={`Watch ${ad.ad_name} on Facebook`}
+            >
+              <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white/80 shadow-md backdrop-blur-sm hover:bg-white transition-colors">
+                <Play size={24} className="text-[#111827] ml-1" fill="currentColor" />
+              </span>
+            </button>
+          )}
+        </div>
 
         <div className="mt-4">
-          <p className="text-sm font-bold text-[#0F0F1A] leading-snug">{ad.ad_name}</p>
+          <p className="text-sm font-bold text-[#0F0F1A] leading-snug truncate" title={ad.ad_name}>{ad.ad_name}</p>
           <div className="flex items-center gap-1.5 mt-2 flex-wrap">
             <CreativeTypeBadge creativeType={ad.creative_type} />
           </div>
           <p className="text-xs text-[#9CA3AF] mt-2">{ad.campaign_name || '—'}</p>
 
-          {isVideo && adsManagerUrl && (
+          {isVideo && ad.video_url && (
             <a
-              href={adsManagerUrl}
+              href={ad.video_url}
               target="_blank"
               rel="noreferrer"
               className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-[#E5E7EB] px-3 py-1.5 text-xs font-medium text-[#2563EB] hover:bg-[#EFF6FF] transition-colors"
             >
-              View in Ads Manager
+              Watch on Facebook
+              <ExternalLink size={12} />
+            </a>
+          )}
+
+          {!isVideo && storyUrl && (
+            <a
+              href={storyUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-[#E5E7EB] px-3 py-1.5 text-xs font-medium text-[#7C3AED] hover:bg-[#F5F3FF] transition-colors"
+            >
+              View original post
               <ExternalLink size={12} />
             </a>
           )}
@@ -326,11 +366,11 @@ export default function AdCreatives() {
                 const watchThrough = getWatchThroughValue(ad)
                 const isVideo = ad.creative_type === 'VIDEO'
                 const detailRows = [
-                  { label: 'Total Impressions', value: formatWholeNumber(ad.total_impressions), className: 'font-medium' },
-                  { label: 'Avg Frequency', value: formatDecimal(ad.avg_frequency), className: getFreqColor(ad.avg_frequency) },
-                  { label: 'CTR', value: ad.avg_ctr != null ? `${formatDecimal(ad.avg_ctr)}%` : '—', className: 'font-medium' },
+                  { label: 'Total Impressions', value: formatWholeNumber(ad.total_impressions), className: 'font-medium text-[#0F0F1A]' },
+                  { label: 'Avg Frequency', value: formatDecimal(ad.avg_frequency), className: getFreqColor(ad.avg_frequency) || 'text-[#0F0F1A]' },
+                  { label: 'CTR', value: ad.avg_ctr != null ? `${formatDecimal(ad.avg_ctr)}%` : '—', className: 'font-medium text-[#0F0F1A]' },
                   { label: 'Cost per Lead', value: formatCurrency(ad.cost_per_lead), className: getCPLColor(ad.cost_per_lead) },
-                  { label: 'Cost per Active', value: formatCurrency(ad.cost_per_active), className: 'font-medium' },
+                  { label: 'Cost per Active', value: formatCurrency(ad.cost_per_active), className: 'font-medium text-[#0F0F1A]' },
                   ...(isVideo ? [
                     { label: 'Hook Rate', value: hookRate != null ? `${formatDecimal(hookRate)}%` : '—', className: getHookRateColor(hookRate), bordered: true },
                     { label: 'Watch-Through', value: watchThrough != null ? `${formatDecimal(watchThrough)}%` : '—', className: getWatchThroughColor(watchThrough) },
@@ -387,7 +427,7 @@ export default function AdCreatives() {
                     {expandedId === ad.ad_id && (
                       <tr key={`${ad.ad_id}-expanded`} className="border-t border-[#F3F4F6] bg-[#FAFAFA]">
                         <td colSpan={14} className="px-6 py-4">
-                          <div className="grid grid-cols-1 xl:grid-cols-[200px_minmax(0,1fr)_280px] gap-6 items-start">
+                          <div className="grid grid-cols-1 lg:grid-cols-[200px_1fr_280px] gap-6 items-start">
                             <ExpandedCreativePreview ad={ad} />
                             <div>
                               <p className="text-xs font-semibold text-[#6B7280] mb-3">PERFORMANCE BREAKDOWN</p>

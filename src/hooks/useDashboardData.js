@@ -17,6 +17,7 @@ const fallbackAds = mockAds.map(ad => ({
   total_leads: ad.leads, meetings_booked: ad.meetings, showed_up: ad.showed,
   active_opportunities: ad.activeOpps, closed_won: ad.closedWon, cost_per_lead: ad.cpl,
   cost_per_active: ad.costPerActive, meta_ad_id: null, creative_url: null, creative_type: null,
+  video_url: null, effective_object_story_id: null,
 }))
 
 const fallbackContacts = mockLeads.map(lead => ({
