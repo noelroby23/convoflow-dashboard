@@ -144,7 +144,7 @@ export function useAllContacts() {
 export function useLeadTrackerContacts() {
   const { refreshKey } = useDashboard()
   return useSupabaseQuery(
-    () => supabase.from('lead_tracker').select('*').order('status_updated_at', { ascending: false }),
+    () => supabase.from('lead_tracker').select('*').order('ghl_created_at', { ascending: false, nullsFirst: false }),
     [refreshKey], fallbackLeadTracker
   )
 }

@@ -3,7 +3,7 @@ import KPICard from '../components/ui/KPICard'
 import Tabs from '../components/ui/Tabs'
 import ErrorBoundary from '../components/ui/ErrorBoundary'
 import AISummary from '../components/ui/AISummary'
-import { useSalesRepPerformance } from '../hooks/useDashboardData'
+import { useSalesRepPerformance, useTargets } from '../hooks/useDashboardData'
 import { useDashboardOverview } from '../hooks/useDashboardOverview'
 import { useDashboard } from '../store/dashboard'
 import { salesReport } from '../lib/reports/generators'
@@ -13,6 +13,7 @@ export default function SalesPerformance() {
   const { data: salesReps, loading: repsLoading } = useSalesRepPerformance()
   const dateRange = useDashboard(s => s.dateRange)
   const { data: overview, loading: overviewLoading } = useDashboardOverview(dateRange.from, dateRange.to)
+  const { data: targets } = useTargets()
   const setReportBuilder = useDashboard(s => s.setReportBuilder)
 
   useEffect(() => {
@@ -29,6 +30,9 @@ export default function SalesPerformance() {
   const totalDisqualified = Number(overview?.disqualified ?? 0)
   const totalLost = Number(overview?.closed_lost ?? 0)
   const totalNotInterested = Number(overview?.not_interested ?? 0)
+  const meetingsTarget = targets?.monthly_meetings ?? 30
+  const showsTarget = 23
+  const closeRateTarget = 20
 
   const showRate = totalMeetings > 0 ? ((totalShows / totalMeetings) * 100).toFixed(0) : 0
   const closeRate = totalShows > 0 ? ((totalCloses / totalShows) * 100).toFixed(0) : 0
@@ -49,8 +53,8 @@ export default function SalesPerformance() {
           {/* Row 1 — Meetings */}
           <ErrorBoundary>
             <div className="grid grid-cols-4 gap-3 mb-3">
-              <KPICard label="Meetings Scheduled" value={totalMeetings} loading={overviewLoading} description="Total meetings booked this period" />
-              <KPICard label="Shows" value={totalShows} loading={overviewLoading} description="People who attended their meeting" />
+              <KPICard label="Meetings Scheduled" value={totalMeetings} loading={overviewLoading} description="Total meetings booked this period" target={meetingsTarget} />
+              <KPICard label="Shows" value={totalShows} loading={overviewLoading} description="People who attended their meeting" target={showsTarget} />
               <KPICard label="No-Shows" value={totalNoShows} loading={overviewLoading} inverse={true} description="People who missed their meeting" />
               <KPICard label="Closes" value={totalCloses} loading={overviewLoading} description="New customers signed" target={2} />
             </div>
@@ -60,7 +64,7 @@ export default function SalesPerformance() {
           <ErrorBoundary>
             <div className="grid grid-cols-4 gap-3 mb-6">
               <KPICard label="Show Rate" value={showRate} suffix="%" loading={overviewLoading} description="% of booked meetings that showed up" target={75} />
-              <KPICard label="Close Rate" value={closeRate} suffix="%" loading={overviewLoading} description="% of showed meetings that closed" target={20} />
+              <KPICard label="Close Rate" value={closeRate} suffix="%" loading={overviewLoading} description="% of showed meetings that closed" target={closeRateTarget} />
               <KPICard label="Disqualified" value={totalDisqualified} loading={overviewLoading} inverse={true} description="Leads disqualified by AI or sales team" />
               <KPICard label="Lost / Not Interested" value={totalLost + totalNotInterested} loading={overviewLoading} inverse={true} description="Leads lost or marked not interested" />
             </div>

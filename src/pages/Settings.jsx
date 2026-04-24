@@ -31,7 +31,7 @@ const syncSources = [
   { name: 'VAPI (AI Calls)', lastSync: '12 min ago', status: 'live', description: 'AI call recordings & summaries' },
 ]
 
-const teamMembers = [
+const fallbackTeamMembers = [
   { name: 'Mark Marti', email: 'mark@convoflow.ae', role: 'Admin', avatar: 'MM' },
   { name: 'Abdus', email: 'abdus@convoflow.ae', role: 'Admin', avatar: 'AB' },
   { name: 'Noel', email: 'noel@convoflow.ae', role: 'Viewer', avatar: 'NL' },
@@ -70,9 +70,17 @@ export default function Settings() {
   const { currentClientId } = useDashboard()
   const { isEnabled, setIsEnabled } = useDailyAISummary()
   const [targets, setTargets] = useState(defaultTargets)
+  const [teamMembers, setTeamMembers] = useState(fallbackTeamMembers)
+  const [teamTableAvailable, setTeamTableAvailable] = useState(true)
+  const [inviteName, setInviteName] = useState('')
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteRole, setInviteRole] = useState('Viewer')
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
   const [loadError, setLoadError] = useState(null)
+  const [inviteError, setInviteError] = useState(null)
+  const [inviteSaved, setInviteSaved] = useState(false)
+  const [inviting, setInviting] = useState(false)
 
   useEffect(() => {
     supabase
@@ -96,6 +104,28 @@ export default function Settings() {
       })
   }, [currentClientId])
 
+  useEffect(() => {
+    supabase
+      .from('team_members')
+      .select('name, email, role')
+      .eq('client_id', currentClientId)
+      .order('invited_at', { ascending: false })
+      .then(({ data, error }) => {
+        if (error) {
+          setTeamTableAvailable(false)
+          return
+        }
+
+        setTeamTableAvailable(true)
+        if (data?.length) {
+          setTeamMembers(data.map(member => ({
+            ...member,
+            avatar: member.name?.split(' ').map(part => part[0]).join('').slice(0, 2).toUpperCase() || 'TM',
+          })))
+        }
+      })
+  }, [currentClientId])
+
   const handleSave = async () => {
     setSaving(true)
     setLoadError(null)
@@ -114,6 +144,50 @@ export default function Settings() {
     }
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
+  }
+
+  const handleInvite = async () => {
+    if (!teamTableAvailable) return
+
+    setInviteError(null)
+
+    if (!inviteName.trim() || !inviteEmail.trim()) {
+      setInviteError('Name and email are required.')
+      return
+    }
+
+    setInviting(true)
+    const { data, error } = await supabase
+      .from('team_members')
+      .insert({
+        client_id: currentClientId,
+        name: inviteName.trim(),
+        email: inviteEmail.trim(),
+        role: inviteRole,
+        invited_at: new Date().toISOString(),
+      })
+      .select('name, email, role')
+      .single()
+
+    setInviting(false)
+
+    if (error) {
+      setInviteError(error.message)
+      return
+    }
+
+    setTeamMembers(prev => [
+      {
+        ...data,
+        avatar: data.name?.split(' ').map(part => part[0]).join('').slice(0, 2).toUpperCase() || 'TM',
+      },
+      ...prev,
+    ])
+    setInviteName('')
+    setInviteEmail('')
+    setInviteRole('Viewer')
+    setInviteSaved(true)
+    setTimeout(() => setInviteSaved(false), 2000)
   }
 
   return (
@@ -205,9 +279,35 @@ export default function Settings() {
             <Users className="w-5 h-5 text-[#EC4899]" />
             <h2 className="text-base font-semibold text-[#0F0F1A]">Team Members</h2>
           </div>
-          <button className="px-4 py-2 rounded-lg border border-[#EC4899] text-[#EC4899] text-sm font-medium hover:bg-pink-50 transition-colors">
-            + Invite member
-          </button>
+        </div>
+        <div className="px-6 py-4 border-b border-[#E5E7EB] bg-[#F9FAFB]">
+          {!teamTableAvailable ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              Team management coming soon — contact support to add members.
+            </div>
+          ) : (
+            <div className="grid grid-cols-[1.2fr_1.4fr_0.8fr_auto] gap-3 items-end">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wide text-[#6B7280] mb-1">Name</label>
+                <input value={inviteName} onChange={e => setInviteName(e.target.value)} className="w-full text-sm border border-[#E5E7EB] rounded-lg px-3 py-2 focus:outline-none focus:border-[#EC4899]" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wide text-[#6B7280] mb-1">Email</label>
+                <input value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} className="w-full text-sm border border-[#E5E7EB] rounded-lg px-3 py-2 focus:outline-none focus:border-[#EC4899]" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wide text-[#6B7280] mb-1">Role</label>
+                <select value={inviteRole} onChange={e => setInviteRole(e.target.value)} className="w-full text-sm border border-[#E5E7EB] rounded-lg px-3 py-2 focus:outline-none focus:border-[#EC4899] bg-white">
+                  <option value="Admin">Admin</option>
+                  <option value="Viewer">Viewer</option>
+                </select>
+              </div>
+              <button onClick={handleInvite} disabled={inviting} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${inviteSaved ? 'bg-green-100 text-green-700' : 'bg-[#EC4899] text-white hover:bg-[#DB2777]'} disabled:opacity-60`}>
+                {inviting ? 'Inviting...' : inviteSaved ? 'Invited!' : 'Invite Member'}
+              </button>
+            </div>
+          )}
+          {inviteError && <p className="mt-3 text-sm text-red-700">{inviteError}</p>}
         </div>
         <table className="w-full">
           <thead>

@@ -5,17 +5,27 @@ function getTargetStatus(value, target, inverse) {
   if (target === null) {
     return {
       onTarget: null,
+      statusLabel: null,
       borderColor: '#E5E7EB',
       statusColor: '#16A34A',
     }
   }
 
-  const onTarget = inverse ? value <= target : value >= target
+  const statusLevel = inverse
+    ? value <= target ? 'green' : value <= target * 1.25 ? 'yellow' : 'red'
+    : value >= target ? 'green' : value >= target * 0.75 ? 'yellow' : 'red'
+
+  const palette = statusLevel === 'green'
+    ? { color: '#16A34A', label: 'On track' }
+    : statusLevel === 'yellow'
+      ? { color: '#F59E0B', label: 'Near target' }
+      : { color: '#DC2626', label: 'Off target' }
 
   return {
-    onTarget,
-    borderColor: onTarget ? '#16A34A' : '#DC2626',
-    statusColor: onTarget ? '#16A34A' : '#DC2626',
+    onTarget: statusLevel === 'green',
+    statusLabel: palette.label,
+    borderColor: palette.color,
+    statusColor: palette.color,
   }
 }
 
@@ -56,7 +66,7 @@ export default function KPICard({
     )
   }
 
-  const { onTarget, borderColor, statusColor } = getTargetStatus(value, target, inverse)
+  const { onTarget, statusLabel, borderColor, statusColor } = getTargetStatus(value, target, inverse)
 
   // Trend direction: positive outcome = green, negative outcome = red
   // For inverse metrics (costs): going down is good, going up is bad
@@ -100,9 +110,11 @@ export default function KPICard({
       {target !== null && (
         <p className="text-xs text-[#6B7280]">
           Target: {prefix}{typeof target === 'number' && target >= 1000 ? target.toLocaleString() : target}{suffix}
-          {onTarget
-            ? <span className="ml-1 font-medium" style={{ color: statusColor }}>✓ On track</span>
-            : <span className="ml-1 text-[#DC2626] font-medium">✗ Off target</span>
+          {statusLabel && (
+            <span className="ml-1 font-medium" style={{ color: statusColor }}>
+              {onTarget ? '✓' : statusLabel === 'Near target' ? '△' : '✗'} {statusLabel}
+            </span>
+          )
           }
         </p>
       )}

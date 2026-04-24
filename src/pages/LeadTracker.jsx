@@ -287,12 +287,19 @@ export default function LeadTracker() {
                             <p className="text-xs font-semibold text-[#6B7280] mb-2">CONTACT DETAILS</p>
                             <div className="flex justify-between"><span className="text-[#6B7280]">Email</span><span>{contact.email || '—'}</span></div>
                             <div className="flex justify-between"><span className="text-[#6B7280]">Phone</span><span>{contact.phone || '—'}</span></div>
+                            <div className="flex justify-between"><span className="text-[#6B7280]">Industry</span><span>{contact.industry || '—'}</span></div>
                             <div className="flex justify-between"><span className="text-[#6B7280]">Meeting Date</span><span>{contact.meeting_date ? new Date(contact.meeting_date).toLocaleDateString() : '—'}</span></div>
                             <div className="flex justify-between"><span className="text-[#6B7280]">Deal Value</span><span className="font-medium">{contact.deal_value ? `AED ${Number(contact.deal_value).toLocaleString()}` : '—'}</span></div>
                             <div className="flex justify-between"><span className="text-[#6B7280]">Pipeline</span><span>{contact.ghl_pipeline_name || '—'}</span></div>
-                            <div className="flex justify-between"><span className="text-[#6B7280]">Follow-up Attempts</span><span>{contact.follow_up_attempts ?? '—'}</span></div>
+                            <div className="flex justify-between"><span className="text-[#6B7280]">Lead Score</span><span>{contact.lead_quality_score || '—'}</span></div>
+                            <div className="flex justify-between"><span className="text-[#6B7280]">Follow-up Attempts</span><span>{contact.follow_up_attempts > 0 ? contact.follow_up_attempts : '—'}</span></div>
                             <div className="flex justify-between"><span className="text-[#6B7280]">Assigned To</span><span>{contact.assigned_to || '—'}</span></div>
-                            {contact.dq_reason && <div className="flex justify-between"><span className="text-[#6B7280]">DQ Reason</span><span className="text-[#DC2626]">{contact.dq_reason}</span></div>}
+                            <div className="flex justify-between"><span className="text-[#6B7280]">DQ Reason</span><span className={contact.dq_reason ? 'text-[#DC2626]' : ''}>{contact.dq_reason || '—'}</span></div>
+                            <div className="flex justify-between"><span className="text-[#6B7280]">Recording</span><span>{contact.call_recording_url ? <a href={contact.call_recording_url} target="_blank" rel="noreferrer" className="text-[#EC4899] hover:underline">Listen</a> : '—'}</span></div>
+                            <div className="pt-2 border-t border-[#E5E7EB]">
+                              <p className="text-[#6B7280] mb-1">Call Summary</p>
+                              <p className="text-[#333333] leading-relaxed">{contact.call_summary || '—'}</p>
+                            </div>
                           </div>
                           <div className="col-span-2">
                             <AudioTranscriptViewer

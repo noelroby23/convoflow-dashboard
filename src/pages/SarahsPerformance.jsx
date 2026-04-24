@@ -6,7 +6,7 @@ import AISummary from '../components/ui/AISummary'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import { useDashboard } from '../store/dashboard'
 import { sarahReport } from '../lib/reports/generators'
-import { useFunnelSummary, useAllContacts } from '../hooks/useDashboardData'
+import { useFunnelSummary, useAllContacts, useTargets } from '../hooks/useDashboardData'
 
 const OUTCOME_COLORS = {
   'Meeting Booked': '#16A34A',
@@ -35,6 +35,7 @@ const CustomLabel = ({ cx, cy, midAngle, outerRadius, name, value }) => {
 export default function SarahsPerformance() {
   const [activeTab, setActiveTab] = useState('overview')
   const setReportBuilder = useDashboard(s => s.setReportBuilder)
+  const { data: targets } = useTargets()
 
   // Lifetime totals — not date-filtered
   const { data: funnel, loading: funnelLoading } = useFunnelSummary()
@@ -44,6 +45,8 @@ export default function SarahsPerformance() {
   const showedUp = funnel?.showed_up ?? 0
   const activeOpps = funnel?.active_opportunities ?? 0
   const totalContacts = contacts?.length ?? 0
+  const meetingsTarget = targets?.monthly_meetings ? Math.round(targets.monthly_meetings / 2) : 15
+  const showedTarget = 17
 
   // Real outcome breakdown from all contact stages
   const stageCounts = {}
@@ -98,8 +101,8 @@ export default function SarahsPerformance() {
             <div className="grid grid-cols-6 gap-3 mb-6">
               <KPICard label="Calls Attempted" value="—" description="Call log integration coming soon" />
               <KPICard label="Calls Connected" value="—" description="Call log integration coming soon" />
-              <KPICard label="Meetings Booked" value={meetingsBooked} loading={funnelLoading} description="Total meetings Sarah booked" target={15} />
-              <KPICard label="Showed Up" value={showedUp} loading={funnelLoading} description="Leads who attended their meeting" target={Math.round(meetingsBooked * 0.75)} />
+              <KPICard label="Meetings Booked" value={meetingsBooked} loading={funnelLoading} description="Total meetings Sarah booked" target={meetingsTarget} />
+              <KPICard label="Showed Up" value={showedUp} loading={funnelLoading} description="Leads who attended their meeting" target={showedTarget} />
               <KPICard label="Not Interested" value={notInterestedCount} loading={contactsLoading} description={`${notInterestedPct}% of leads were qualified but chose not to proceed.`} inverse={true} />
               <KPICard label="Disqualified" value={disqualifiedCount} loading={contactsLoading} description={`${disqualifiedPct}% of leads did not meet fit criteria.`} inverse={true} />
             </div>
