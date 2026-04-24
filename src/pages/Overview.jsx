@@ -18,7 +18,7 @@ export default function Overview() {
   const setReportBuilder = useDashboard(s => s.setReportBuilder)
   const { data: overview, loading: overviewLoading } = useDashboardOverview(dateRange.from, dateRange.to)
   const { data: targets } = useTargets()
-  const { data: activePipeline, loading: pipelineLoading } = useContactDetails(['active', 'proposal_sent', 'follow_up_meeting', 'meeting_booked'])
+  const { data: activePipeline, loading: pipelineLoading } = useContactDetails(['showed', 'active'])
 
   useEffect(() => {
     setReportBuilder(() => homeReport(overview, activePipeline))
