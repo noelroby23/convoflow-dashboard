@@ -110,26 +110,25 @@ function CreativeTypeBadge({ creativeType }) {
 
 function CreativeThumbnail({ ad }) {
   const [imageBroken, setImageBroken] = useState(false)
-  const showImage = ad.creative_url && !imageBroken
+  const showImage = Boolean(ad.creative_url && !imageBroken)
   const isVideo = ad.creative_type === 'VIDEO'
 
-  if (showImage) {
-    return (
-      <img
-        src={ad.creative_url}
-        alt={ad.ad_name}
-        onError={(e) => {
-          e.target.style.display = 'none'
-          setImageBroken(true)
-        }}
-        className="w-10 h-10 md:w-12 md:h-12 rounded-lg object-cover border border-gray-200 flex-shrink-0 bg-[#F9FAFB]"
-      />
-    )
-  }
-
   return (
-    <div className="w-10 h-10 md:w-12 md:h-12 rounded-lg border border-gray-200 bg-[#F3F4F6] flex items-center justify-center flex-shrink-0">
-      {isVideo ? <Play size={16} className="text-[#9CA3AF] ml-0.5" /> : <FileText size={16} className="text-[#9CA3AF]" />}
+    <div className="relative w-10 h-10 md:w-12 md:h-12 flex-shrink-0">
+      {showImage && (
+        <img
+          src={ad.creative_url}
+          alt={ad.ad_name}
+          className="w-10 h-10 md:w-12 md:h-12 rounded object-cover flex-shrink-0 border border-gray-200 bg-[#F9FAFB]"
+          onError={(e) => {
+            e.target.style.display = 'none'
+            setImageBroken(true)
+          }}
+        />
+      )}
+      <div className={`w-10 h-10 md:w-12 md:h-12 rounded bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0 ${showImage ? 'hidden' : 'flex'}`}>
+        {isVideo ? <Play size={16} className="text-[#9CA3AF] ml-0.5" /> : <FileText size={16} className="text-[#9CA3AF]" />}
+      </div>
     </div>
   )
 }
@@ -137,7 +136,7 @@ function CreativeThumbnail({ ad }) {
 function ExpandedCreativePreview({ ad }) {
   const [imageBroken, setImageBroken] = useState(false)
   const expandedCreativeUrl = getExpandedCreativeUrl(ad.creative_url)
-  const showImage = expandedCreativeUrl && !imageBroken
+  const showImage = Boolean(expandedCreativeUrl && !imageBroken)
   const isVideo = ad.creative_type === 'VIDEO'
   const storyUrl = getStoryUrl(ad.effective_object_story_id)
 
@@ -146,7 +145,7 @@ function ExpandedCreativePreview({ ad }) {
       <p className="text-xs font-semibold text-[#6B7280] mb-3">CREATIVE PREVIEW</p>
       <div className="rounded-xl border border-[#E5E7EB] bg-white p-4">
         <div className="relative w-full max-w-[200px]">
-          {showImage ? (
+          {showImage && (
             <img
               src={expandedCreativeUrl}
               alt={ad.ad_name}
@@ -154,25 +153,32 @@ function ExpandedCreativePreview({ ad }) {
                 e.target.style.display = 'none'
                 setImageBroken(true)
               }}
-              className="w-full rounded-lg object-cover border border-gray-200 bg-[#F9FAFB]"
+              className="w-full max-w-[200px] aspect-square object-cover rounded-lg border border-gray-200 bg-[#F9FAFB]"
             />
-          ) : (
-            <div className="w-full aspect-square rounded-lg border border-gray-200 bg-[#F3F4F6] flex items-center justify-center">
-              {isVideo ? <Play size={36} className="text-[#9CA3AF] ml-1" /> : <FileText size={36} className="text-[#9CA3AF]" />}
-            </div>
           )}
 
+          <div className={`w-full max-w-[200px] aspect-square rounded-lg border border-gray-200 bg-[#F3F4F6] items-center justify-center ${showImage ? 'hidden' : 'flex'}`}>
+            {isVideo ? <Play size={36} className="text-[#9CA3AF] ml-1" /> : <FileText size={36} className="text-[#9CA3AF]" />}
+          </div>
+
           {isVideo && ad.video_url && (
-            <button
-              type="button"
+            <div
+              className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-lg hover:bg-black/40 transition cursor-pointer"
               onClick={() => window.open(ad.video_url, '_blank', 'noopener,noreferrer')}
-              className="absolute inset-0 flex items-center justify-center"
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  window.open(ad.video_url, '_blank', 'noopener,noreferrer')
+                }
+              }}
               aria-label={`Watch ${ad.ad_name} on Facebook`}
             >
-              <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white/80 shadow-md backdrop-blur-sm hover:bg-white transition-colors">
-                <Play size={24} className="text-[#111827] ml-1" fill="currentColor" />
-              </span>
-            </button>
+              <div className="w-12 h-12 bg-white/90 rounded-full flex items-center justify-center">
+                <svg className="w-6 h-6 text-gray-800 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+              </div>
+            </div>
           )}
         </div>
 
@@ -213,7 +219,9 @@ function ExpandedCreativePreview({ ad }) {
 }
 
 export default function AdCreatives() {
-  const { data: ads, loading, error } = useAdPerformance()
+  const { data, loading, error } = useAdPerformance()
+  const ads = data
+  console.log('AD DATA SAMPLE:', data?.[0])
   const setReportBuilder = useDashboard(s => s.setReportBuilder)
   const [expandedId, setExpandedId] = useState(null)
   const [activeFilter, setActiveFilter] = useState('all')
@@ -365,15 +373,15 @@ export default function AdCreatives() {
                 const hookRate = getHookRateValue(ad)
                 const watchThrough = getWatchThroughValue(ad)
                 const isVideo = ad.creative_type === 'VIDEO'
-                const detailRows = [
-                  { label: 'Total Impressions', value: formatWholeNumber(ad.total_impressions), className: 'font-medium text-[#0F0F1A]' },
-                  { label: 'Avg Frequency', value: formatDecimal(ad.avg_frequency), className: getFreqColor(ad.avg_frequency) || 'text-[#0F0F1A]' },
-                  { label: 'CTR', value: ad.avg_ctr != null ? `${formatDecimal(ad.avg_ctr)}%` : '—', className: 'font-medium text-[#0F0F1A]' },
-                  { label: 'Cost per Lead', value: formatCurrency(ad.cost_per_lead), className: getCPLColor(ad.cost_per_lead) },
-                  { label: 'Cost per Active', value: formatCurrency(ad.cost_per_active), className: 'font-medium text-[#0F0F1A]' },
+                const adDetails = [
+                  { label: 'Total Impressions', value: ad.total_impressions?.toLocaleString() || '—' },
+                  { label: 'Avg Frequency', value: ad.avg_frequency != null ? Number(ad.avg_frequency).toFixed(2) : '—' },
+                  { label: 'CTR', value: ad.avg_ctr != null ? `${ad.avg_ctr}%` : '—' },
+                  { label: 'Cost per Lead', value: ad.cost_per_lead ? `AED ${Number(ad.cost_per_lead).toLocaleString()}` : '—' },
+                  { label: 'Cost per Active', value: ad.cost_per_active ? `AED ${Number(ad.cost_per_active).toLocaleString()}` : '—' },
                   ...(isVideo ? [
-                    { label: 'Hook Rate', value: hookRate != null ? `${formatDecimal(hookRate)}%` : '—', className: getHookRateColor(hookRate), bordered: true },
-                    { label: 'Watch-Through', value: watchThrough != null ? `${formatDecimal(watchThrough)}%` : '—', className: getWatchThroughColor(watchThrough) },
+                    { label: 'Hook Rate', value: ad.hook_rate_pct != null ? `${ad.hook_rate_pct}%` : '—', bordered: true },
+                    { label: 'Watch-Through', value: ad.watch_through_pct != null ? `${ad.watch_through_pct}%` : '—' },
                   ] : []),
                 ]
                 const rowAccent = classification === 'action' ? 'border-l-2 border-l-red-400' :
@@ -428,8 +436,8 @@ export default function AdCreatives() {
                       <tr key={`${ad.ad_id}-expanded`} className="border-t border-[#F3F4F6] bg-[#FAFAFA]">
                         <td colSpan={14} className="px-6 py-4">
                           <div className="w-full overflow-hidden">
-                            <div className="grid grid-cols-1 md:grid-cols-[1fr_2fr_1fr] gap-4 items-start">
-                              <div className="min-w-0 overflow-hidden">
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 p-4">
+                              <div className="min-w-0 overflow-hidden lg:max-w-[220px]">
                                 <ExpandedCreativePreview ad={ad} />
                               </div>
                               <div className="min-w-0 overflow-hidden">
@@ -470,13 +478,13 @@ export default function AdCreatives() {
                                   </div>
                                 )}
                               </div>
-                              <div className="min-w-0 overflow-hidden">
+                              <div className="min-w-0 overflow-hidden lg:max-w-[240px] lg:justify-self-end w-full">
                                 <p className="text-xs font-semibold text-[#6B7280] mb-3">AD DETAILS</p>
                                 <div className="space-y-2">
-                                  {detailRows.map(({ label, value, className, bordered }) => (
-                                    <div key={label} className={`flex justify-between items-center gap-2 ${bordered ? 'pt-2 border-t border-[#E5E7EB]' : ''}`}>
+                                  {adDetails.map(({ label, value, bordered }) => (
+                                    <div key={label} className={`flex justify-between py-1 items-center gap-2 ${bordered ? 'pt-2 border-t border-[#E5E7EB]' : ''}`}>
                                       <span className="text-xs text-[#6B7280] whitespace-nowrap">{label}</span>
-                                      <span className={`${className} text-xs text-right whitespace-nowrap`}>{value || '—'}</span>
+                                      <span className="text-xs font-semibold text-right whitespace-nowrap text-[#0F0F1A]">{value || '—'}</span>
                                     </div>
                                   ))}
                                 </div>
