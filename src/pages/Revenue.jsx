@@ -4,25 +4,27 @@ import AISummary from '../components/ui/AISummary'
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { useDashboard } from '../store/dashboard'
 import { revenueReport } from '../lib/reports/generators'
-import { useFunnelSummary, useAdPerformance, useDailyMetrics } from '../hooks/useDashboardData'
+import { useAdPerformance, useDailyMetrics } from '../hooks/useDashboardData'
+import { useDashboardOverview } from '../hooks/useDashboardOverview'
 
 export default function Revenue() {
+  const dateRange = useDashboard(s => s.dateRange)
   const setReportBuilder = useDashboard(s => s.setReportBuilder)
-  const { data: funnel, loading: funnelLoading } = useFunnelSummary()
+  const { data: overview, loading: overviewLoading } = useDashboardOverview(dateRange.from, dateRange.to)
   const { data: ads, loading: adsLoading } = useAdPerformance()
   const { data: dailyMetrics, loading: metricsLoading } = useDailyMetrics()
 
-  const totalSpend = Number(funnel?.total_spend ?? 0)
-  const closedRevenue = Number(funnel?.closed_revenue ?? 0)
-  const activePipelineValue = Number(funnel?.pipeline_value ?? 0)
+  const totalSpend = Number(overview?.total_spend ?? 0)
+  const closedRevenue = Number(overview?.closed_revenue ?? 0)
+  const activePipelineValue = Number(overview?.pipeline_value ?? 0)
   const historicalCloseRate = 0.2
   const projectedRevenue = closedRevenue + (activePipelineValue * historicalCloseRate)
   const roas = totalSpend > 0 ? (closedRevenue / totalSpend).toFixed(1) : '0.0'
 
   useEffect(() => {
-    setReportBuilder(() => revenueReport())
+    setReportBuilder(() => revenueReport(overview))
     return () => setReportBuilder(null)
-  }, [setReportBuilder])
+  }, [overview, setReportBuilder])
 
   // Revenue by ad — only ads with closed won > 0
   const revenueByAd = (ads ?? [])
@@ -43,7 +45,7 @@ export default function Revenue() {
     }
   })
 
-  const loading = funnelLoading || adsLoading || metricsLoading
+  const loading = overviewLoading || adsLoading || metricsLoading
 
   return (
     <div>

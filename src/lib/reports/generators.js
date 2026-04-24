@@ -164,13 +164,13 @@ export function salesReport(reps) {
 }
 
 // ─── Revenue & ROI ───────────────────────────────────────────────────────────
-export function revenueReport() {
-  const totalSpend = 9194
-  const closedRevenue = 24000
-  const activePipelineValue = 45000
+export function revenueReport(overview) {
+  const totalSpend = Number(overview?.total_spend ?? 9194)
+  const closedRevenue = Number(overview?.closed_revenue ?? 24000)
+  const activePipelineValue = Number(overview?.pipeline_value ?? 45000)
   const historicalCloseRate = 0.2
   const projectedRevenue = closedRevenue + (activePipelineValue * historicalCloseRate)
-  const roas = +(closedRevenue / totalSpend).toFixed(1)
+  const roas = totalSpend > 0 ? +(closedRevenue / totalSpend).toFixed(1) : 0
 
   const recommendations = []
   if (roas < 4) recommendations.push(`ROAS is ${roas}x vs the 4x target — closing the AED ${activePipelineValue.toLocaleString()} active pipeline at 20% would bring projected ROAS above target.`)
