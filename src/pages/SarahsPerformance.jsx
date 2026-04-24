@@ -1,181 +1,134 @@
-import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import KPICard from '../components/ui/KPICard'
-import Tabs from '../components/ui/Tabs'
 import ErrorBoundary from '../components/ui/ErrorBoundary'
-import AISummary from '../components/ui/AISummary'
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
-import { useDashboard } from '../store/dashboard'
-import { sarahReport } from '../lib/reports/generators'
-import { useFunnelSummary, useAllContacts, useTargets } from '../hooks/useDashboardData'
+import { useSarahStages, useTargets } from '../hooks/useDashboardData'
 
-const OUTCOME_COLORS = {
-  'Meeting Booked': '#16A34A',
-  'Showed Up': '#22C55E',
-  'No Show': '#F97316',
-  'Active / Proposal': '#2563EB',
-  'Disqualified': '#DC2626',
-  'Not Interested': '#9CA3AF',
-  'Wrong Number': '#D1D5DB',
-  'Follow Up': '#FBBF24',
-  'Callback': '#8B5CF6',
+const STAGE_BORDER_CLASS = {
+  meeting_booked: 'border-l-[#16A34A]',
+  contacted: 'border-l-[#2563EB]',
+  callback: 'border-l-[#2563EB]',
+  qualified_no_meeting: 'border-l-[#2563EB]',
+  follow_up: 'border-l-[#F59E0B]',
+  no_show: 'border-l-[#F59E0B]',
+  not_interested: 'border-l-[#DC2626]',
+  disqualified: 'border-l-[#DC2626]',
+  wrong_number: 'border-l-[#DC2626]',
 }
 
-const RADIAN = Math.PI / 180
-const CustomLabel = ({ cx, cy, midAngle, outerRadius, name, value }) => {
-  const radius = outerRadius + 35
-  const x = cx + radius * Math.cos(-midAngle * RADIAN)
-  const y = cy + radius * Math.sin(-midAngle * RADIAN)
-  return (
-    <text x={x} y={y} fill={OUTCOME_COLORS[name] || '#333'} textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize={11} fontWeight={500}>
-      {`${name} (${value})`}
-    </text>
-  )
+const STAGE_TEXT_CLASS = {
+  meeting_booked: 'text-[#16A34A]',
+  contacted: 'text-[#2563EB]',
+  callback: 'text-[#2563EB]',
+  qualified_no_meeting: 'text-[#2563EB]',
+  follow_up: 'text-[#D97706]',
+  no_show: 'text-[#D97706]',
+  not_interested: 'text-[#DC2626]',
+  disqualified: 'text-[#DC2626]',
+  wrong_number: 'text-[#DC2626]',
+}
+
+const CONVERSATION_STAGES = ['contacted', 'callback', 'qualified_no_meeting', 'meeting_booked']
+
+function formatPercent(count, total) {
+  if (!total) return '0% of total leads'
+
+  const percent = ((count / total) * 100).toFixed(count > 0 ? 1 : 0)
+  return `${percent}% of total leads`
 }
 
 export default function SarahsPerformance() {
-  const [activeTab, setActiveTab] = useState('overview')
-  const setReportBuilder = useDashboard(s => s.setReportBuilder)
+  const navigate = useNavigate()
+  const { stages, totalLeads, loading, error } = useSarahStages()
   const { data: targets } = useTargets()
 
-  // Lifetime totals — not date-filtered
-  const { data: funnel, loading: funnelLoading } = useFunnelSummary()
-  const { data: contacts, loading: contactsLoading } = useAllContacts()
-
-  const meetingsBooked = funnel?.meetings_booked ?? 0
-  const showedUp = funnel?.showed_up ?? 0
-  const activeOpps = funnel?.active_opportunities ?? 0
-  const totalContacts = contacts?.length ?? 0
-  const meetingsTarget = targets?.monthly_meetings ? Math.round(targets.monthly_meetings / 2) : 15
-  const showedTarget = 17
-
-  // Real outcome breakdown from all contact stages
   const stageCounts = {}
-  ;(contacts ?? []).forEach(c => {
-    if (c.current_stage) stageCounts[c.current_stage] = (stageCounts[c.current_stage] || 0) + 1
+  stages.forEach(({ stage, count }) => {
+    stageCounts[stage] = Number(count ?? 0)
   })
 
-  const outcomeData = [
-    { name: 'Meeting Booked',    value: stageCounts['meeting_booked'] || 0 },
-    { name: 'Showed Up',         value: stageCounts['showed'] || 0 },
-    { name: 'No Show',           value: stageCounts['no_show'] || 0 },
-    { name: 'Active / Proposal', value: (stageCounts['active'] || 0) + (stageCounts['closed_won'] || 0) },
-    { name: 'Disqualified',      value: stageCounts['disqualified'] || 0 },
-    { name: 'Not Interested',    value: stageCounts['not_interested'] || 0 },
-    { name: 'Wrong Number',      value: stageCounts['wrong_number'] || 0 },
-    { name: 'Follow Up',         value: (stageCounts['follow_up'] || 0) + (stageCounts['contacted'] || 0) + (stageCounts['qualified_no_meeting'] || 0) },
-    { name: 'Callback',          value: stageCounts['callback'] || 0 },
-  ].filter(d => d.value > 0)
-
-  const disqualifiedCount = stageCounts['disqualified'] || 0
-  const notInterestedCount = stageCounts['not_interested'] || 0
-  const disqualifiedPct = totalContacts > 0 ? Math.round((disqualifiedCount / totalContacts) * 100) : 0
-  const notInterestedPct = totalContacts > 0 ? Math.round((notInterestedCount / totalContacts) * 100) : 0
-
-  // Real DQ reasons from contact dq_reason field
-  const dqMap = {}
-  ;(contacts ?? [])
-    .filter(c => c.current_stage === 'disqualified' && c.dq_reason)
-    .forEach(c => { dqMap[c.dq_reason] = (dqMap[c.dq_reason] || 0) + 1 })
-  const dqReasons = Object.entries(dqMap)
-    .map(([reason, count]) => ({ reason, count }))
-    .sort((a, b) => b.count - a.count)
-
-  const loading = funnelLoading || contactsLoading
-
-  useEffect(() => {
-    setReportBuilder(() => sarahReport({ meetingsBooked, showedUp, activeOpps }, dqReasons))
-    return () => setReportBuilder(null)
-  }, [meetingsBooked, showedUp, activeOpps, setReportBuilder])
+  const conversations = CONVERSATION_STAGES.reduce((sum, stage) => sum + (stageCounts[stage] || 0), 0)
+  const meetingsBooked = stageCounts.meeting_booked || 0
+  const bookingRate = totalLeads > 0 ? Number(((meetingsBooked / totalLeads) * 100).toFixed(1)) : 0
+  const meetingsTarget = targets?.monthly_meetings ? Math.round(targets.monthly_meetings / 2) : 15
 
   return (
     <div>
-      <Tabs
-        tabs={[{ id: 'overview', label: 'Overview' }, { id: 'recent-calls', label: 'Recent Calls' }]}
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-      />
-
-      {activeTab === 'overview' && (
-        <>
-          <ErrorBoundary>
-            <div className="grid grid-cols-6 gap-3 mb-6">
-              <KPICard label="Calls Attempted" value="—" description="Call log integration coming soon" />
-              <KPICard label="Calls Connected" value="—" description="Call log integration coming soon" />
-              <KPICard label="Meetings Booked" value={meetingsBooked} loading={funnelLoading} description="Total meetings Sarah booked" target={meetingsTarget} />
-              <KPICard label="Showed Up" value={showedUp} loading={funnelLoading} description="Leads who attended their meeting" target={showedTarget} />
-              <KPICard label="Not Interested" value={notInterestedCount} loading={contactsLoading} description={`${notInterestedPct}% of leads were qualified but chose not to proceed.`} inverse={true} />
-              <KPICard label="Disqualified" value={disqualifiedCount} loading={contactsLoading} description={`${disqualifiedPct}% of leads did not meet fit criteria.`} inverse={true} />
-            </div>
-          </ErrorBoundary>
-
-          <ErrorBoundary>
-            <div className="bg-white rounded-xl border border-[#E5E7EB] p-6 shadow-sm mb-6">
-              <h2 className="text-sm font-bold text-[#0F0F1A] mb-4">Lead Outcome Breakdown</h2>
-              {contactsLoading ? (
-                <div className="skeleton h-64 w-full" />
-              ) : outcomeData.length === 0 ? (
-                <p className="text-sm text-[#9CA3AF] text-center py-12">No contact data available yet.</p>
-              ) : (
-                <ResponsiveContainer width="100%" height={340}>
-                  <PieChart>
-                    <Pie
-                      data={outcomeData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={70}
-                      outerRadius={110}
-                      dataKey="value"
-                      labelLine={true}
-                      label={<CustomLabel />}
-                    >
-                      {outcomeData.map((entry, i) => (
-                        <Cell key={i} fill={OUTCOME_COLORS[entry.name] || '#E5E7EB'} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(v, name) => [`${v} leads`, name]} />
-                  </PieChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-          </ErrorBoundary>
-
-          <ErrorBoundary>
-            <div className="bg-white rounded-xl border border-[#E5E7EB] p-6 shadow-sm">
-              <h2 className="text-sm font-bold text-[#0F0F1A] mb-4">Disqualification Reasons</h2>
-              {contactsLoading ? (
-                <div className="space-y-3">{[...Array(3)].map((_, i) => <div key={i} className="skeleton h-8 w-full" />)}</div>
-              ) : dqReasons.length === 0 ? (
-                <p className="text-sm text-[#9CA3AF] text-center py-6">No disqualified leads with recorded reasons yet.</p>
-              ) : (
-                dqReasons.map(({ reason, count }) => (
-                  <div key={reason} className="flex items-center justify-between py-2 border-b border-[#F3F4F6] last:border-0">
-                    <span className="text-sm text-[#333333]">{reason}</span>
-                    <span className="text-sm font-semibold text-[#DC2626]">{count}</span>
-                  </div>
-                ))
-              )}
-            </div>
-          </ErrorBoundary>
-
-          <AISummary
+      <ErrorBoundary>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 mb-6">
+          <KPICard
+            label="Total Leads"
+            value={totalLeads}
             loading={loading}
-            summary={
-              `Sarah booked ${meetingsBooked} meetings in total, of which ${showedUp} showed up — a show rate of ${meetingsBooked > 0 ? ((showedUp / meetingsBooked) * 100).toFixed(0) : 0}%. ` +
-              `${meetingsBooked >= 15 ? 'Meetings are on target.' : `Meetings are below the 15 target — ${15 - meetingsBooked} more needed.`} ` +
-              `${activeOpps} opportunities are currently active in the pipeline. ` +
-              (dqReasons.length > 0 ? `Top disqualification reason: ${dqReasons[0].reason} (${dqReasons[0].count} leads). ` : '') +
-              `Call-level metrics will be available once VAPI call log integration is complete.`
-            }
+            description="All non-test leads assigned to Sarah's pipeline."
           />
-        </>
-      )}
-
-      {activeTab === 'recent-calls' && (
-        <div className="bg-white rounded-xl border border-[#E5E7EB] p-12 flex flex-col items-center justify-center gap-3">
-          <p className="text-sm font-medium text-[#333333]">Call recordings coming soon</p>
-          <p className="text-xs text-[#9CA3AF] text-center max-w-sm">In the meantime, you can see call summaries on individual leads in the Lead Tracker.</p>
+          <KPICard
+            label="Conversations"
+            value={conversations}
+            loading={loading}
+            description="Leads Sarah reached, advanced, or booked into a meeting."
+          />
+          <KPICard
+            label="Meetings Booked"
+            value={meetingsBooked}
+            loading={loading}
+            target={meetingsTarget}
+            description="Meetings Sarah successfully handed over to sales."
+          />
+          <KPICard
+            label="Booking Rate"
+            value={bookingRate}
+            suffix="%"
+            loading={loading}
+            description="Meetings booked as a share of Sarah's total leads."
+          />
         </div>
-      )}
+      </ErrorBoundary>
+
+      <ErrorBoundary>
+        <div className="bg-white rounded-xl border border-[#E5E7EB] p-6 shadow-sm">
+          <div className="mb-4">
+            <h2 className="text-sm font-bold text-[#0F0F1A]">Stage Breakdown</h2>
+            <p className="text-xs text-[#6B7280] mt-1">Sarah-owned stages only, from follow-up through meeting booked and early exits.</p>
+          </div>
+
+          {error && !loading && (
+            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-[#B91C1C]">
+              {error}
+            </div>
+          )}
+
+          {loading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+              {[...Array(9)].map((_, index) => (
+                <div key={index} className="bg-white rounded-xl border border-[#E5E7EB] border-l-4 border-l-[#E5E7EB] p-5 shadow-sm">
+                  <div className="skeleton h-4 w-40 mb-4" />
+                  <div className="skeleton h-9 w-20 mb-3" />
+                  <div className="skeleton h-3 w-28" />
+                </div>
+              ))}
+            </div>
+          ) : !stages.length ? (
+            <p className="text-sm text-[#9CA3AF] text-center py-12">No Sarah stage data available yet.</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+              {stages.map(({ stage, count, label }) => (
+                <button
+                  key={stage}
+                  type="button"
+                  onClick={() => navigate(`/lead-tracker?stage=${encodeURIComponent(stage)}`)}
+                  className={`rounded-xl border border-[#E5E7EB] border-l-4 bg-white p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md cursor-pointer ${STAGE_BORDER_CLASS[stage] || 'border-l-[#E5E7EB]'}`}
+                >
+                  <p className="text-sm font-semibold text-[#0F0F1A]">{label}</p>
+                  <p className={`mt-3 text-3xl font-bold ${STAGE_TEXT_CLASS[stage] || 'text-[#0F0F1A]'}`}>
+                    {Number(count ?? 0).toLocaleString()}
+                  </p>
+                  <p className="mt-2 text-xs text-[#9CA3AF]">{formatPercent(Number(count ?? 0), totalLeads)}</p>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </ErrorBoundary>
     </div>
   )
 }

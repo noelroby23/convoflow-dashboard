@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useLeadTrackerContacts } from '../hooks/useDashboardData'
 import { useDashboard } from '../store/dashboard'
 import { leadsReport } from '../lib/reports/generators'
 import ErrorBoundary from '../components/ui/ErrorBoundary'
-import AudioTranscriptViewer from '../components/ui/AudioTranscriptViewer'
-import { ChevronDown, ChevronUp, Search, Download, Layers, Megaphone, Flame } from 'lucide-react'
+import { ChevronDown, ChevronUp, Search, Download, Layers, Megaphone, Flame, FileText, Volume2, MessageSquare } from 'lucide-react'
 import { exportCsv } from '../lib/exportCsv'
 import AISummary from '../components/ui/AISummary'
 
@@ -41,71 +41,55 @@ const PRIORITY_FILTERS = [
 
 const STAGE_FILTERS = [
   { id: 'all', label: 'All Stages' },
-  { id: 'meeting_booked', label: 'Meeting Booked' },
-  { id: 'showed_up', label: 'Showed Up' },
-  { id: 'active_opportunities', label: 'Active Opportunities' },
-  { id: 'closed_won', label: 'Closed Won' },
-  { id: 'closed_lost', label: 'Closed Lost' },
-  { id: 'no_show', label: 'No Show' },
-  { id: 'contacted', label: 'Contacted' },
+  { id: 'new', label: 'New' },
   { id: 'follow_up', label: 'Follow Up' },
+  { id: 'contacted', label: 'Contacted' },
   { id: 'callback', label: 'Callback' },
   { id: 'qualified_no_meeting', label: 'Qualified No Meeting' },
-  { id: 'disqualified', label: 'Disqualified' },
+  { id: 'meeting_booked', label: 'Meeting Booked' },
+  { id: 'no_show', label: 'No Show' },
   { id: 'not_interested', label: 'Not Interested' },
+  { id: 'disqualified', label: 'Disqualified' },
   { id: 'wrong_number', label: 'Wrong Number' },
+  { id: 'showed', label: 'Showed Up' },
+  { id: 'active', label: 'Active Opportunities' },
+  { id: 'closed_won', label: 'Closed Won' },
+  { id: 'closed_lost', label: 'Closed Lost' },
 ]
 
+const KNOWN_STAGE_VALUES = new Set(STAGE_FILTERS.filter(stage => stage.id !== 'all').map(stage => stage.id))
+
+const hasText = (value) => typeof value === 'string' && value.trim().length > 0
+
 function applyFunnelFilter(data, filter) {
-  switch (filter) {
-    case 'all':
-      return data
-    case 'meeting_booked':
-      return data.filter(c => c.funnel_meeting_booked)
-    case 'showed_up':
-      return data.filter(c => c.funnel_showed_up)
-    case 'active_opportunities':
-      return data.filter(c => c.funnel_active_opp)
-    case 'closed_won':
-      return data.filter(c => c.funnel_closed_won)
-    case 'closed_lost':
-      return data.filter(c => c.funnel_closed_lost)
-    case 'no_show':
-      return data.filter(c => c.funnel_no_show)
-    case 'contacted':
-    case 'follow_up':
-    case 'callback':
-    case 'qualified_no_meeting':
-    case 'disqualified':
-    case 'not_interested':
-    case 'wrong_number':
-      return data.filter(c => c.current_stage === filter)
-    default:
-      return data
-  }
+  if (filter === 'all') return data
+  return data.filter(c => c.current_stage === filter)
 }
 
 function getStageCounts(data) {
   return {
     all: data.length,
-    meeting_booked: data.filter(c => c.funnel_meeting_booked).length,
-    showed_up: data.filter(c => c.funnel_showed_up).length,
-    active_opportunities: data.filter(c => c.funnel_active_opp).length,
-    closed_won: data.filter(c => c.funnel_closed_won).length,
-    closed_lost: data.filter(c => c.funnel_closed_lost).length,
-    no_show: data.filter(c => c.funnel_no_show).length,
-    contacted: data.filter(c => c.current_stage === 'contacted').length,
+    new: data.filter(c => c.current_stage === 'new').length,
     follow_up: data.filter(c => c.current_stage === 'follow_up').length,
+    contacted: data.filter(c => c.current_stage === 'contacted').length,
     callback: data.filter(c => c.current_stage === 'callback').length,
     qualified_no_meeting: data.filter(c => c.current_stage === 'qualified_no_meeting').length,
-    disqualified: data.filter(c => c.current_stage === 'disqualified').length,
+    meeting_booked: data.filter(c => c.current_stage === 'meeting_booked').length,
+    no_show: data.filter(c => c.current_stage === 'no_show').length,
     not_interested: data.filter(c => c.current_stage === 'not_interested').length,
+    disqualified: data.filter(c => c.current_stage === 'disqualified').length,
     wrong_number: data.filter(c => c.current_stage === 'wrong_number').length,
+    showed: data.filter(c => c.current_stage === 'showed').length,
+    active: data.filter(c => c.current_stage === 'active').length,
+    closed_won: data.filter(c => c.current_stage === 'closed_won').length,
+    closed_lost: data.filter(c => c.current_stage === 'closed_lost').length,
   }
 }
 
 export default function LeadTracker() {
   const { data: contacts, loading } = useLeadTrackerContacts()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const stageFromUrl = searchParams.get('stage')
   const setReportBuilder = useDashboard(s => s.setReportBuilder)
   const [expandedId, setExpandedId] = useState(null)
   const [stageFilter, setStageFilter] = useState('all')
@@ -118,6 +102,26 @@ export default function LeadTracker() {
     setReportBuilder(() => leadsReport(contacts))
     return () => setReportBuilder(null)
   }, [contacts, setReportBuilder])
+
+  useEffect(() => {
+    if (stageFromUrl && KNOWN_STAGE_VALUES.has(stageFromUrl)) {
+      setStageFilter(stageFromUrl)
+      return
+    }
+
+    setStageFilter('all')
+  }, [stageFromUrl])
+
+  const handleStageFilterChange = (selectedStage) => {
+    setStageFilter(selectedStage)
+
+    if (selectedStage === 'all') {
+      setSearchParams({})
+      return
+    }
+
+    setSearchParams({ stage: selectedStage })
+  }
 
   const uniqueAds = contacts ? [...new Set(contacts.map(c => c.ad_name || c.source_ad).filter(Boolean))] : []
   const stageCounts = contacts ? getStageCounts(contacts) : {}
@@ -189,7 +193,7 @@ export default function LeadTracker() {
         <div className="relative">
           <Layers size={14} className={`absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none ${stageFilter !== 'all' ? 'text-[#EC4899]' : 'text-[#9CA3AF]'}`} />
           <ChevronDown size={14} className={`absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none ${stageFilter !== 'all' ? 'text-[#EC4899]' : 'text-[#6B7280]'}`} />
-          <select value={stageFilter} onChange={e => setStageFilter(e.target.value)}
+          <select value={stageFilter} onChange={e => handleStageFilterChange(e.target.value)}
             className={`appearance-none text-sm font-medium rounded-lg pl-9 pr-8 py-2 cursor-pointer transition-all focus:outline-none ${stageFilter !== 'all' ? 'border border-[#EC4899] bg-pink-50 text-[#EC4899]' : 'border border-[#E5E7EB] bg-white text-[#333333] hover:border-[#9CA3AF]'}`}>
             <option value="all">All Stages</option>
             {STAGE_FILTERS.filter(s => s.id !== 'all').map(stage => (
@@ -247,6 +251,11 @@ export default function LeadTracker() {
             ) : filtered.map((contact) => {
               const priority = getPriority(contact)
               const priorityConfig = PRIORITY_CONFIG[priority]
+              const hasCallSummary = hasText(contact.call_summary)
+              const hasCallRecording = hasText(contact.call_recording_url)
+              const hasCallTranscript = hasText(contact.call_transcript)
+              const hasCallData = hasCallSummary || hasCallRecording || hasCallTranscript
+
               return (
                 <>
                   <tr
@@ -282,31 +291,75 @@ export default function LeadTracker() {
                   {expandedId === contact.contact_id && (
                     <tr key={`${contact.contact_id}-exp`} className="border-t border-[#F3F4F6] bg-[#FAFAFA]">
                       <td colSpan={8} className="px-6 py-4">
-                        <div className="grid grid-cols-3 gap-6">
-                          <div className="space-y-2 text-sm">
-                            <p className="text-xs font-semibold text-[#6B7280] mb-2">CONTACT DETAILS</p>
-                            <div className="flex justify-between"><span className="text-[#6B7280]">Email</span><span>{contact.email || '—'}</span></div>
-                            <div className="flex justify-between"><span className="text-[#6B7280]">Phone</span><span>{contact.phone || '—'}</span></div>
-                            <div className="flex justify-between"><span className="text-[#6B7280]">Industry</span><span>{contact.industry || '—'}</span></div>
-                            <div className="flex justify-between"><span className="text-[#6B7280]">Meeting Date</span><span>{contact.meeting_date ? new Date(contact.meeting_date).toLocaleDateString() : '—'}</span></div>
-                            <div className="flex justify-between"><span className="text-[#6B7280]">Deal Value</span><span className="font-medium">{contact.deal_value ? `AED ${Number(contact.deal_value).toLocaleString()}` : '—'}</span></div>
-                            <div className="flex justify-between"><span className="text-[#6B7280]">Pipeline</span><span>{contact.ghl_pipeline_name || '—'}</span></div>
-                            <div className="flex justify-between"><span className="text-[#6B7280]">Lead Score</span><span>{contact.lead_quality_score || '—'}</span></div>
-                            <div className="flex justify-between"><span className="text-[#6B7280]">Follow-up Attempts</span><span>{contact.follow_up_attempts > 0 ? contact.follow_up_attempts : '—'}</span></div>
-                            <div className="flex justify-between"><span className="text-[#6B7280]">Assigned To</span><span>{contact.assigned_to || '—'}</span></div>
-                            <div className="flex justify-between"><span className="text-[#6B7280]">DQ Reason</span><span className={contact.dq_reason ? 'text-[#DC2626]' : ''}>{contact.dq_reason || '—'}</span></div>
-                            <div className="flex justify-between"><span className="text-[#6B7280]">Recording</span><span>{contact.call_recording_url ? <a href={contact.call_recording_url} target="_blank" rel="noreferrer" className="text-[#EC4899] hover:underline">Listen</a> : '—'}</span></div>
-                            <div className="pt-2 border-t border-[#E5E7EB]">
-                              <p className="text-[#6B7280] mb-1">Call Summary</p>
-                              <p className="text-[#333333] leading-relaxed">{contact.call_summary || '—'}</p>
+                        <div className="space-y-6">
+                          {hasCallData && (
+                            <div className="space-y-4">
+                              {hasCallSummary && (
+                                <div>
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <FileText size={14} className="text-[#6B7280]" />
+                                    <p className="text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Call Summary</p>
+                                  </div>
+                                  <div className="rounded-lg border border-[#E5E7EB] bg-white px-4 py-3 text-sm text-[#333333] leading-relaxed">
+                                    {contact.call_summary}
+                                  </div>
+                                </div>
+                              )}
+
+                              {hasCallRecording && (
+                                <div>
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <Volume2 size={14} className="text-[#6B7280]" />
+                                    <p className="text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Call Recording</p>
+                                  </div>
+                                  <div className="rounded-lg border border-[#E5E7EB] bg-white px-4 py-3">
+                                    <audio controls preload="none" className="w-full mt-2">
+                                      <source src={contact.call_recording_url} type="audio/mpeg" />
+                                      Your browser does not support the audio element.
+                                    </audio>
+                                  </div>
+                                </div>
+                              )}
+
+                              {hasCallTranscript && (
+                                <div>
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <MessageSquare size={14} className="text-[#6B7280]" />
+                                    <p className="text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Call Transcript</p>
+                                  </div>
+                                  <div className="max-h-72 overflow-y-auto whitespace-pre-wrap rounded-lg border border-[#E5E7EB] bg-[#F9FAFB] px-4 py-3 text-sm text-[#4B5563] leading-relaxed">
+                                    {contact.call_transcript}
+                                  </div>
+                                </div>
+                              )}
                             </div>
-                          </div>
-                          <div className="col-span-2">
-                            <AudioTranscriptViewer
-                              recordingUrl={contact.call_recording_url}
-                              transcript={contact.call_transcript}
-                              summary={contact.call_summary}
-                            />
+                          )}
+
+                          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <div className="space-y-2 text-sm lg:col-span-2">
+                              <p className="text-xs font-semibold text-[#6B7280] mb-2">CONTACT DETAILS</p>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+                                <div className="flex justify-between gap-3"><span className="text-[#6B7280]">Email</span><span className="text-right">{contact.email || '—'}</span></div>
+                                <div className="flex justify-between gap-3"><span className="text-[#6B7280]">Phone</span><span className="text-right">{contact.phone || '—'}</span></div>
+                                <div className="flex justify-between gap-3"><span className="text-[#6B7280]">Industry</span><span className="text-right">{contact.industry || '—'}</span></div>
+                                <div className="flex justify-between gap-3"><span className="text-[#6B7280]">Meeting Date</span><span className="text-right">{contact.meeting_date ? new Date(contact.meeting_date).toLocaleDateString() : '—'}</span></div>
+                                <div className="flex justify-between gap-3"><span className="text-[#6B7280]">Deal Value</span><span className="text-right font-medium">{contact.deal_value ? `AED ${Number(contact.deal_value).toLocaleString()}` : '—'}</span></div>
+                                <div className="flex justify-between gap-3"><span className="text-[#6B7280]">Pipeline</span><span className="text-right">{contact.ghl_pipeline_name || '—'}</span></div>
+                                <div className="flex justify-between gap-3"><span className="text-[#6B7280]">Lead Score</span><span className="text-right">{contact.lead_quality_score || '—'}</span></div>
+                                <div className="flex justify-between gap-3"><span className="text-[#6B7280]">Follow-up Attempts</span><span className="text-right">{contact.follow_up_attempts > 0 ? contact.follow_up_attempts : '—'}</span></div>
+                                <div className="flex justify-between gap-3"><span className="text-[#6B7280]">Assigned To</span><span className="text-right">{contact.assigned_to || '—'}</span></div>
+                                <div className="flex justify-between gap-3"><span className="text-[#6B7280]">DQ Reason</span><span className={`text-right ${contact.dq_reason ? 'text-[#DC2626]' : ''}`}>{contact.dq_reason || '—'}</span></div>
+                              </div>
+                            </div>
+                            <div className="rounded-xl border border-[#E5E7EB] bg-white p-4">
+                              <p className="text-xs font-semibold text-[#6B7280] mb-2">LEAD STATUS</p>
+                              <div className="space-y-2 text-sm">
+                                <div className="flex justify-between gap-3"><span className="text-[#6B7280]">Stage</span><span className="text-right">{contact.stage_label || formatStage(contact.current_stage) || '—'}</span></div>
+                                <div className="flex justify-between gap-3"><span className="text-[#6B7280]">Priority</span><span className="text-right">{priorityConfig.label}</span></div>
+                                <div className="flex justify-between gap-3"><span className="text-[#6B7280]">Source Ad</span><span className="text-right">{contact.ad_name || contact.source_ad || '—'}</span></div>
+                                <div className="flex justify-between gap-3"><span className="text-[#6B7280]">Created</span><span className="text-right">{(contact.ghl_created_at || contact.created_at) ? new Date(contact.ghl_created_at || contact.created_at).toLocaleDateString() : '—'}</span></div>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </td>

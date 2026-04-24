@@ -53,6 +53,12 @@ const fallbackDailyMetrics = mockTrendsData.map(d => ({
   clicks: 0, leads: d.leads, meetings_booked: d.meetings, closes: 0,
 }))
 
+const SARAH_CLIENT_ID = 'ca5a5257-9217-4d06-990e-b789cb233ac0'
+const fallbackSarahStages = {
+  stages: [],
+  totalLeads: 0,
+}
+
 const getDateRangeDays = (from, to) => {
   if (!from || !to) return []
 
@@ -147,6 +153,38 @@ export function useLeadTrackerContacts() {
     () => supabase.from('lead_tracker').select('*').order('ghl_created_at', { ascending: false, nullsFirst: false }),
     [refreshKey], fallbackLeadTracker
   )
+}
+
+export function useSarahStages() {
+  const refreshKey = useDashboard(s => s.refreshKey)
+
+  const { data, loading, error } = useSupabaseQuery(
+    async () => {
+      const [stageResult, totalResult] = await Promise.all([
+        supabase.rpc('sarah_stage_summary'),
+        supabase.from('contacts').select('id', { count: 'exact', head: true })
+          .eq('client_id', SARAH_CLIENT_ID)
+          .eq('is_test', false),
+      ])
+
+      return {
+        data: {
+          stages: stageResult.data ?? [],
+          totalLeads: totalResult.count ?? 0,
+        },
+        error: stageResult.error || totalResult.error,
+      }
+    },
+    [refreshKey],
+    fallbackSarahStages
+  )
+
+  return {
+    stages: data?.stages ?? [],
+    totalLeads: data?.totalLeads ?? 0,
+    loading,
+    error,
+  }
 }
 
 export function useDailyMetrics() {
