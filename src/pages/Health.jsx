@@ -1,12 +1,14 @@
 import { useEffect, useMemo } from 'react'
-import { useFunnelSummary, useTargets } from '../hooks/useDashboardData'
+import { useTargets } from '../hooks/useDashboardData'
+import { useDashboardOverview } from '../hooks/useDashboardOverview'
 import ErrorBoundary from '../components/ui/ErrorBoundary'
 import AISummary from '../components/ui/AISummary'
 import { useDashboard } from '../store/dashboard'
 import { healthReport } from '../lib/reports/generators'
 
 export default function Health() {
-  const { data, loading } = useFunnelSummary()
+  const dateRange = useDashboard(s => s.dateRange)
+  const { data, loading } = useDashboardOverview(dateRange.from, dateRange.to)
   const { data: targets } = useTargets()
   const setReportBuilder = useDashboard(s => s.setReportBuilder)
 
