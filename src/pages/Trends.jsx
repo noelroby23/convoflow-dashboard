@@ -9,26 +9,42 @@ import { trendsReport } from '../lib/reports/generators'
 
 const FREQ_CEILING = 2.5
 
+const parseTrendDate = (value) => {
+  if (!value) return null
+  const parsed = new Date(`${value}T00:00:00Z`)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
 export default function Trends() {
   const { data: metrics, loading } = useTrendMetricsByDate()
   const { data: ads } = useAdPerformance()
   const setReportBuilder = useDashboard(s => s.setReportBuilder)
 
-  const chartData = (metrics ?? []).filter(d => d?.date).map(d => ({
-    date: format(new Date(`${d.date}T00:00:00Z`), 'MMM d'),
-    spend: Number(d.spend ?? 0),
-    leads: Number(d.leads ?? 0),
-    cpl: d.leads > 0 ? +(d.spend / d.leads).toFixed(1) : 0,
-    meetings: Number(d.meetings_booked ?? 0),
-    frequency: Number(d.avg_frequency ?? 0),
-    rawDate: d.date,
-  }))
+  const chartData = (metrics ?? []).reduce((rows, d) => {
+    const parsedDate = parseTrendDate(d?.date)
+    if (!parsedDate) return rows
+
+    rows.push({
+      date: format(parsedDate, 'MMM d'),
+      spend: Number(d.spend ?? 0),
+      leads: Number(d.leads ?? 0),
+      cpl: d.leads > 0 ? +(d.spend / d.leads).toFixed(1) : 0,
+      meetings: Number(d.meetings_booked ?? 0),
+      frequency: Number(d.avg_frequency ?? 0),
+      rawDate: d.date,
+    })
+
+    return rows
+  }, [])
 
   // Group daily data into weeks for comparison table
   const weeklyData = (() => {
     const weeks = {}
     chartData.forEach(d => {
-      const weekKey = format(startOfWeek(new Date(`${d.rawDate}T00:00:00Z`), { weekStartsOn: 1 }), 'MMM d')
+      const rawDate = parseTrendDate(d.rawDate)
+      if (!rawDate) return
+
+      const weekKey = format(startOfWeek(rawDate, { weekStartsOn: 1 }), 'MMM d')
       if (!weeks[weekKey]) weeks[weekKey] = { week: weekKey, spend: 0, leads: 0, meetings: 0, frequency: [], days: 0 }
       weeks[weekKey].spend += d.spend
       weeks[weekKey].leads += d.leads
