@@ -129,11 +129,11 @@ export function sarahReport(kpis, dqReasons) {
 }
 
 // ─── Sales Performance ───────────────────────────────────────────────────────
-export function salesReport(reps) {
-  const totalMeetings = reps?.reduce((s, r) => s + (r.meetings_scheduled ?? 0), 0) ?? 0
-  const totalShows = reps?.reduce((s, r) => s + (r.shows ?? 0), 0) ?? 0
-  const totalNoShows = reps?.reduce((s, r) => s + (r.no_shows ?? 0), 0) ?? 0
-  const totalCloses = reps?.reduce((s, r) => s + (r.closes ?? 0), 0) ?? 0
+export function salesReport(overview, reps) {
+  const totalMeetings = Number(overview?.meetings_booked ?? 0)
+  const totalShows = Number(overview?.showed_up ?? 0)
+  const totalNoShows = Number(overview?.no_shows ?? 0)
+  const totalCloses = Number(overview?.closed_won ?? 0)
   const totalRevenue = reps?.reduce((s, r) => s + (r.revenue_closed ?? 0), 0) ?? 0
   const showRate = totalMeetings > 0 ? +((totalShows / totalMeetings) * 100).toFixed(0) : 0
 
