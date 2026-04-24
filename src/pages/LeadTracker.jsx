@@ -4,7 +4,7 @@ import { useLeadTrackerContacts } from '../hooks/useDashboardData'
 import { useDashboard } from '../store/dashboard'
 import { leadsReport } from '../lib/reports/generators'
 import ErrorBoundary from '../components/ui/ErrorBoundary'
-import { ChevronDown, ChevronUp, Search, Download, Layers, Megaphone, Flame, FileText, Volume2, MessageSquare } from 'lucide-react'
+import { ChevronDown, ChevronUp, Search, Download, Layers, Megaphone, Flame, FileText, Volume2, MessageSquare, Route as RouteIcon, UserPlus, Phone, CalendarCheck, CheckCircle2, Flag, XCircle } from 'lucide-react'
 import { exportCsv } from '../lib/exportCsv'
 import AISummary from '../components/ui/AISummary'
 
@@ -60,6 +60,156 @@ const STAGE_FILTERS = [
 const KNOWN_STAGE_VALUES = new Set(STAGE_FILTERS.filter(stage => stage.id !== 'all').map(stage => stage.id))
 
 const hasText = (value) => typeof value === 'string' && value.trim().length > 0
+
+const POSITIVE_STAGES = new Set(['meeting_booked', 'showed', 'active', 'closed_won'])
+const NEGATIVE_STAGES = new Set(['disqualified', 'not_interested', 'wrong_number', 'closed_lost'])
+
+const TIMELINE_TONES = {
+  blue: {
+    dot: 'border-blue-200 bg-blue-50',
+    icon: 'text-blue-600',
+  },
+  green: {
+    dot: 'border-green-200 bg-green-50',
+    icon: 'text-green-600',
+  },
+  red: {
+    dot: 'border-red-200 bg-red-50',
+    icon: 'text-red-600',
+  },
+}
+
+function parseTimestamp(value) {
+  if (!value) return null
+
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+function formatTimestamp(value) {
+  const parsed = parseTimestamp(value)
+  if (!parsed) return null
+
+  return parsed.toLocaleString([], {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
+function getStageTone(stage) {
+  if (POSITIVE_STAGES.has(stage)) return 'green'
+  if (NEGATIVE_STAGES.has(stage)) return 'red'
+  return 'blue'
+}
+
+function sortJourneyEvents(events) {
+  return [...events].sort((a, b) => {
+    if (a.sortAt && b.sortAt && a.sortAt !== b.sortAt) return b.sortAt - a.sortAt
+    if (a.sortAt && !b.sortAt) return -1
+    if (!a.sortAt && b.sortAt) return 1
+    return b.fallbackOrder - a.fallbackOrder
+  })
+}
+
+function buildLeadJourney(contact) {
+  const events = []
+
+  if (contact.created_at) {
+    events.push({
+      key: 'form-submitted',
+      label: 'Form Submitted',
+      timestamp: contact.created_at,
+      sortAt: parseTimestamp(contact.created_at)?.getTime() ?? null,
+      detail: 'Lead submitted from Meta and entered the funnel.',
+      tone: 'blue',
+      icon: FileText,
+      fallbackOrder: 10,
+    })
+  }
+
+  if (contact.ghl_created_at) {
+    events.push({
+      key: 'ghl-created',
+      label: 'GHL Contact Created',
+      timestamp: contact.ghl_created_at,
+      sortAt: parseTimestamp(contact.ghl_created_at)?.getTime() ?? null,
+      detail: 'Lead synced into GoHighLevel.',
+      tone: 'blue',
+      icon: UserPlus,
+      fallbackOrder: 20,
+    })
+  }
+
+  if (hasText(contact.call_recording_url)) {
+    events.push({
+      key: 'call-recorded',
+      label: 'Call Recorded',
+      timestamp: null,
+      sortAt: null,
+      detail: 'A VAPI call recording is available for this lead.',
+      tone: 'blue',
+      icon: Phone,
+      fallbackOrder: 40,
+    })
+  }
+
+  if (contact.funnel_meeting_booked) {
+    events.push({
+      key: 'meeting-booked',
+      label: 'Meeting Booked',
+      timestamp: contact.meeting_date || contact.status_updated_at,
+      sortAt: parseTimestamp(contact.meeting_date || contact.status_updated_at)?.getTime() ?? null,
+      detail: contact.meeting_date ? `Scheduled for ${new Date(contact.meeting_date).toLocaleString([], { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}.` : 'Lead progressed to a booked meeting.',
+      tone: 'green',
+      icon: CalendarCheck,
+      fallbackOrder: 60,
+    })
+  }
+
+  if (contact.funnel_showed_up) {
+    events.push({
+      key: 'showed-up',
+      label: 'Showed Up',
+      timestamp: contact.status_updated_at,
+      sortAt: parseTimestamp(contact.status_updated_at)?.getTime() ?? null,
+      detail: 'Lead attended the booked meeting.',
+      tone: 'green',
+      icon: CheckCircle2,
+      fallbackOrder: 70,
+    })
+  }
+
+  if (contact.funnel_closed_lost || contact.current_stage === 'disqualified') {
+    events.push({
+      key: 'disqualified',
+      label: contact.current_stage === 'disqualified' ? 'Disqualified' : 'Closed Lost',
+      timestamp: contact.status_updated_at,
+      sortAt: parseTimestamp(contact.status_updated_at)?.getTime() ?? null,
+      detail: hasText(contact.dq_reason) ? contact.dq_reason : 'Lead exited the funnel without progressing.',
+      tone: 'red',
+      icon: XCircle,
+      fallbackOrder: 80,
+    })
+  }
+
+  if (contact.stage_label || contact.current_stage) {
+    events.push({
+      key: 'current-stage',
+      label: `Current Stage: ${contact.stage_label || formatStage(contact.current_stage)}`,
+      timestamp: contact.status_updated_at,
+      sortAt: parseTimestamp(contact.status_updated_at)?.getTime() ?? null,
+      detail: 'Most recent funnel status recorded for this lead.',
+      tone: getStageTone(contact.current_stage),
+      icon: Flag,
+      fallbackOrder: 90,
+    })
+  }
+
+  return sortJourneyEvents(events)
+}
 
 function applyFunnelFilter(data, filter) {
   if (filter === 'all') return data
@@ -255,6 +405,7 @@ export default function LeadTracker() {
               const hasCallRecording = hasText(contact.call_recording_url)
               const hasCallTranscript = hasText(contact.call_transcript)
               const hasCallData = hasCallSummary || hasCallRecording || hasCallTranscript
+              const journeyEvents = buildLeadJourney(contact)
 
               return (
                 <>
@@ -332,6 +483,43 @@ export default function LeadTracker() {
                                   </div>
                                 </div>
                               )}
+                            </div>
+                          )}
+
+                          {journeyEvents.length > 0 && (
+                            <div className="rounded-xl border border-[#E5E7EB] bg-white p-4">
+                              <div className="flex items-center gap-2 mb-4">
+                                <RouteIcon size={14} className="text-[#6B7280]" />
+                                <p className="text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Lead Journey</p>
+                              </div>
+                              <div>
+                                {journeyEvents.map((event, index) => {
+                                  const tone = TIMELINE_TONES[event.tone] || TIMELINE_TONES.blue
+                                  const Icon = event.icon
+
+                                  return (
+                                    <div key={event.key} className="relative pl-10 pb-5 last:pb-0">
+                                      {index < journeyEvents.length - 1 && (
+                                        <span className="absolute left-[13px] top-7 bottom-0 w-px bg-[#E5E7EB]" />
+                                      )}
+                                      <span className={`absolute left-0 top-0 flex h-7 w-7 items-center justify-center rounded-full border ${tone.dot}`}>
+                                        <Icon size={13} className={tone.icon} />
+                                      </span>
+                                      <div className="min-h-7">
+                                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                          <p className="text-sm font-medium text-[#0F0F1A]">{event.label}</p>
+                                          {event.timestamp && (
+                                            <span className="text-xs text-[#9CA3AF]">{formatTimestamp(event.timestamp)}</span>
+                                          )}
+                                        </div>
+                                        {event.detail && (
+                                          <p className="mt-1 text-sm text-[#6B7280] leading-relaxed">{event.detail}</p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
                             </div>
                           )}
 
