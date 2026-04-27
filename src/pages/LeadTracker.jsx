@@ -4,7 +4,7 @@ import { useLeadTrackerContacts } from '../hooks/useDashboardData'
 import { useDashboard } from '../store/dashboard'
 import { leadsReport } from '../lib/reports/generators'
 import ErrorBoundary from '../components/ui/ErrorBoundary'
-import { ChevronDown, ChevronUp, Search, Download, Layers, Megaphone, Flame, FileText, Volume2, MessageSquare, Route as RouteIcon, Phone, CalendarCheck, CheckCircle2, XCircle } from 'lucide-react'
+import { ChevronDown, ChevronUp, Search, Download, Layers, Megaphone, Flame, FileText, Volume2, MessageSquare, Route as RouteIcon, Phone, CalendarCheck, CheckCircle2, XCircle, Clock3, Trophy, Repeat, Reply, CircleSlash } from 'lucide-react'
 import { exportCsv } from '../lib/exportCsv'
 import AISummary from '../components/ui/AISummary'
 
@@ -87,54 +87,41 @@ function parseTimestamp(value) {
   return Number.isNaN(parsed.getTime()) ? null : parsed
 }
 
-function formatTimestamp(value) {
+function formatJourneyDate(value) {
   const parsed = parseTimestamp(value)
-  if (!parsed) return null
+  if (!parsed || parsed.getFullYear() < 2025) return 'Date unavailable'
 
   return parsed.toLocaleString([], {
-    year: 'numeric',
     month: 'short',
     day: 'numeric',
+    year: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
   })
 }
 
-function sortJourneyEvents(events) {
-  const timestamped = events
-    .filter(event => event.sortAt !== null)
-    .sort((a, b) => b.sortAt - a.sortAt)
-
-  const untimestamped = events
-    .filter(event => event.sortAt === null)
-    .sort((a, b) => b.fallbackOrder - a.fallbackOrder)
-
-  if (!timestamped.length) return untimestamped
-  if (!untimestamped.length) return timestamped
-
-  return [timestamped[0], ...untimestamped, ...timestamped.slice(1)]
+function getValidJourneyDate(value) {
+  const parsed = parseTimestamp(value)
+  if (!parsed || parsed.getFullYear() < 2025) return null
+  return value
 }
 
-function sortNonMilestoneJourney(events) {
-  const order = {
-    'current-stage': 4,
-    'call-recorded': 3,
-    'follow-up-attempts': 2,
-    'lead-entered': 1,
-  }
+function getTagText(tags) {
+  if (Array.isArray(tags)) return tags.join(',').toLowerCase()
+  return String(tags || '').toLowerCase()
+}
 
+function sortJourneyEvents(events) {
   return [...events].sort((a, b) => {
-    const rankDiff = (order[b.key] ?? 0) - (order[a.key] ?? 0)
-    if (rankDiff !== 0) return rankDiff
-
-    if (a.sortAt !== null && b.sortAt !== null) return b.sortAt - a.sortAt
-    if (a.sortAt !== null) return -1
-    if (b.sortAt !== null) return 1
-    return 0
+    if (a.sortAt === null && b.sortAt === null) return b.fallbackOrder - a.fallbackOrder
+    if (a.sortAt === null) return -1
+    if (b.sortAt === null) return 1
+    if (a.sortAt !== b.sortAt) return b.sortAt - a.sortAt
+    return b.fallbackOrder - a.fallbackOrder
   })
 }
 
-function getCurrentStageEvent(contact) {
+function getCurrentStageEvent(contact, statusTime) {
   if (!contact.current_stage) return null
 
   const stageConfig = {
@@ -176,8 +163,8 @@ function getCurrentStageEvent(contact) {
   return {
     key: 'current-stage',
     label: `Current Stage: ${contact.stage_label || formatStage(contact.current_stage)}`,
-    timestamp: contact.status_updated_at || null,
-    sortAt: parseTimestamp(contact.status_updated_at)?.getTime() ?? null,
+    timestamp: statusTime,
+    sortAt: parseTimestamp(statusTime)?.getTime() ?? null,
     detail: config.detail,
     tone: config.tone,
     icon: MessageSquare,
@@ -188,13 +175,19 @@ function getCurrentStageEvent(contact) {
 function buildLeadJourney(contact) {
   const events = []
   const leadEnteredAt = contact.ghl_created_at || contact.created_at || null
-  const hasFunnelMilestone = Boolean(
-    contact.funnel_meeting_booked ||
-    contact.funnel_showed_up ||
-    contact.funnel_closed_won ||
-    contact.funnel_closed_lost ||
-    contact.funnel_no_show
-  )
+  const firstCallAt = contact.first_call_at || null
+  const meetingBookedAt = contact.meeting_booked_at || null
+  const validMeetingDate = getValidJourneyDate(contact.meeting_date)
+  const showedAt = contact.showed_at || null
+  const closedAt = contact.closed_at || null
+  const statusUpdatedAt = contact.status_updated_at || null
+  const tagText = getTagText(contact.current_tags)
+  const hasMilestoneStage = ['meeting_booked', 'showed', 'active', 'closed_won', 'closed_lost', 'no_show'].includes(contact.current_stage)
+
+  const createEstimatedSortAt = (primary, fallback, offset = 0) => {
+    const parsed = parseTimestamp(primary || fallback)
+    return parsed ? parsed.getTime() + offset : null
+  }
 
   events.push({
     key: 'lead-entered',
@@ -207,53 +200,69 @@ function buildLeadJourney(contact) {
     fallbackOrder: 10,
   })
 
-  if (hasText(contact.call_recording_url)) {
+  if (firstCallAt) {
     events.push({
-      key: 'call-recorded',
-      label: 'Call Recorded',
-      timestamp: contact.first_call_at || null,
-      sortAt: parseTimestamp(contact.first_call_at)?.getTime() ?? null,
-      detail: 'A call recording is available for this lead.',
+      key: 'ai-call-made',
+      label: 'AI Call Made',
+      timestamp: firstCallAt,
+      sortAt: parseTimestamp(firstCallAt)?.getTime() ?? null,
+      detail: hasText(contact.call_summary) ? contact.call_summary : 'Sarah called the lead.',
       tone: 'blue',
       icon: Phone,
       fallbackOrder: 20,
     })
   }
 
-  if (contact.follow_up_attempts > 0) {
+  if (hasText(contact.call_recording_url)) {
     events.push({
-      key: 'follow-up-attempts',
-      label: `Follow-Up Attempts: ${contact.follow_up_attempts}`,
-      timestamp: null,
-      sortAt: null,
-      detail: `${contact.follow_up_attempts} call attempts made.`,
-      tone: 'amber',
-      icon: Phone,
-      fallbackOrder: 15,
+      key: 'call-recorded',
+      label: 'Call Recorded',
+      timestamp: firstCallAt || leadEnteredAt || null,
+      sortAt: createEstimatedSortAt(firstCallAt, leadEnteredAt, -1),
+      detail: 'A call recording is available for this lead.',
+      tone: 'blue',
+      icon: Volume2,
+      fallbackOrder: 19,
     })
   }
 
-  if (contact.funnel_meeting_booked) {
-    const meetingTimestamp = contact.meeting_booked_at || contact.meeting_date || null
+  if (meetingBookedAt || contact.funnel_meeting_booked || hasMilestoneStage) {
+    const meetingTimestamp = meetingBookedAt || validMeetingDate || null
+    const meetingDetail = validMeetingDate
+      ? `Scheduled for ${formatJourneyDate(validMeetingDate)}.`
+      : 'Meeting scheduled.'
 
     events.push({
       key: 'meeting-booked',
       label: 'Meeting Booked',
       timestamp: meetingTimestamp,
       sortAt: parseTimestamp(meetingTimestamp)?.getTime() ?? null,
-      detail: contact.meeting_date ? `Scheduled for ${new Date(contact.meeting_date).toLocaleString([], { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}.` : 'Lead progressed to a booked meeting.',
+      detail: meetingDetail,
       tone: 'green',
       icon: CalendarCheck,
       fallbackOrder: 40,
     })
   }
 
-  if (contact.funnel_showed_up) {
+  if (validMeetingDate && (!meetingBookedAt || parseTimestamp(meetingBookedAt)?.getTime() !== parseTimestamp(validMeetingDate)?.getTime())) {
+    events.push({
+      key: 'meeting-scheduled',
+      label: 'Meeting Scheduled',
+      timestamp: null,
+      sortAt: createEstimatedSortAt(validMeetingDate, meetingBookedAt, -2),
+      detail: `Meeting date: ${formatJourneyDate(validMeetingDate)}`,
+      tone: 'blue',
+      icon: Clock3,
+      fallbackOrder: 39,
+    })
+  }
+
+  if (showedAt || contact.funnel_showed_up) {
     events.push({
       key: 'showed-up',
       label: 'Showed Up',
-      timestamp: contact.showed_at || null,
-      sortAt: parseTimestamp(contact.showed_at)?.getTime() ?? null,
+      timestamp: showedAt || null,
+      sortAt: createEstimatedSortAt(showedAt, validMeetingDate || meetingBookedAt, 1),
       detail: 'Lead attended the booked meeting.',
       tone: 'green',
       icon: CheckCircle2,
@@ -265,8 +274,8 @@ function buildLeadJourney(contact) {
     events.push({
       key: 'no-show',
       label: 'No Show',
-      timestamp: null,
-      sortAt: null,
+      timestamp: validMeetingDate || statusUpdatedAt || null,
+      sortAt: createEstimatedSortAt(validMeetingDate || statusUpdatedAt, meetingBookedAt, 2),
       detail: 'Lead missed the booked meeting.',
       tone: 'red',
       icon: XCircle,
@@ -275,39 +284,168 @@ function buildLeadJourney(contact) {
   }
 
   if (contact.funnel_closed_won) {
-    const closedWonTimestamp = contact.closed_at || contact.status_updated_at || null
+    const closedWonTimestamp = closedAt || statusUpdatedAt || null
 
     events.push({
       key: 'closed-won',
       label: 'Closed Won',
       timestamp: closedWonTimestamp,
       sortAt: parseTimestamp(closedWonTimestamp)?.getTime() ?? null,
-      detail: 'Lead converted into a customer.',
+      detail: `Deal closed. Value: AED ${Number(contact.deal_value ?? 0).toLocaleString()}`,
       tone: 'green',
-      icon: CheckCircle2,
+      icon: Trophy,
       fallbackOrder: 70,
     })
   }
 
   if (contact.funnel_closed_lost) {
-    const closedLostTimestamp = contact.closed_at || contact.status_updated_at || null
+    const closedLostTimestamp = closedAt || statusUpdatedAt || null
 
     events.push({
       key: 'closed-lost',
       label: 'Closed Lost',
       timestamp: closedLostTimestamp,
       sortAt: parseTimestamp(closedLostTimestamp)?.getTime() ?? null,
-      detail: hasText(contact.dq_reason) ? contact.dq_reason : 'Lead exited the funnel without progressing.',
+      detail: 'Deal lost.',
       tone: 'red',
       icon: XCircle,
       fallbackOrder: 80,
     })
   }
 
-  if (!hasFunnelMilestone) {
-    const currentStageEvent = getCurrentStageEvent(contact)
+  if (contact.current_stage === 'disqualified' && !contact.funnel_closed_lost) {
+    events.push({
+      key: 'disqualified',
+      label: 'Disqualified',
+      timestamp: statusUpdatedAt,
+      sortAt: parseTimestamp(statusUpdatedAt)?.getTime() ?? null,
+      detail: hasText(contact.dq_reason) ? `Lead disqualified. Reason: ${contact.dq_reason}` : 'Lead was disqualified.',
+      tone: 'red',
+      icon: CircleSlash,
+      fallbackOrder: 65,
+    })
+  }
+
+  if (contact.current_stage === 'not_interested') {
+    events.push({
+      key: 'not-interested',
+      label: 'Not Interested',
+      timestamp: statusUpdatedAt,
+      sortAt: parseTimestamp(statusUpdatedAt)?.getTime() ?? null,
+      detail: 'Lead not interested.',
+      tone: 'red',
+      icon: XCircle,
+      fallbackOrder: 64,
+    })
+  }
+
+  if (contact.current_stage === 'wrong_number') {
+    events.push({
+      key: 'wrong-number',
+      label: 'Wrong Number',
+      timestamp: statusUpdatedAt,
+      sortAt: parseTimestamp(statusUpdatedAt)?.getTime() ?? null,
+      detail: 'Wrong number.',
+      tone: 'red',
+      icon: XCircle,
+      fallbackOrder: 63,
+    })
+  }
+
+  if (!hasMilestoneStage && !['disqualified', 'not_interested', 'wrong_number'].includes(contact.current_stage)) {
+    const currentStageEvent = getCurrentStageEvent(contact, statusUpdatedAt)
     if (currentStageEvent) events.push(currentStageEvent)
-    return sortNonMilestoneJourney(events)
+  }
+
+  if (tagText.includes('follow_up_uk') || tagText.includes('follow_up_done_uk')) {
+    events.push({
+      key: 'follow-up-sequence-started',
+      label: 'Follow-Up Sequence Started',
+      timestamp: null,
+      sortAt: createEstimatedSortAt(firstCallAt, leadEnteredAt, -5),
+      detail: 'Lead entered the follow-up sequence.',
+      tone: 'amber',
+      icon: Repeat,
+      fallbackOrder: 25,
+    })
+  }
+
+  if (tagText.includes('chatbot')) {
+    events.push({
+      key: 'whatsapp-chatbot',
+      label: 'WhatsApp Chatbot',
+      timestamp: null,
+      sortAt: createEstimatedSortAt(firstCallAt, leadEnteredAt, -4),
+      detail: 'WhatsApp chatbot conversation started.',
+      tone: 'blue',
+      icon: MessageSquare,
+      fallbackOrder: 24,
+    })
+  }
+
+  if (tagText.includes('customer_reply')) {
+    events.push({
+      key: 'customer-replied',
+      label: 'Customer Replied',
+      timestamp: null,
+      sortAt: createEstimatedSortAt(meetingBookedAt || firstCallAt, leadEnteredAt, -3),
+      detail: 'Lead replied via WhatsApp.',
+      tone: 'blue',
+      icon: Reply,
+      fallbackOrder: 23,
+    })
+  }
+
+  if (tagText.includes('meeting_confirmed_uk')) {
+    events.push({
+      key: 'meeting-confirmed',
+      label: 'Meeting Confirmed',
+      timestamp: null,
+      sortAt: createEstimatedSortAt(validMeetingDate || meetingBookedAt, firstCallAt, -2),
+      detail: 'Lead confirmed the meeting.',
+      tone: 'green',
+      icon: CheckCircle2,
+      fallbackOrder: 52,
+    })
+  }
+
+  if (tagText.includes('meeting_reminder_done_uk')) {
+    events.push({
+      key: 'meeting-reminder-sent',
+      label: 'Meeting Reminder Sent',
+      timestamp: null,
+      sortAt: createEstimatedSortAt(validMeetingDate || meetingBookedAt, firstCallAt, -1),
+      detail: 'Pre-meeting reminder sent.',
+      tone: 'blue',
+      icon: MessageSquare,
+      fallbackOrder: 51,
+    })
+  }
+
+  if (tagText.includes('meeting_missed_call_done_uk')) {
+    events.push({
+      key: 'post-no-show-call',
+      label: 'Post-No-Show Call',
+      timestamp: null,
+      sortAt: createEstimatedSortAt(statusUpdatedAt, validMeetingDate || meetingBookedAt, -1),
+      detail: 'Follow-up call made after no-show.',
+      tone: 'amber',
+      icon: Phone,
+      fallbackOrder: 57,
+    })
+  }
+
+  if (tagText.includes('meeting_missed_no_action_uk')) {
+    events.push({
+      key: 'no-show-no-response',
+      label: 'No Show — No Response',
+      timestamp: null,
+      sortAt: createEstimatedSortAt(statusUpdatedAt, validMeetingDate || meetingBookedAt, -2),
+      detail: 'Lead unreachable after missed meeting.',
+      tone: 'red',
+      icon: XCircle,
+      fallbackOrder: 56,
+    })
   }
 
   return sortJourneyEvents(events)
@@ -598,7 +736,7 @@ export default function LeadTracker() {
                                 {journeyEvents.map((event, index) => {
                                   const tone = TIMELINE_TONES[event.tone] || TIMELINE_TONES.blue
                                   const Icon = event.icon
-                                  const eventTimestamp = formatTimestamp(event.timestamp) ?? '—'
+                                  const eventTimestamp = event.timestamp ? formatJourneyDate(event.timestamp) : '—'
 
                                   return (
                                     <div key={event.key} className="relative pl-10 pb-5 last:pb-0">
