@@ -79,7 +79,7 @@ function formatCurrency(value) {
 function getAdViewUrl(ad) {
   if (ad.video_url) return ad.fb_post_url || ad.video_url
   if (ad.meta_ad_id) {
-    return `https://primary-production-3cd9.up.railway.app/webhook/ad-preview-redirect?meta_ad_id=${ad.meta_ad_id}`
+    return `https://primary-production-3cd9.up.railway.app/webhook/ad-preview?meta_ad_id=${ad.meta_ad_id}`
   }
   return ad.fb_post_url || null
 }
