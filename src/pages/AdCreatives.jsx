@@ -76,8 +76,12 @@ function formatCurrency(value) {
   return `AED ${Number(value).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
 }
 
-function getAdDestination(ad) {
-  return ad.video_url || ad.fb_post_url || null
+function getAdViewUrl(ad) {
+  if (ad.video_url) return ad.fb_post_url || ad.video_url
+  if (ad.meta_ad_id) {
+    return `https://primary-production-3cd9.up.railway.app/webhook/ad-preview-redirect?meta_ad_id=${ad.meta_ad_id}`
+  }
+  return ad.fb_post_url || null
 }
 
 function openAdDestination(url) {
@@ -105,8 +109,8 @@ function CreativeTypeBadge({ creativeType }) {
 
 function CreativeThumbnail({ ad }) {
   const isVideo = ad.creative_type === 'VIDEO'
-  const destination = getAdDestination(ad)
-  const hasLink = Boolean(destination)
+  const destination = getAdViewUrl(ad)
+  const hasLink = Boolean(ad.video_url || ad.meta_ad_id)
 
   const handleThumbClick = (e) => {
     e.stopPropagation()
@@ -117,7 +121,7 @@ function CreativeThumbnail({ ad }) {
     <div
       className={`group relative w-10 h-10 md:w-12 md:h-12 flex-shrink-0 rounded bg-gray-100 border border-gray-200 flex items-center justify-center transition-all ${hasLink ? 'cursor-pointer hover:scale-110 hover:shadow-md hover:border-blue-400' : ''}`}
       onClick={hasLink ? handleThumbClick : undefined}
-      title={hasLink ? 'View ad on Facebook' : 'No preview available'}
+      title={hasLink ? (isVideo ? 'View ad on Facebook' : 'Preview ad') : 'No preview available'}
       role={hasLink ? 'button' : undefined}
       tabIndex={hasLink ? 0 : undefined}
       onKeyDown={hasLink ? (e) => {
@@ -145,8 +149,8 @@ function CreativeThumbnail({ ad }) {
 
 function ExpandedCreativePreview({ ad }) {
   const isVideo = ad.creative_type === 'VIDEO'
-  const destination = getAdDestination(ad)
-  const hasLink = Boolean(destination)
+  const destination = getAdViewUrl(ad)
+  const hasLink = Boolean(ad.video_url || ad.meta_ad_id)
 
   return (
     <div>
@@ -163,7 +167,7 @@ function ExpandedCreativePreview({ ad }) {
               openAdDestination(destination)
             }
           } : undefined}
-          aria-label={hasLink ? `View ${ad.ad_name} on Facebook` : undefined}
+          aria-label={hasLink ? `${isVideo ? 'View' : 'Preview'} ${ad.ad_name} on Facebook` : undefined}
         >
           <div className="w-full max-w-[220px] aspect-square rounded-lg border border-gray-200 bg-[#F3F4F6] flex items-center justify-center relative overflow-hidden transition-all group-hover:shadow-md group-hover:border-blue-400">
             {isVideo ? <Play size={52} className="text-[#9CA3AF] ml-1 relative z-10" /> : <FileText size={52} className="text-[#9CA3AF] relative z-10" />}
@@ -185,7 +189,20 @@ function ExpandedCreativePreview({ ad }) {
         <div className="mt-4">
           <p className="text-sm font-bold text-[#0F0F1A] leading-snug truncate" title={ad.ad_name}>{ad.ad_name}</p>
           <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-            <CreativeTypeBadge creativeType={ad.creative_type} />
+            {hasLink ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  openAdDestination(destination)
+                }}
+                className="inline-flex"
+              >
+                <CreativeTypeBadge creativeType={ad.creative_type} />
+              </button>
+            ) : (
+              <CreativeTypeBadge creativeType={ad.creative_type} />
+            )}
           </div>
           <p className="text-xs text-[#9CA3AF] mt-2">{ad.campaign_name || '—'}</p>
 
@@ -197,7 +214,7 @@ function ExpandedCreativePreview({ ad }) {
               className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-[#E5E7EB] px-3 py-1.5 text-xs font-medium text-[#2563EB] hover:bg-[#EFF6FF] transition-colors"
               onClick={(e) => e.stopPropagation()}
             >
-              View on Facebook
+              {isVideo ? 'View on Facebook' : 'Preview Ad'}
               <ExternalLink size={12} />
             </a>
           )}
