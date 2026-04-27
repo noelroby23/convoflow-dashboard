@@ -76,18 +76,13 @@ function formatCurrency(value) {
   return `AED ${Number(value).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
 }
 
-function getExpandedCreativeUrl(creativeUrl) {
-  return creativeUrl?.replace(/p64x64/g, 'p480x480') || creativeUrl || null
+function getAdDestination(ad) {
+  return ad.video_url || ad.fb_post_url || null
 }
 
-function getStoryUrl(effectiveObjectStoryId) {
-  if (!effectiveObjectStoryId) return null
-  if (effectiveObjectStoryId.startsWith('http://') || effectiveObjectStoryId.startsWith('https://')) return effectiveObjectStoryId
-
-  const [pageId, postId] = effectiveObjectStoryId.split('_')
-  if (pageId && postId) return `https://www.facebook.com/${pageId}/posts/${postId}`
-
-  return null
+function openAdDestination(url) {
+  if (!url) return
+  window.open(url, '_blank', 'noopener,noreferrer')
 }
 
 function matchesFilter(ad, filterId) {
@@ -109,77 +104,82 @@ function CreativeTypeBadge({ creativeType }) {
 }
 
 function CreativeThumbnail({ ad }) {
-  const [imageBroken, setImageBroken] = useState(false)
-  const showImage = Boolean(ad.creative_url && !imageBroken)
   const isVideo = ad.creative_type === 'VIDEO'
+  const destination = getAdDestination(ad)
+  const hasLink = Boolean(destination)
+
+  const handleThumbClick = (e) => {
+    e.stopPropagation()
+    openAdDestination(destination)
+  }
 
   return (
-    <div className="relative w-10 h-10 md:w-12 md:h-12 flex-shrink-0">
-      {showImage && (
-        <img
-          src={ad.creative_url}
-          alt={ad.ad_name}
-          className="w-10 h-10 md:w-12 md:h-12 rounded object-cover flex-shrink-0 border border-gray-200 bg-[#F9FAFB]"
-          onError={(e) => {
-            e.target.style.display = 'none'
-            setImageBroken(true)
-          }}
-        />
-      )}
-      <div className={`w-10 h-10 md:w-12 md:h-12 rounded bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0 ${showImage ? 'hidden' : 'flex'}`}>
+    <div
+      className={`group relative w-10 h-10 md:w-12 md:h-12 flex-shrink-0 rounded bg-gray-100 border border-gray-200 flex items-center justify-center transition-all ${hasLink ? 'cursor-pointer hover:scale-110 hover:shadow-md hover:border-blue-400' : ''}`}
+      onClick={hasLink ? handleThumbClick : undefined}
+      title={hasLink ? 'View ad on Facebook' : 'No preview available'}
+      role={hasLink ? 'button' : undefined}
+      tabIndex={hasLink ? 0 : undefined}
+      onKeyDown={hasLink ? (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          handleThumbClick(e)
+        }
+      } : undefined}
+    >
+      <div className="absolute inset-0 rounded bg-white/75 opacity-0 transition-opacity group-hover:opacity-100" />
+      <div className="absolute inset-x-0 bottom-0 flex justify-center pb-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+        <span className="text-[8px] font-semibold text-blue-600">View ↗</span>
+      </div>
+      <div className="relative z-10">
         {isVideo ? <Play size={16} className="text-[#9CA3AF] ml-0.5" /> : <FileText size={16} className="text-[#9CA3AF]" />}
       </div>
+      {hasLink && (
+        <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full flex items-center justify-center">
+          <span className="text-white text-[8px]">↗</span>
+        </div>
+      )}
     </div>
   )
 }
 
 function ExpandedCreativePreview({ ad }) {
-  const [imageBroken, setImageBroken] = useState(false)
-  const expandedCreativeUrl = getExpandedCreativeUrl(ad.creative_url)
-  const showImage = Boolean(expandedCreativeUrl && !imageBroken)
   const isVideo = ad.creative_type === 'VIDEO'
-  const storyUrl = getStoryUrl(ad.effective_object_story_id)
+  const destination = getAdDestination(ad)
+  const hasLink = Boolean(destination)
 
   return (
     <div>
       <p className="text-xs font-semibold text-[#6B7280] mb-3">CREATIVE PREVIEW</p>
       <div className="rounded-xl border border-[#E5E7EB] bg-white p-4">
-        <div className="relative w-full max-w-[200px]">
-          {showImage && (
-            <img
-              src={expandedCreativeUrl}
-              alt={ad.ad_name}
-              onError={(e) => {
-                e.target.style.display = 'none'
-                setImageBroken(true)
-              }}
-              className="w-full max-w-[200px] aspect-square object-cover rounded-lg border border-gray-200 bg-[#F9FAFB]"
-            />
-          )}
-
-          <div className={`w-full max-w-[200px] aspect-square rounded-lg border border-gray-200 bg-[#F3F4F6] items-center justify-center ${showImage ? 'hidden' : 'flex'}`}>
-            {isVideo ? <Play size={36} className="text-[#9CA3AF] ml-1" /> : <FileText size={36} className="text-[#9CA3AF]" />}
-          </div>
-
-          {isVideo && ad.video_url && (
-            <div
-              className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-lg hover:bg-black/40 transition cursor-pointer"
-              onClick={() => window.open(ad.video_url, '_blank', 'noopener,noreferrer')}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault()
-                  window.open(ad.video_url, '_blank', 'noopener,noreferrer')
-                }
-              }}
-              aria-label={`Watch ${ad.ad_name} on Facebook`}
-            >
-              <div className="w-12 h-12 bg-white/90 rounded-full flex items-center justify-center">
-                <svg className="w-6 h-6 text-gray-800 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+        <div
+          className={`group relative w-full max-w-[220px] ${hasLink ? 'cursor-pointer' : ''}`}
+          onClick={hasLink ? () => openAdDestination(destination) : undefined}
+          role={hasLink ? 'button' : undefined}
+          tabIndex={hasLink ? 0 : undefined}
+          onKeyDown={hasLink ? (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              openAdDestination(destination)
+            }
+          } : undefined}
+          aria-label={hasLink ? `View ${ad.ad_name} on Facebook` : undefined}
+        >
+          <div className="w-full max-w-[220px] aspect-square rounded-lg border border-gray-200 bg-[#F3F4F6] flex items-center justify-center relative overflow-hidden transition-all group-hover:shadow-md group-hover:border-blue-400">
+            {isVideo ? <Play size={52} className="text-[#9CA3AF] ml-1 relative z-10" /> : <FileText size={52} className="text-[#9CA3AF] relative z-10" />}
+            {isVideo && hasLink && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-lg hover:bg-black/40 transition">
+                <div className="w-12 h-12 bg-white/90 rounded-full flex items-center justify-center">
+                  <svg className="w-6 h-6 text-gray-800 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+            {hasLink && !isVideo && (
+              <div className="absolute -top-1 -right-1 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                <span className="text-white text-[10px]">↗</span>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="mt-4">
@@ -189,26 +189,15 @@ function ExpandedCreativePreview({ ad }) {
           </div>
           <p className="text-xs text-[#9CA3AF] mt-2">{ad.campaign_name || '—'}</p>
 
-          {isVideo && ad.video_url && (
+          {hasLink && (
             <a
-              href={ad.video_url}
+              href={destination}
               target="_blank"
               rel="noreferrer"
               className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-[#E5E7EB] px-3 py-1.5 text-xs font-medium text-[#2563EB] hover:bg-[#EFF6FF] transition-colors"
+              onClick={(e) => e.stopPropagation()}
             >
-              Watch on Facebook
-              <ExternalLink size={12} />
-            </a>
-          )}
-
-          {!isVideo && storyUrl && (
-            <a
-              href={storyUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-[#E5E7EB] px-3 py-1.5 text-xs font-medium text-[#7C3AED] hover:bg-[#F5F3FF] transition-colors"
-            >
-              View original post
+              View on Facebook
               <ExternalLink size={12} />
             </a>
           )}
@@ -436,11 +425,11 @@ export default function AdCreatives() {
                       <tr key={`${ad.ad_id}-expanded`} className="border-t border-[#F3F4F6] bg-[#FAFAFA]">
                         <td colSpan={14} className="px-6 py-4">
                           <div className="w-full overflow-hidden">
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 p-4">
-                              <div className="min-w-0 overflow-hidden lg:max-w-[220px]">
+                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 overflow-hidden">
+                              <div className="lg:col-span-3 min-w-0">
                                 <ExpandedCreativePreview ad={ad} />
                               </div>
-                              <div className="min-w-0 overflow-hidden">
+                              <div className="lg:col-span-6 min-w-0">
                                 <p className="text-xs font-semibold text-[#6B7280] mb-3">PERFORMANCE BREAKDOWN</p>
                                 <ResponsiveContainer width="100%" height={140}>
                                   <BarChart data={[
@@ -478,7 +467,7 @@ export default function AdCreatives() {
                                   </div>
                                 )}
                               </div>
-                              <div className="min-w-0 overflow-hidden lg:max-w-[240px] lg:justify-self-end w-full">
+                              <div className="lg:col-span-3 min-w-0">
                                 <p className="text-xs font-semibold text-[#6B7280] mb-3">AD DETAILS</p>
                                 <div className="space-y-2">
                                   {adDetails.map(({ label, value, bordered }) => (
