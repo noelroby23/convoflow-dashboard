@@ -17,7 +17,8 @@ import {
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import { DATE_RANGE_PRESETS, getPresetRange, useDashboard } from '../store/dashboard'
 
-const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const WEEKDAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
+const SIDE_PRESET_IDS = ['last_7_days', 'last_14_days', 'last_30_days', 'this_week', 'last_week', 'this_month', 'last_month', 'last_quarter', 'all_time']
 
 function parseDate(value) {
   if (!value) return null
@@ -64,13 +65,14 @@ function rangeMatchesPreset(from, to) {
 
 function CalendarMonth({ month, startDate, endDate, onSelectDate }) {
   const days = useMemo(() => getCalendarDays(month), [month])
+  const today = new Date()
 
   return (
     <div className="min-w-0">
-      <div className="mb-3 text-sm font-semibold text-white">{format(month, 'MMMM yyyy')}</div>
+      <div className="mb-4 text-sm font-semibold text-[#1F2937] text-center">{format(month, 'MMM yyyy')}</div>
       <div className="grid grid-cols-7 gap-1 mb-2">
         {WEEKDAY_LABELS.map(label => (
-          <div key={label} className="text-[11px] font-medium text-slate-400 text-center py-1">{label}</div>
+          <div key={label} className="text-[11px] font-medium text-[#9CA3AF] text-center py-1">{label}</div>
         ))}
       </div>
       <div className="grid grid-cols-7 gap-1">
@@ -80,6 +82,7 @@ function CalendarMonth({ month, startDate, endDate, onSelectDate }) {
           const selected = isSelectedStart || isSelectedEnd
           const inRange = isInRange(day, startDate, endDate)
           const currentMonth = isSameMonth(day, month)
+          const isToday = isSameDay(day, today)
 
           return (
             <button
@@ -87,11 +90,12 @@ function CalendarMonth({ month, startDate, endDate, onSelectDate }) {
               type="button"
               onClick={() => onSelectDate(day)}
               className={[
-                'h-10 rounded-lg text-sm transition-colors',
-                currentMonth ? 'text-white' : 'text-slate-600',
-                selected ? 'bg-[#EC4899] text-white shadow-sm' : '',
-                !selected && inRange ? 'bg-[#7C2D92]/40 text-pink-100' : '',
-                !selected && !inRange ? 'hover:bg-slate-800' : '',
+                'h-9 rounded-full text-sm transition-colors',
+                currentMonth ? 'text-[#374151]' : 'text-[#D1D5DB]',
+                selected ? 'bg-[#FF6B8A] text-white shadow-sm' : '',
+                !selected && inRange ? 'bg-[#FFE0E6] text-[#B8325A]' : '',
+                !selected && !inRange ? 'hover:bg-[#FFF0F3]' : '',
+                isToday && !selected ? 'ring-1 ring-[#FF6B8A]' : '',
               ].join(' ')}
             >
               {format(day, 'd')}
@@ -106,6 +110,7 @@ function CalendarMonth({ month, startDate, endDate, onSelectDate }) {
 export default function DateRangePicker() {
   const { dateRange, setDatePreset, setCustomDateRange } = useDashboard()
   const [isOpen, setIsOpen] = useState(false)
+  const [isVisible, setIsVisible] = useState(false)
   const [draftFrom, setDraftFrom] = useState(dateRange.from)
   const [draftTo, setDraftTo] = useState(dateRange.to)
   const [draftPreset, setDraftPreset] = useState(dateRange.preset)
@@ -123,16 +128,32 @@ export default function DateRangePicker() {
     if (!isOpen) return undefined
 
     const handleEscape = (event) => {
-      if (event.key === 'Escape') setIsOpen(false)
+      if (event.key === 'Escape') handleClose()
     }
 
+    const frame = requestAnimationFrame(() => setIsVisible(true))
     window.addEventListener('keydown', handleEscape)
-    return () => window.removeEventListener('keydown', handleEscape)
+    return () => {
+      cancelAnimationFrame(frame)
+      window.removeEventListener('keydown', handleEscape)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen])
 
   const startDate = parseDate(draftFrom)
   const endDate = parseDate(draftTo)
   const leftMonth = subMonths(displayMonth, 1)
+  const sidePresets = DATE_RANGE_PRESETS.filter(preset => SIDE_PRESET_IDS.includes(preset.id))
+
+  const handleOpen = () => {
+    setIsOpen(true)
+    setIsVisible(false)
+  }
+
+  const handleClose = () => {
+    setIsVisible(false)
+    window.setTimeout(() => setIsOpen(false), 180)
+  }
 
   const handlePresetSelect = (presetId) => {
     if (presetId === 'custom') {
@@ -184,37 +205,63 @@ export default function DateRangePicker() {
       setCustomDateRange(normalizedFrom, normalizedTo)
     }
 
-    setIsOpen(false)
+    handleClose()
   }
 
   return (
     <>
       <button
         type="button"
-        onClick={() => setIsOpen(true)}
-        className="no-print flex items-center gap-2 px-3 py-1.5 text-xs border border-[#E5E7EB] rounded-lg text-[#6B7280] hover:bg-[#F3F4F6] transition-colors min-w-[210px] justify-between"
+        onClick={handleOpen}
+        className="no-print flex items-center gap-2 px-3 py-2 text-xs rounded-xl bg-[#FF6B8A] text-white hover:bg-[#FF5C80] transition-colors min-w-[220px] justify-between shadow-sm"
       >
         <span className="flex items-center gap-2 min-w-0">
           <CalendarDays size={14} />
-          <span className="truncate">{formatRangeLabel(dateRange.from, dateRange.to, dateRange.preset)}</span>
+          <span className="truncate font-medium">{formatRangeLabel(dateRange.from, dateRange.to, dateRange.preset)}</span>
         </span>
         <ChevronDown size={14} />
       </button>
 
       {isOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-sm" onClick={() => setIsOpen(false)}>
+        <div
+          className={`fixed inset-0 z-50 bg-slate-900/25 backdrop-blur-sm transition-opacity duration-200 ${isVisible ? 'opacity-100' : 'opacity-0'}`}
+          onClick={handleClose}
+        >
           <div
-            className="absolute right-6 top-20 w-[min(960px,calc(100vw-3rem))] rounded-2xl border border-slate-800 bg-slate-950 text-white shadow-2xl overflow-hidden"
+            className={`absolute right-6 top-20 w-[min(1080px,calc(100vw-2rem))] rounded-[12px] bg-white shadow-2xl overflow-hidden transition-all duration-200 ${isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="grid grid-cols-1 lg:grid-cols-[1.5fr_0.9fr]">
-              <div className="p-6 border-b lg:border-b-0 lg:border-r border-slate-800">
-                <div className="flex items-center justify-between mb-5">
-                  <button type="button" onClick={() => setDisplayMonth(subMonths(displayMonth, 1))} className="w-9 h-9 rounded-lg border border-slate-800 text-slate-300 hover:bg-slate-900 flex items-center justify-center">
+            <div className="px-6 py-4 bg-gradient-to-r from-[#FF6B8A] to-[#FF8FA3]">
+              <h2 className="text-lg font-semibold text-white">Select Date Range</h2>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr_280px]">
+              <div className="bg-[#F8F9FA] p-5 border-b lg:border-b-0 lg:border-r border-[#E5E7EB]">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#9CA3AF] mb-4">Recently used</p>
+                <div className="space-y-1">
+                  {sidePresets.map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => handlePresetSelect(preset.id)}
+                      className="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-white transition-colors"
+                    >
+                      <span className={`w-4 h-4 rounded-full border flex items-center justify-center ${draftPreset === preset.id ? 'border-[#FF6B8A]' : 'border-[#D1D5DB]'}`}>
+                        {draftPreset === preset.id && <span className="w-2 h-2 rounded-full bg-[#FF6B8A]" />}
+                      </span>
+                      <span className={`text-sm ${draftPreset === preset.id ? 'font-semibold text-[#B8325A]' : 'text-[#374151]'}`}>{preset.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="p-6 border-b lg:border-b-0 lg:border-r border-[#E5E7EB] min-w-0">
+                <div className="flex items-center justify-between mb-6">
+                  <button type="button" onClick={() => setDisplayMonth(subMonths(displayMonth, 1))} className="w-9 h-9 rounded-full border border-[#F3C5CF] text-[#FF6B8A] hover:bg-[#FFF0F3] flex items-center justify-center transition-colors">
                     <ChevronLeft size={16} />
                   </button>
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Custom Range</div>
-                  <button type="button" onClick={() => setDisplayMonth(addMonths(displayMonth, 1))} className="w-9 h-9 rounded-lg border border-slate-800 text-slate-300 hover:bg-slate-900 flex items-center justify-center">
+                  <div className="w-9 h-9" />
+                  <button type="button" onClick={() => setDisplayMonth(addMonths(displayMonth, 1))} className="w-9 h-9 rounded-full border border-[#F3C5CF] text-[#FF6B8A] hover:bg-[#FFF0F3] flex items-center justify-center transition-colors">
                     <ChevronRight size={16} />
                   </button>
                 </div>
@@ -225,73 +272,78 @@ export default function DateRangePicker() {
                 </div>
               </div>
 
-              <div className="p-6 bg-slate-950/80">
-                <div className="grid grid-cols-2 gap-2 mb-5">
-                  {DATE_RANGE_PRESETS.map((preset) => (
-                    <button
-                      key={preset.id}
-                      type="button"
-                      onClick={() => handlePresetSelect(preset.id)}
-                      className={[
-                        'rounded-lg border px-3 py-2 text-xs font-medium text-left transition-colors',
-                        draftPreset === preset.id
-                          ? 'border-[#EC4899] bg-[#EC4899]/15 text-pink-100'
-                          : 'border-slate-800 text-slate-300 hover:bg-slate-900',
-                      ].join(' ')}
-                    >
-                      {preset.label}
-                    </button>
-                  ))}
+              <div className="p-6 min-w-0">
+                <div className="mb-5">
+                  <label className="block text-xs font-semibold text-[#6B7280] mb-2">Select Date Range</label>
+                  <select
+                    value={draftPreset}
+                    onChange={(event) => handlePresetSelect(event.target.value)}
+                    className="w-full rounded-lg border border-[#E5E7EB] bg-white px-3 py-2 text-sm text-[#374151] focus:outline-none focus:ring-2 focus:ring-[#FFB8C7] focus:border-[#FF6B8A]"
+                  >
+                    {DATE_RANGE_PRESETS.map((preset) => (
+                      <option key={preset.id} value={preset.id}>{preset.label}</option>
+                    ))}
+                  </select>
                 </div>
 
-                <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3 mb-5">
                   <div>
-                    <label className="block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400 mb-2">From</label>
+                    <label className="block text-xs font-semibold text-[#6B7280] mb-2">From</label>
                     <input
                       value={draftFrom}
                       onChange={(event) => {
                         setDraftPreset('custom')
                         setDraftFrom(event.target.value)
                       }}
-                      className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white focus:outline-none focus:border-[#EC4899]"
+                      className="w-full rounded-lg border border-[#E5E7EB] bg-white px-3 py-2 text-sm text-[#374151] focus:outline-none focus:ring-2 focus:ring-[#FFB8C7] focus:border-[#FF6B8A]"
                       placeholder="YYYY-MM-DD"
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400 mb-2">To</label>
+                    <label className="block text-xs font-semibold text-[#6B7280] mb-2">To</label>
                     <input
                       value={draftTo}
                       onChange={(event) => {
                         setDraftPreset('custom')
                         setDraftTo(event.target.value)
                       }}
-                      className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white focus:outline-none focus:border-[#EC4899]"
+                      className="w-full rounded-lg border border-[#E5E7EB] bg-white px-3 py-2 text-sm text-[#374151] focus:outline-none focus:ring-2 focus:ring-[#FFB8C7] focus:border-[#FF6B8A]"
                       placeholder="YYYY-MM-DD"
                     />
                   </div>
                 </div>
 
-                <div className="mt-6 rounded-xl border border-slate-800 bg-slate-900/70 px-4 py-3">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 mb-1">Selected</div>
-                  <div className="text-sm text-white">{formatRangeLabel(draftFrom, draftTo || draftFrom, draftPreset)}</div>
+                <div className="mb-6">
+                  <label className="block text-xs font-semibold text-[#6B7280] mb-2">Comparison Range</label>
+                  <select className="w-full rounded-lg border border-[#E5E7EB] bg-white px-3 py-2 text-sm text-[#374151] focus:outline-none focus:ring-2 focus:ring-[#FFB8C7] focus:border-[#FF6B8A]">
+                    <option>No Comparison</option>
+                  </select>
                 </div>
 
-                <div className="mt-6 flex items-center justify-end gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setIsOpen(false)}
-                    className="rounded-lg border border-slate-800 px-4 py-2 text-sm text-slate-300 hover:bg-slate-900 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleApply}
-                    className="rounded-lg bg-[#EC4899] px-4 py-2 text-sm font-medium text-white hover:bg-[#DB2777] transition-colors"
-                  >
-                    Apply
-                  </button>
+                <div className="rounded-xl bg-[#FFF7F9] border border-[#FFE0E6] px-4 py-3">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9CA3AF] mb-1">Selected Range</div>
+                  <div className="text-sm font-medium text-[#374151]">{formatRangeLabel(draftFrom, draftTo || draftFrom, draftPreset)}</div>
                 </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-t border-[#E5E7EB] px-6 py-4 bg-white">
+              <p className="text-xs text-[#9CA3AF]">Dates shown in Dubai Time</p>
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={handleClose}
+                  className="rounded-lg border border-[#D1D5DB] bg-white px-4 py-2 text-sm text-[#6B7280] hover:bg-[#F8F9FA] transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleApply}
+                  className="rounded-lg bg-[#FF6B8A] px-4 py-2 text-sm font-medium text-white hover:bg-[#FF5C80] transition-colors"
+                >
+                  Apply
+                </button>
               </div>
             </div>
           </div>

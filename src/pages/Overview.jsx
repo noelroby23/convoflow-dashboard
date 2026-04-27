@@ -1,5 +1,5 @@
-import { useEffect } from 'react'
-import { useContactDetails, useTargets } from '../hooks/useDashboardData'
+import { useEffect, useMemo, useState } from 'react'
+import { useAllContacts, useContactDetails, useTargets } from '../hooks/useDashboardData'
 import { useDashboardOverview } from '../hooks/useDashboardOverview'
 import KPICard from '../components/ui/KPICard'
 import InsightsFeed from '../components/ui/InsightsFeed'
@@ -12,13 +12,27 @@ import { useNavigate } from 'react-router-dom'
 import { useDashboard } from '../store/dashboard'
 import { homeReport } from '../lib/reports/generators'
 
+function getLeadDateValue(lead) {
+  const raw = lead?.ghl_created_at || lead?.created_at
+  if (!raw) return null
+  const parsed = new Date(raw)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+function formatLeadDate(lead) {
+  const parsed = getLeadDateValue(lead)
+  return parsed ? parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
+}
+
 export default function Overview() {
   const navigate = useNavigate()
   const dateRange = useDashboard(s => s.dateRange)
   const setReportBuilder = useDashboard(s => s.setReportBuilder)
   const { data: overview, loading: overviewLoading } = useDashboardOverview(dateRange.from, dateRange.to)
   const { data: targets } = useTargets()
+  const { data: activeLeads, loading: activeLeadsLoading } = useAllContacts()
   const { data: activePipeline, loading: pipelineLoading } = useContactDetails(['showed', 'active'])
+  const [showAllLeads, setShowAllLeads] = useState(false)
 
   useEffect(() => {
     setReportBuilder(() => homeReport(overview, activePipeline))
@@ -52,6 +66,14 @@ export default function Overview() {
   const roasTarget = targets?.roas_target ?? 4
   const formattedSpend = Number(totalSpend).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   const formattedCpl = Number(cpl).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const sortedActiveLeads = useMemo(() => {
+    return [...(activeLeads ?? [])].sort((a, b) => {
+      const aDate = getLeadDateValue(a)?.getTime() ?? 0
+      const bDate = getLeadDateValue(b)?.getTime() ?? 0
+      return bDate - aDate
+    })
+  }, [activeLeads])
+  const visibleActiveLeads = showAllLeads ? sortedActiveLeads : sortedActiveLeads.slice(0, 10)
 
   // Build insights dynamically
   const insights = []
@@ -95,6 +117,67 @@ export default function Overview() {
         <div className="bg-white rounded-xl border border-[#E5E7EB] p-6 shadow-sm mb-6">
           <h2 className="text-sm font-bold text-[#0F0F1A] mb-4">Pipeline Funnel</h2>
           <Funnel data={overview} loading={overviewLoading} />
+        </div>
+      </ErrorBoundary>
+
+      <ErrorBoundary>
+        <div className="bg-white rounded-xl border border-[#E5E7EB] p-6 shadow-sm mb-6">
+          <div className="flex items-center justify-between gap-4 mb-4">
+            <div>
+              <h2 className="text-sm font-bold text-[#0F0F1A] mb-1">Active Leads</h2>
+              <p className="text-xs text-[#6B7280]">{sortedActiveLeads.length} leads came in during this period</p>
+            </div>
+            {sortedActiveLeads.length > 10 && (
+              <button
+                type="button"
+                onClick={() => setShowAllLeads(current => !current)}
+                className="text-xs font-medium text-[#EC4899] hover:underline"
+              >
+                {showAllLeads ? 'Show less' : 'Show all'}
+              </button>
+            )}
+          </div>
+
+          {activeLeadsLoading ? (
+            <div className="space-y-3">{[...Array(4)].map((_, i) => <div key={i} className="skeleton h-10 w-full" />)}</div>
+          ) : !sortedActiveLeads.length ? (
+            <p className="text-sm text-[#9CA3AF] text-center py-8">No leads were created during this date range.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <div className={showAllLeads ? 'max-h-[540px] overflow-y-auto' : 'max-h-[460px] overflow-y-auto'}>
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-white z-10">
+                    <tr className="border-b border-[#E5E7EB]">
+                      {['Name', 'Company', 'Source Ad', 'Stage', 'Date', 'Deal Value'].map((heading) => (
+                        <th
+                          key={heading}
+                          className={`text-left text-xs font-semibold text-[#6B7280] pb-2 pr-4 ${heading === 'Company' || heading === 'Deal Value' ? 'hidden md:table-cell' : ''}`}
+                        >
+                          {heading}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleActiveLeads.map((lead, index) => (
+                      <tr key={lead.contact_id} className={`border-b border-[#F3F4F6] hover:bg-[#FAFAFA] ${index % 2 === 1 ? 'bg-[#FCFCFD]' : ''}`}>
+                        <td className="py-3 pr-4 font-medium text-[#0F0F1A]">
+                          <button type="button" onClick={() => navigate('/lead-tracker')} className="hover:text-[#EC4899] transition-colors text-left">
+                            {lead.full_name || '—'}
+                          </button>
+                        </td>
+                        <td className="py-3 pr-4 text-[#6B7280] hidden md:table-cell">{lead.company_name || lead.company || '—'}</td>
+                        <td className="py-3 pr-4 text-[#6B7280]">{lead.ad_name || lead.source_ad || '—'}</td>
+                        <td className="py-3 pr-4"><StatusBadge stage={lead.current_stage} /></td>
+                        <td className="py-3 pr-4 text-[#6B7280] whitespace-nowrap">{formatLeadDate(lead)}</td>
+                        <td className="py-3 text-[#0F0F1A] font-medium hidden md:table-cell">{lead.deal_value ? `AED ${Number(lead.deal_value).toLocaleString()}` : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       </ErrorBoundary>
 

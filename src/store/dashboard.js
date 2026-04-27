@@ -1,16 +1,16 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { subDays, subMonths, subQuarters, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, format } from 'date-fns'
+import { subDays, subMonths, subQuarters, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfWeek, endOfWeek, format } from 'date-fns'
 
-export const DEFAULT_DATE_PRESET = 'last_30_days'
+export const DEFAULT_DATE_PRESET = 'this_month'
 export const ALL_TIME_START = '2020-01-01'
 
 export const DATE_RANGE_PRESETS = [
-  { id: 'today', label: 'Today' },
-  { id: 'yesterday', label: 'Yesterday' },
   { id: 'last_7_days', label: 'Last 7 Days' },
   { id: 'last_14_days', label: 'Last 14 Days' },
   { id: 'last_30_days', label: 'Last 30 Days' },
+  { id: 'this_week', label: 'This Week' },
+  { id: 'last_week', label: 'Last Week' },
   { id: 'this_month', label: 'This Month' },
   { id: 'last_month', label: 'Last Month' },
   { id: 'last_quarter', label: 'Last Quarter' },
@@ -35,6 +35,18 @@ export const getPresetRange = (preset) => {
       return { from: format(subDays(now, 13), 'yyyy-MM-dd'), to: today }
     case 'last_30_days':
       return { from: format(subDays(now, 29), 'yyyy-MM-dd'), to: today }
+    case 'this_week':
+      return {
+        from: format(startOfWeek(now), 'yyyy-MM-dd'),
+        to: format(endOfWeek(now), 'yyyy-MM-dd'),
+      }
+    case 'last_week': {
+      const lastWeek = subDays(startOfWeek(now), 1)
+      return {
+        from: format(startOfWeek(lastWeek), 'yyyy-MM-dd'),
+        to: format(endOfWeek(lastWeek), 'yyyy-MM-dd'),
+      }
+    }
     case 'this_month':
       return { from: format(startOfMonth(now), 'yyyy-MM-dd'), to: today }
     case 'last_month': {
