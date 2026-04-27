@@ -80,8 +80,8 @@ export const mockCallOutcomes = [
 ]
 
 export const mockSalesReps = [
-  { name: 'Ron Davies', meetings: 8, shows: 5, noShows: 3, showRate: 62.5, active: 3, closes: 1, closeRate: 20, avgTimeToContact: '2.1 hrs' },
-  { name: 'Steve Branch', meetings: 5, shows: 3, noShows: 2, showRate: 60, active: 2, closes: 0, closeRate: 0, avgTimeToContact: '4.3 hrs' },
+  { name: 'Ron David', meetings: 15, shows: 11, noShows: 3, showRate: 73.3, active: 0, closes: 0, closeRate: 0, avgTimeToContact: '2.1 hrs' },
+  { name: 'Abdus Samad', meetings: 9, shows: 3, noShows: 4, showRate: 33.3, active: 0, closes: 0, closeRate: 0, avgTimeToContact: '4.3 hrs' },
 ]
 
 export const mockWeeklyData = [

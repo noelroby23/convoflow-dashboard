@@ -23,10 +23,10 @@ export default function SalesPerformance() {
 
   const loading = repsLoading || overviewLoading
 
-  const totalMeetings = Number(overview?.meetings_booked ?? 0)
-  const totalShows = Number(overview?.showed_up ?? 0)
-  const totalNoShows = Number(overview?.no_shows ?? 0)
-  const totalCloses = Number(overview?.closed_won ?? 0)
+  const totalMeetings = (salesReps ?? []).reduce((sum, rep) => sum + Number(rep.meetings_scheduled ?? 0), 0)
+  const totalShows = (salesReps ?? []).reduce((sum, rep) => sum + Number(rep.shows ?? 0), 0)
+  const totalNoShows = (salesReps ?? []).reduce((sum, rep) => sum + Number(rep.no_shows ?? 0), 0)
+  const totalCloses = (salesReps ?? []).reduce((sum, rep) => sum + Number(rep.closes ?? 0), 0)
   const totalDisqualified = Number(overview?.disqualified ?? 0)
   const totalLost = Number(overview?.closed_lost ?? 0)
   const totalNotInterested = Number(overview?.not_interested ?? 0)
@@ -91,8 +91,8 @@ export default function SalesPerformance() {
                     {salesReps.map((rep) => {
                       const showRate = rep.meetings_scheduled > 0
                         ? ((rep.shows / rep.meetings_scheduled) * 100).toFixed(1) : '0.0'
-                      const closeRate = rep.meetings_scheduled > 0
-                        ? ((rep.closes / rep.meetings_scheduled) * 100).toFixed(1) : '0.0'
+                      const closeRate = rep.shows > 0
+                        ? ((rep.closes / rep.shows) * 100).toFixed(1) : '0.0'
                       return (
                         <tr key={rep.sales_rep} className="border-b border-[#F3F4F6]">
                           <td className="py-3 pr-4 font-medium text-[#0F0F1A]">{rep.sales_rep}</td>

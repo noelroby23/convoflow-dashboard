@@ -5,6 +5,8 @@ import {
   mockAds, mockLeads, mockTrendsData, mockSalesReps
 } from '../data/mockData'
 
+const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
+
 const fallbackFunnel = {
   client_id: 'mock', client_name: 'ConvoFlow UK', total_leads: 93, meetings_booked: 13,
   showed_up: 8, active_opportunities: 6, closed_won: 1, no_shows: 5, disqualified: 24,
@@ -443,44 +445,10 @@ export function useTrendMetricsByDate() {
 }
 
 export function useSalesRepPerformance() {
-  const { currentClientId, dateRange, refreshKey } = useDashboard()
+  const { currentClientId, refreshKey } = useDashboard()
   return useSupabaseQuery(
-    async () => {
-      const { data, error } = await supabase.from('lead_tracker').select('assigned_to, funnel_meeting_booked, funnel_showed_up, funnel_no_show, funnel_closed_won, deal_value, ghl_created_at, created_at').eq('client_id', currentClientId)
-      if (error) return { data: null, error }
-
-      const filteredRows = filterRowsByDateRange(data, row => row.ghl_created_at || row.created_at, dateRange.from, dateRange.to)
-      const grouped = new Map()
-
-      for (const row of filteredRows) {
-        const rep = row.assigned_to || 'Unassigned'
-        const current = grouped.get(rep) ?? {
-          client_id: currentClientId,
-          sales_rep: rep,
-          meetings_scheduled: 0,
-          shows: 0,
-          no_shows: 0,
-          closes: 0,
-          revenue_closed: 0,
-        }
-
-        if (row.funnel_meeting_booked) current.meetings_scheduled += 1
-        if (row.funnel_showed_up) current.shows += 1
-        if (row.funnel_no_show) current.no_shows += 1
-        if (row.funnel_closed_won) {
-          current.closes += 1
-          current.revenue_closed += Number(row.deal_value ?? 0)
-        }
-
-        grouped.set(rep, current)
-      }
-
-      return {
-        data: Array.from(grouped.values()),
-        error: null,
-      }
-    },
-    [currentClientId, dateRange.from, dateRange.to, refreshKey], fallbackSalesReps
+    () => supabase.from('sales_rep_performance').select('*').eq('client_id', currentClientId),
+    [currentClientId, refreshKey], USE_MOCK ? fallbackSalesReps : null
   )
 }
 
