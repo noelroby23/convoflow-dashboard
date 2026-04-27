@@ -2,6 +2,8 @@ import { supabase } from '../lib/supabase'
 import { useDashboard } from '../store/dashboard'
 import { useSupabaseQuery } from './useSupabaseQuery'
 
+const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
+
 const fallbackOverview = {
   client_id: 'mock',
   client_name: 'ConvoFlow UK',
@@ -38,9 +40,41 @@ export function useDashboardOverview(dateFrom, dateTo, paidOnly = true) {
         p_client_id: currentClientId,
       })
 
-      return { data, error }
+      if (error) return { data: null, error }
+
+      const row = Array.isArray(data) ? (data[0] ?? null) : data
+      if (!row) return { data: null, error: null }
+
+      const totalSpend = Number(row.total_spend ?? 0)
+      const totalLeads = Number(row.total_leads ?? 0)
+      const meetingsBooked = Number(row.meetings_booked ?? 0)
+      const showedUp = Number(row.showed_up ?? 0)
+      const activeOpps = Number(row.active_opportunities ?? 0)
+      const closedWon = Number(row.closed_won ?? 0)
+      const closedRevenue = Number(row.deal_value ?? row.closed_revenue ?? 0)
+
+      return {
+        data: {
+          ...row,
+          total_spend: totalSpend,
+          total_leads: totalLeads,
+          meetings_booked: meetingsBooked,
+          showed_up: showedUp,
+          active_opportunities: activeOpps,
+          closed_won: closedWon,
+          closed_revenue: closedRevenue,
+          cost_per_lead: totalLeads > 0 ? totalSpend / totalLeads : 0,
+          cost_per_meeting: meetingsBooked > 0 ? totalSpend / meetingsBooked : 0,
+          cost_per_active: activeOpps > 0 ? totalSpend / activeOpps : 0,
+          show_rate: meetingsBooked > 0 ? (showedUp / meetingsBooked) * 100 : 0,
+          meeting_rate: totalLeads > 0 ? (meetingsBooked / totalLeads) * 100 : 0,
+          roas: totalSpend > 0 ? closedRevenue / totalSpend : 0,
+        },
+        error: null,
+      }
+
     },
     [currentClientId, dateFrom, dateTo, paidOnly, refreshKey],
-    fallbackOverview
+    USE_MOCK ? fallbackOverview : null
   )
 }

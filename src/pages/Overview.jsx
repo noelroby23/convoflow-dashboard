@@ -28,7 +28,7 @@ export default function Overview() {
   const navigate = useNavigate()
   const dateRange = useDashboard(s => s.dateRange)
   const setReportBuilder = useDashboard(s => s.setReportBuilder)
-  const { data: overview, loading: overviewLoading } = useDashboardOverview(dateRange.from, dateRange.to)
+  const { data: overview, loading: overviewLoading, error: overviewError } = useDashboardOverview(dateRange.from, dateRange.to)
   const { data: targets } = useTargets()
   const { data: activeLeads, loading: activeLeadsLoading } = useAllContacts()
   const { data: activePipeline, loading: pipelineLoading } = useContactDetails(['showed', 'active'])
@@ -89,34 +89,52 @@ export default function Overview() {
         <InsightsFeed insights={insights} />
       </ErrorBoundary>
 
+      {overviewError && !overviewLoading && (
+        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-[#B91C1C]">
+          Failed to load Home page KPIs for the selected date range.
+        </div>
+      )}
+
       <h2 className="text-xs font-semibold uppercase tracking-wide text-[#6B7280] mb-3">Volume</h2>
       <ErrorBoundary>
-        <div className="grid grid-cols-6 gap-3 mb-6">
-          <KPICard label="Total Spend" value={totalSpend} prefix="AED " inverse={true} loading={overviewLoading} description="What you spent on ads this period" target={spendTarget} />
-          <KPICard label="Total Leads" value={totalLeads} loading={overviewLoading} description="People who raised their hand interested in you" target={leadsTarget} />
-          <KPICard label="Meetings Booked" value={meetingsBooked} loading={overviewLoading} description="Sales conversations Sarah booked" target={meetingsTarget} />
-          <KPICard label="Showed Up" value={showedUp} loading={overviewLoading} description="People who actually attended their meeting" target={showsTarget} />
-          <KPICard label="Active Opportunities" value={activeOpps} loading={overviewLoading} description="Leads your sales team is currently working" target={activeOppsTarget} />
-          <KPICard label="Closed Won" value={closedWon} loading={overviewLoading} description="New customers who signed and paid" target={closesTarget} />
-        </div>
+        {overviewError && !overviewLoading ? (
+          <div className="bg-white rounded-xl border border-[#E5E7EB] p-8 text-center mb-6">
+            <p className="text-sm text-[#B91C1C]">KPI data is unavailable right now.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-6 gap-3 mb-6">
+            <KPICard label="Total Spend" value={totalSpend} prefix="AED " inverse={true} loading={overviewLoading} description="What you spent on ads this period" target={spendTarget} />
+            <KPICard label="Total Leads" value={totalLeads} loading={overviewLoading} description="People who raised their hand interested in you" target={leadsTarget} />
+            <KPICard label="Meetings Booked" value={meetingsBooked} loading={overviewLoading} description="Sales conversations Sarah booked" target={meetingsTarget} />
+            <KPICard label="Showed Up" value={showedUp} loading={overviewLoading} description="People who actually attended their meeting" target={showsTarget} />
+            <KPICard label="Active Opportunities" value={activeOpps} loading={overviewLoading} description="Leads your sales team is currently working" target={activeOppsTarget} />
+            <KPICard label="Closed Won" value={closedWon} loading={overviewLoading} description="New customers who signed and paid" target={closesTarget} />
+          </div>
+        )}
       </ErrorBoundary>
 
       <h2 className="text-xs font-semibold uppercase tracking-wide text-[#6B7280] mb-3">Unit Economics</h2>
       <ErrorBoundary>
-        <div className="grid grid-cols-6 gap-3 mb-6">
-          <KPICard label="Cost per Lead" value={cpl} prefix="AED " inverse={true} loading={overviewLoading} description="What each interested person costs you" target={cplTarget} recommendation="If CPL is above target, pause underperforming ads." />
-          <KPICard label="Cost per Meeting" value={costPerMeeting} prefix="AED " inverse={true} loading={overviewLoading} description="What each booked sales conversation costs you" target={costPerMeetingTarget} />
-          <KPICard label="Cost per Active Opp" value={costPerActive} prefix="AED " inverse={true} loading={overviewLoading} description="What it costs to get each real engaged buyer" target={costPerActiveTarget} />
-          <KPICard label="Show Rate" value={showRate} suffix="%" loading={overviewLoading} description="Out of 10 booked meetings, how many show up" target={showRateTarget} recommendation="Add WhatsApp reminders 24h and 1h before meetings." />
-          <KPICard label="Meeting Rate" value={meetingRate} suffix="%" loading={overviewLoading} description="Out of 100 interested people, how many book" target={meetingRateTarget} />
-          <KPICard label="ROAS" value={roas} suffix="x" loading={overviewLoading} description="For every AED spent, how many you make back" target={roasTarget} recommendation="Close active opportunities to improve ROAS." />
-        </div>
+        {overviewError && !overviewLoading ? null : (
+          <div className="grid grid-cols-6 gap-3 mb-6">
+            <KPICard label="Cost per Lead" value={cpl} prefix="AED " inverse={true} loading={overviewLoading} description="What each interested person costs you" target={cplTarget} recommendation="If CPL is above target, pause underperforming ads." />
+            <KPICard label="Cost per Meeting" value={costPerMeeting} prefix="AED " inverse={true} loading={overviewLoading} description="What each booked sales conversation costs you" target={costPerMeetingTarget} />
+            <KPICard label="Cost per Active Opp" value={costPerActive} prefix="AED " inverse={true} loading={overviewLoading} description="What it costs to get each real engaged buyer" target={costPerActiveTarget} />
+            <KPICard label="Show Rate" value={showRate} suffix="%" loading={overviewLoading} description="Out of 10 booked meetings, how many show up" target={showRateTarget} recommendation="Add WhatsApp reminders 24h and 1h before meetings." />
+            <KPICard label="Meeting Rate" value={meetingRate} suffix="%" loading={overviewLoading} description="Out of 100 interested people, how many book" target={meetingRateTarget} />
+            <KPICard label="ROAS" value={roas} suffix="x" loading={overviewLoading} description="For every AED spent, how many you make back" target={roasTarget} recommendation="Close active opportunities to improve ROAS." />
+          </div>
+        )}
       </ErrorBoundary>
 
       <ErrorBoundary>
         <div className="bg-white rounded-xl border border-[#E5E7EB] p-6 shadow-sm mb-6">
           <h2 className="text-sm font-bold text-[#0F0F1A] mb-4">Pipeline Funnel</h2>
-          <Funnel data={overview} loading={overviewLoading} />
+          {overviewError && !overviewLoading ? (
+            <p className="text-sm text-[#B91C1C] text-center py-8">Funnel data is unavailable right now.</p>
+          ) : (
+            <Funnel data={overview} loading={overviewLoading} />
+          )}
         </div>
       </ErrorBoundary>
 
