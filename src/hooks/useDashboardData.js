@@ -54,13 +54,46 @@ const fallbackDailyMetrics = mockTrendsData.map(d => ({
   clicks: 0, leads: d.leads, meetings_booked: d.meetings, closes: 0,
 }))
 
-const SARAH_CLIENT_ID = 'ca5a5257-9217-4d06-990e-b789cb233ac0'
 const fallbackSarahStages = {
   stages: [],
   totalLeads: 0,
   funnelMeetings: 0,
   funnelConversations: 0,
 }
+
+const SARAH_STAGE_ORDER = [
+  'follow_up',
+  'contacted',
+  'callback',
+  'qualified_no_meeting',
+  'meeting_booked',
+  'no_show',
+  'not_interested',
+  'disqualified',
+  'wrong_number',
+]
+
+const formatStageLabel = (stage) => stage ? stage.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : null
+
+const parseDateValue = (value) => {
+  if (!value) return null
+  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00Z` : value
+  const parsed = new Date(normalized)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+const isWithinDateRange = (value, from, to) => {
+  const parsed = parseDateValue(value)
+  if (!parsed || !from || !to) return false
+
+  const start = new Date(`${from}T00:00:00Z`)
+  const end = new Date(`${to}T23:59:59.999Z`)
+  return parsed >= start && parsed <= end
+}
+
+const filterRowsByDateRange = (rows, getValue, from, to) => (
+  (rows ?? []).filter(row => isWithinDateRange(getValue(row), from, to))
+)
 
 const getDateRangeDays = (from, to) => {
   if (!from || !to) return []
@@ -116,98 +149,215 @@ export function useFunnelSummary() {
 }
 
 export function useAdPerformance() {
-  const { currentClientId, refreshKey } = useDashboard()
+  const { currentClientId, dateRange, refreshKey } = useDashboard()
   return useSupabaseQuery(
     async () => {
-      const [performanceResult, creativeResult] = await Promise.all([
+      const adsResult = await supabase.from('ads').select('*').eq('client_id', currentClientId)
+      if (adsResult.error) return { data: null, error: adsResult.error }
+
+      const ads = adsResult.data ?? []
+      const adIds = ads.map(ad => ad.id).filter(Boolean)
+
+      const [performanceResult, dailyMetricsResult, leadTrackerResult] = await Promise.all([
         supabase.from('ad_performance').select('*').eq('client_id', currentClientId),
-        supabase.from('ads').select('id, meta_ad_id, creative_url, creative_type').eq('client_id', currentClientId),
+        adIds.length
+          ? supabase.from('ad_daily_metrics').select('*').in('ad_id', adIds).gte('date', dateRange.from).lte('date', dateRange.to)
+          : Promise.resolve({ data: [], error: null }),
+        supabase.from('lead_tracker').select('*').eq('client_id', currentClientId).order('ghl_created_at', { ascending: false, nullsFirst: false }),
       ])
 
-      if (performanceResult.error || creativeResult.error) {
-        return { data: null, error: performanceResult.error || creativeResult.error }
+      if (performanceResult.error || dailyMetricsResult.error || leadTrackerResult.error) {
+        return { data: null, error: performanceResult.error || dailyMetricsResult.error || leadTrackerResult.error }
       }
 
-      const creativeByMetaAdId = new Map(
-        (creativeResult.data ?? [])
-          .filter(row => row.meta_ad_id)
-          .map(row => [String(row.meta_ad_id), row])
-      )
-      const creativeById = new Map(
-        (creativeResult.data ?? [])
-          .filter(row => row.id)
-          .map(row => [String(row.id), row])
-      )
+      const performanceRows = performanceResult.data ?? []
+      const dailyMetricRows = dailyMetricsResult.data ?? []
+      const leadRows = filterRowsByDateRange(leadTrackerResult.data, row => row.ghl_created_at || row.created_at, dateRange.from, dateRange.to)
 
-      const merged = (performanceResult.data ?? []).map(row => {
-        const creative = creativeByMetaAdId.get(String(row.meta_ad_id ?? ''))
-          || creativeById.get(String(row.ad_id ?? row.id ?? ''))
+      const adsById = new Map(ads.filter(ad => ad.id).map(ad => [String(ad.id), ad]))
+      const adsByMetaAdId = new Map(ads.filter(ad => ad.meta_ad_id).map(ad => [String(ad.meta_ad_id), ad]))
+
+      const dailyMetricsByAdId = new Map()
+      for (const row of dailyMetricRows) {
+        const adId = String(row.ad_id)
+        const current = dailyMetricsByAdId.get(adId) ?? {
+          total_spend: 0,
+          total_impressions: 0,
+          total_clicks: 0,
+          frequencySum: 0,
+          frequencyCount: 0,
+        }
+
+        current.total_spend += Number(row.spend ?? 0)
+        current.total_impressions += Number(row.impressions ?? 0)
+        current.total_clicks += Number(row.clicks ?? 0)
+        if (row.frequency != null) {
+          current.frequencySum += Number(row.frequency)
+          current.frequencyCount += 1
+        }
+
+        dailyMetricsByAdId.set(adId, current)
+      }
+
+      const leadMetricsByAdName = new Map()
+      for (const row of leadRows) {
+        const adName = row.ad_name || row.source_ad
+        if (!adName) continue
+
+        const current = leadMetricsByAdName.get(adName) ?? {
+          total_leads: 0,
+          meetings_booked: 0,
+          showed_up: 0,
+          active_opportunities: 0,
+          closed_won: 0,
+        }
+
+        current.total_leads += 1
+        if (row.funnel_meeting_booked) current.meetings_booked += 1
+        if (row.funnel_showed_up) current.showed_up += 1
+        if (row.funnel_active_opp) current.active_opportunities += 1
+        if (row.funnel_closed_won) current.closed_won += 1
+
+        leadMetricsByAdName.set(adName, current)
+      }
+
+      const merged = performanceRows.map(row => {
+        const creative = adsByMetaAdId.get(String(row.meta_ad_id ?? '')) || adsById.get(String(row.ad_id ?? row.id ?? ''))
+        const dailyMetrics = dailyMetricsByAdId.get(String(row.ad_id ?? row.id ?? ''))
+        const leadMetrics = leadMetricsByAdName.get(row.ad_name) ?? {
+          total_leads: 0,
+          meetings_booked: 0,
+          showed_up: 0,
+          active_opportunities: 0,
+          closed_won: 0,
+        }
+
+        const totalSpend = Number(dailyMetrics?.total_spend ?? 0)
+        const totalImpressions = Number(dailyMetrics?.total_impressions ?? 0)
+        const totalClicks = Number(dailyMetrics?.total_clicks ?? 0)
+        const totalLeads = Number(leadMetrics.total_leads ?? 0)
+        const activeOpps = Number(leadMetrics.active_opportunities ?? 0)
 
         return {
           ...row,
+          ad_name: row.ad_name ?? creative?.ad_name ?? null,
+          status: row.status ?? creative?.status ?? null,
+          campaign_name: row.campaign_name ?? creative?.campaign_name ?? null,
           meta_ad_id: row.meta_ad_id ?? creative?.meta_ad_id ?? null,
           creative_url: row.creative_url ?? creative?.creative_url ?? null,
           creative_type: row.creative_type ?? creative?.creative_type ?? null,
+          video_url: row.video_url ?? creative?.video_url ?? null,
+          effective_object_story_id: row.effective_object_story_id ?? creative?.effective_object_story_id ?? null,
+          fb_post_url: row.fb_post_url ?? creative?.fb_post_url ?? null,
+          total_spend: totalSpend,
+          total_impressions: totalImpressions,
+          total_clicks: totalClicks,
+          avg_frequency: dailyMetrics?.frequencyCount ? dailyMetrics.frequencySum / dailyMetrics.frequencyCount : 0,
+          avg_ctr: totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0,
+          total_leads: totalLeads,
+          meetings_booked: Number(leadMetrics.meetings_booked ?? 0),
+          showed_up: Number(leadMetrics.showed_up ?? 0),
+          active_opportunities: activeOpps,
+          closed_won: Number(leadMetrics.closed_won ?? 0),
+          cost_per_lead: totalLeads > 0 ? totalSpend / totalLeads : null,
+          cost_per_active: activeOpps > 0 ? totalSpend / activeOpps : null,
         }
       })
 
       return { data: merged, error: null }
     },
-    [currentClientId, refreshKey], fallbackAds
+    [currentClientId, dateRange.from, dateRange.to, refreshKey], fallbackAds
   )
 }
 
 export function useContactDetails(stageFilter = null) {
-  const { currentClientId, refreshKey } = useDashboard()
+  const { currentClientId, dateRange, refreshKey } = useDashboard()
   const filtered = stageFilter
     ? fallbackContacts.filter(c => stageFilter.includes(c.current_stage)) : fallbackContacts
   return useSupabaseQuery(
     () => {
       let query = supabase.from('contact_details').select('*')
         .eq('client_id', currentClientId)
+        .gte('created_at', `${dateRange.from}T00:00:00Z`)
+        .lte('created_at', `${dateRange.to}T23:59:59.999Z`)
         .or('source.eq.Facebook,ad_id.not.is.null')
       if (stageFilter) query = query.in('current_stage', stageFilter)
       return query
     },
-    [currentClientId, JSON.stringify(stageFilter), refreshKey], filtered
+    [currentClientId, dateRange.from, dateRange.to, JSON.stringify(stageFilter), refreshKey], filtered
   )
 }
 
 export function useAllContacts() {
-  const { currentClientId, refreshKey } = useDashboard()
+  const { currentClientId, dateRange, refreshKey } = useDashboard()
   return useSupabaseQuery(
     () => supabase.from('contact_details').select('*')
       .eq('client_id', currentClientId)
+      .gte('created_at', `${dateRange.from}T00:00:00Z`)
+      .lte('created_at', `${dateRange.to}T23:59:59.999Z`)
       .or('source.eq.Facebook,ad_id.not.is.null')
       .order('created_at', { ascending: false }),
-    [currentClientId, refreshKey], fallbackContacts
+    [currentClientId, dateRange.from, dateRange.to, refreshKey], fallbackContacts
   )
 }
 
 export function useLeadTrackerContacts() {
-  const { refreshKey } = useDashboard()
+  const { currentClientId, dateRange, refreshKey } = useDashboard()
   return useSupabaseQuery(
-    () => supabase.from('lead_tracker').select('*').order('ghl_created_at', { ascending: false, nullsFirst: false }),
-    [refreshKey], fallbackLeadTracker
+    async () => {
+      const { data, error } = await supabase.from('lead_tracker').select('*').eq('client_id', currentClientId).order('ghl_created_at', { ascending: false, nullsFirst: false })
+      if (error) return { data: null, error }
+
+      return {
+        data: filterRowsByDateRange(data, row => row.ghl_created_at || row.created_at, dateRange.from, dateRange.to),
+        error: null,
+      }
+    },
+    [currentClientId, dateRange.from, dateRange.to, refreshKey], fallbackLeadTracker
   )
 }
 
 export function useSarahStages() {
-  const refreshKey = useDashboard(s => s.refreshKey)
+  const { currentClientId, dateRange, refreshKey } = useDashboard()
 
   const { data, loading, error } = useSupabaseQuery(
     async () => {
-      const [stageResult, totalResult] = await Promise.all([
-        supabase.rpc('sarah_stage_summary'),
+      const [leadTrackerResult, totalResult] = await Promise.all([
+        supabase.from('lead_tracker').select('current_stage, stage_label, funnel_meeting_booked, ghl_created_at, created_at').eq('client_id', currentClientId),
         supabase.from('contacts').select('id', { count: 'exact', head: true })
-          .eq('client_id', SARAH_CLIENT_ID)
-          .eq('is_test', false),
+          .eq('client_id', currentClientId)
+          .eq('is_test', false)
+          .gte('created_at', `${dateRange.from}T00:00:00Z`)
+          .lte('created_at', `${dateRange.to}T23:59:59.999Z`),
       ])
 
-      const allRows = stageResult.data ?? []
-      const funnelMeetings = Number(allRows.find(row => row.stage === '_funnel_meetings_booked')?.count ?? 0)
-      const funnelConversations = Number(allRows.find(row => row.stage === '_funnel_conversations')?.count ?? 0)
-      const stages = allRows.filter(row => !row.stage?.startsWith('_funnel_'))
+      if (leadTrackerResult.error || totalResult.error) {
+        return { data: null, error: leadTrackerResult.error || totalResult.error }
+      }
+
+      const filteredRows = filterRowsByDateRange(leadTrackerResult.data, row => row.ghl_created_at || row.created_at, dateRange.from, dateRange.to)
+      const stageCounts = new Map()
+
+      for (const row of filteredRows) {
+        if (!SARAH_STAGE_ORDER.includes(row.current_stage)) continue
+        const current = stageCounts.get(row.current_stage) ?? {
+          stage: row.current_stage,
+          count: 0,
+          label: row.stage_label || formatStageLabel(row.current_stage),
+        }
+        current.count += 1
+        stageCounts.set(row.current_stage, current)
+      }
+
+      const stages = SARAH_STAGE_ORDER.map((stage) => stageCounts.get(stage) ?? {
+        stage,
+        count: 0,
+        label: formatStageLabel(stage),
+      })
+
+      const funnelMeetings = filteredRows.filter(row => row.funnel_meeting_booked).length
+      const funnelConversations = filteredRows.filter(row => !['new', 'follow_up', 'wrong_number'].includes(row.current_stage)).length
+
 
       return {
         data: {
@@ -216,10 +366,10 @@ export function useSarahStages() {
           funnelMeetings,
           funnelConversations,
         },
-        error: stageResult.error || totalResult.error,
+        error: null,
       }
     },
-    [refreshKey],
+    [currentClientId, dateRange.from, dateRange.to, refreshKey],
     fallbackSarahStages
   )
 
@@ -313,10 +463,44 @@ export function useTrendMetricsByDate() {
 }
 
 export function useSalesRepPerformance() {
-  const { currentClientId, refreshKey } = useDashboard()
+  const { currentClientId, dateRange, refreshKey } = useDashboard()
   return useSupabaseQuery(
-    () => supabase.from('sales_rep_performance').select('*').eq('client_id', currentClientId),
-    [currentClientId, refreshKey], fallbackSalesReps
+    async () => {
+      const { data, error } = await supabase.from('lead_tracker').select('assigned_to, funnel_meeting_booked, funnel_showed_up, funnel_no_show, funnel_closed_won, deal_value, ghl_created_at, created_at').eq('client_id', currentClientId)
+      if (error) return { data: null, error }
+
+      const filteredRows = filterRowsByDateRange(data, row => row.ghl_created_at || row.created_at, dateRange.from, dateRange.to)
+      const grouped = new Map()
+
+      for (const row of filteredRows) {
+        const rep = row.assigned_to || 'Unassigned'
+        const current = grouped.get(rep) ?? {
+          client_id: currentClientId,
+          sales_rep: rep,
+          meetings_scheduled: 0,
+          shows: 0,
+          no_shows: 0,
+          closes: 0,
+          revenue_closed: 0,
+        }
+
+        if (row.funnel_meeting_booked) current.meetings_scheduled += 1
+        if (row.funnel_showed_up) current.shows += 1
+        if (row.funnel_no_show) current.no_shows += 1
+        if (row.funnel_closed_won) {
+          current.closes += 1
+          current.revenue_closed += Number(row.deal_value ?? 0)
+        }
+
+        grouped.set(rep, current)
+      }
+
+      return {
+        data: Array.from(grouped.values()),
+        error: null,
+      }
+    },
+    [currentClientId, dateRange.from, dateRange.to, refreshKey], fallbackSalesReps
   )
 }
 

@@ -4,6 +4,7 @@ import { useDashboard } from '../../store/dashboard'
 import { FileDown, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { triggerRefresh } from '../../lib/triggerRefresh'
+import DateRangePicker from '../DateRangePicker'
 
 const pageTitles = {
   '/home': 'Home',
@@ -17,19 +18,11 @@ const pageTitles = {
   '/settings': 'Settings',
 }
 
-const presets = [
-  { id: 'today', label: 'Today' },
-  { id: 'last_7_days', label: 'Last 7 Days' },
-  { id: 'last_30_days', label: 'Last 30 Days' },
-  { id: 'this_month', label: 'This Month' },
-]
-
 export default function Header() {
   const location = useLocation()
-  const { dateRange, setDatePreset, refresh, openReport } = useDashboard()
+  const { refresh, openReport } = useDashboard()
   const title = pageTitles[location.pathname] || 'Dashboard'
   const isSettings = location.pathname === '/settings'
-  const showDatePresets = location.pathname === '/home' || location.pathname === '/week-over-week'
   const [refreshing, setRefreshing] = useState(false)
 
   const handleRefresh = async () => {
@@ -74,23 +67,7 @@ export default function Header() {
       <h1 className="text-lg font-bold text-[#0F0F1A]">{title}</h1>
 
       <div className="flex items-center gap-3">
-        {showDatePresets && (
-          <div className="flex items-center gap-1 bg-[#F3F4F6] rounded-lg p-1">
-            {presets.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => setDatePreset(p.id)}
-                className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
-                  dateRange.preset === p.id
-                    ? 'bg-white text-[#EC4899] shadow-sm'
-                    : 'text-[#6B7280] hover:text-[#333333]'
-                }`}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-        )}
+        <DateRangePicker />
 
         {!isSettings && (
           <>
