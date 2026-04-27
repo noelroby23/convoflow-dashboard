@@ -61,20 +61,6 @@ const fallbackSarahStages = {
   funnelConversations: 0,
 }
 
-const SARAH_STAGE_ORDER = [
-  'follow_up',
-  'contacted',
-  'callback',
-  'qualified_no_meeting',
-  'meeting_booked',
-  'no_show',
-  'not_interested',
-  'disqualified',
-  'wrong_number',
-]
-
-const formatStageLabel = (stage) => stage ? stage.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : null
-
 const parseDateValue = (value) => {
   if (!value) return null
   const normalized = /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00Z` : value
@@ -275,14 +261,17 @@ export function useContactDetails(stageFilter = null) {
   const filtered = stageFilter
     ? fallbackContacts.filter(c => stageFilter.includes(c.current_stage)) : fallbackContacts
   return useSupabaseQuery(
-    () => {
-      let query = supabase.from('contact_details').select('*')
+    async () => {
+      const { data, error } = await supabase.from('contact_details').select('*')
         .eq('client_id', currentClientId)
-        .gte('created_at', `${dateRange.from}T00:00:00Z`)
-        .lte('created_at', `${dateRange.to}T23:59:59.999Z`)
         .or('source.eq.Facebook,ad_id.not.is.null')
-      if (stageFilter) query = query.in('current_stage', stageFilter)
-      return query
+
+      if (error) return { data: null, error }
+
+      let rows = filterRowsByDateRange(data, row => row.ghl_created_at || row.created_at, dateRange.from, dateRange.to)
+      if (stageFilter) rows = rows.filter(row => stageFilter.includes(row.current_stage))
+
+      return { data: rows, error: null }
     },
     [currentClientId, dateRange.from, dateRange.to, JSON.stringify(stageFilter), refreshKey], filtered
   )
@@ -291,12 +280,19 @@ export function useContactDetails(stageFilter = null) {
 export function useAllContacts() {
   const { currentClientId, dateRange, refreshKey } = useDashboard()
   return useSupabaseQuery(
-    () => supabase.from('contact_details').select('*')
-      .eq('client_id', currentClientId)
-      .gte('created_at', `${dateRange.from}T00:00:00Z`)
-      .lte('created_at', `${dateRange.to}T23:59:59.999Z`)
-      .or('source.eq.Facebook,ad_id.not.is.null')
-      .order('created_at', { ascending: false }),
+    async () => {
+      const { data, error } = await supabase.from('contact_details').select('*')
+        .eq('client_id', currentClientId)
+        .or('source.eq.Facebook,ad_id.not.is.null')
+        .order('created_at', { ascending: false })
+
+      if (error) return { data: null, error }
+
+      return {
+        data: filterRowsByDateRange(data, row => row.ghl_created_at || row.created_at, dateRange.from, dateRange.to),
+        error: null,
+      }
+    },
     [currentClientId, dateRange.from, dateRange.to, refreshKey], fallbackContacts
   )
 }
@@ -322,47 +318,31 @@ export function useSarahStages() {
 
   const { data, loading, error } = useSupabaseQuery(
     async () => {
-      const [leadTrackerResult, totalResult] = await Promise.all([
-        supabase.from('lead_tracker').select('current_stage, stage_label, funnel_meeting_booked, ghl_created_at, created_at').eq('client_id', currentClientId),
-        supabase.from('contacts').select('id', { count: 'exact', head: true })
-          .eq('client_id', currentClientId)
-          .eq('is_test', false)
-          .gte('created_at', `${dateRange.from}T00:00:00Z`)
-          .lte('created_at', `${dateRange.to}T23:59:59.999Z`),
+      const [stageResult, contactsResult] = await Promise.all([
+        supabase.rpc('sarah_stage_summary', {
+          start_date: dateRange.from,
+          end_date: dateRange.to,
+          p_client_id: currentClientId,
+        }),
+        supabase.from('contacts').select('id, ghl_created_at, created_at').eq('client_id', currentClientId).eq('is_test', false),
       ])
 
-      if (leadTrackerResult.error || totalResult.error) {
-        return { data: null, error: leadTrackerResult.error || totalResult.error }
+      if (stageResult.error || contactsResult.error) {
+        return { data: null, error: stageResult.error || contactsResult.error }
       }
 
-      const filteredRows = filterRowsByDateRange(leadTrackerResult.data, row => row.ghl_created_at || row.created_at, dateRange.from, dateRange.to)
-      const stageCounts = new Map()
-
-      for (const row of filteredRows) {
-        if (!SARAH_STAGE_ORDER.includes(row.current_stage)) continue
-        const current = stageCounts.get(row.current_stage) ?? {
-          stage: row.current_stage,
-          count: 0,
-          label: row.stage_label || formatStageLabel(row.current_stage),
-        }
-        current.count += 1
-        stageCounts.set(row.current_stage, current)
-      }
-
-      const stages = SARAH_STAGE_ORDER.map((stage) => stageCounts.get(stage) ?? {
-        stage,
-        count: 0,
-        label: formatStageLabel(stage),
-      })
-
-      const funnelMeetings = filteredRows.filter(row => row.funnel_meeting_booked).length
-      const funnelConversations = filteredRows.filter(row => !['new', 'follow_up', 'wrong_number'].includes(row.current_stage)).length
+      const allRows = stageResult.data ?? []
+      const stages = allRows.filter(row => !row.stage?.startsWith('_funnel_'))
+      const funnelMeetings = Number(allRows.find(row => row.stage === '_funnel_meetings_booked')?.count ?? 0)
+      const funnelConversations = Number(allRows.find(row => row.stage === '_funnel_conversations')?.count ?? 0)
+      const filteredContactRows = filterRowsByDateRange(contactsResult.data, row => row.ghl_created_at || row.created_at, dateRange.from, dateRange.to)
+      const totalLeads = new Set(filteredContactRows.map(row => row.id)).size
 
 
       return {
         data: {
           stages,
-          totalLeads: totalResult.count ?? 0,
+          totalLeads,
           funnelMeetings,
           funnelConversations,
         },

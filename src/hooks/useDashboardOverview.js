@@ -32,14 +32,13 @@ export function useDashboardOverview(dateFrom, dateTo, paidOnly = true) {
 
   return useSupabaseQuery(
     async () => {
-      const { data, error } = await supabase.rpc('dashboard_overview', {
+      const { data, error } = await supabase.rpc('dashboard_kpis', {
+        start_date: dateFrom,
+        end_date: dateTo,
         p_client_id: currentClientId,
-        p_from: dateFrom,
-        p_to: dateTo,
-        p_paid_only: paidOnly,
       })
 
-      return { data: Array.isArray(data) ? (data[0] ?? null) : data, error }
+      return { data, error }
     },
     [currentClientId, dateFrom, dateTo, paidOnly, refreshKey],
     fallbackOverview
