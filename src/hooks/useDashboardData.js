@@ -283,10 +283,9 @@ export function useAllContacts() {
   const { currentClientId, dateRange, refreshKey } = useDashboard()
   return useSupabaseQuery(
     async () => {
-      const { data, error } = await supabase.from('contact_details').select('*')
+      const { data, error } = await supabase.from('lead_tracker').select('*')
         .eq('client_id', currentClientId)
-        .or('source.eq.Facebook,ad_id.not.is.null')
-        .order('created_at', { ascending: false })
+        .order('ghl_created_at', { ascending: false, nullsFirst: false })
 
       if (error) return { data: null, error }
 
@@ -295,7 +294,7 @@ export function useAllContacts() {
         error: null,
       }
     },
-    [currentClientId, dateRange.from, dateRange.to, refreshKey], fallbackContacts
+    [currentClientId, dateRange.from, dateRange.to, refreshKey], fallbackLeadTracker
   )
 }
 

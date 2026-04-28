@@ -74,6 +74,9 @@ export default function Overview() {
     })
   }, [activeLeads])
   const visibleActiveLeads = showAllLeads ? sortedActiveLeads : sortedActiveLeads.slice(0, 10)
+  const openLeadTracker = (contactId) => {
+    navigate(contactId ? `/lead-tracker?expand=${encodeURIComponent(contactId)}` : '/lead-tracker')
+  }
 
   // Build insights dynamically
   const insights = []
@@ -178,11 +181,15 @@ export default function Overview() {
                   </thead>
                   <tbody>
                     {visibleActiveLeads.map((lead, index) => (
-                      <tr key={lead.contact_id} className={`border-b border-[#F3F4F6] hover:bg-[#FAFAFA] ${index % 2 === 1 ? 'bg-[#FCFCFD]' : ''}`}>
+                      <tr
+                        key={lead.contact_id}
+                        onClick={() => openLeadTracker(lead.contact_id)}
+                        className={`border-b border-[#F3F4F6] hover:bg-[#FAFAFA] cursor-pointer ${index % 2 === 1 ? 'bg-[#FCFCFD]' : ''}`}
+                      >
                         <td className="py-3 pr-4 font-medium text-[#0F0F1A]">
-                          <button type="button" onClick={() => navigate('/lead-tracker')} className="hover:text-[#EC4899] transition-colors text-left">
+                          <span className="hover:text-[#EC4899] transition-colors">
                             {lead.full_name || '—'}
-                          </button>
+                          </span>
                         </td>
                         <td className="py-3 pr-4 text-[#6B7280] hidden md:table-cell">{lead.company_name || lead.company || '—'}</td>
                         <td className="py-3 pr-4 text-[#6B7280]">{lead.ad_name || lead.source_ad || '—'}</td>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { Fragment, useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useLeadTrackerContacts } from '../hooks/useDashboardData'
 import { useDashboard } from '../store/dashboard'
@@ -480,6 +480,7 @@ export default function LeadTracker() {
   const { data: contacts, loading } = useLeadTrackerContacts()
   const [searchParams, setSearchParams] = useSearchParams()
   const stageFromUrl = searchParams.get('stage')
+  const expandFromUrl = searchParams.get('expand')
   const setReportBuilder = useDashboard(s => s.setReportBuilder)
   const [expandedId, setExpandedId] = useState(null)
   const [stageFilter, setStageFilter] = useState('all')
@@ -501,6 +502,16 @@ export default function LeadTracker() {
 
     setStageFilter('all')
   }, [stageFromUrl])
+
+  useEffect(() => {
+    const expandedContact = contacts?.find(contact => String(contact.contact_id) === expandFromUrl)
+    if (!expandFromUrl || !expandedContact) return
+
+    setExpandedId(expandedContact.contact_id)
+    window.setTimeout(() => {
+      document.getElementById(`lead-${expandFromUrl}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 500)
+  }, [contacts, expandFromUrl])
 
   const handleStageFilterChange = (selectedStage) => {
     setStageFilter(selectedStage)
@@ -646,13 +657,14 @@ export default function LeadTracker() {
               const hasCallTranscript = hasText(contact.call_transcript)
               const hasCallData = hasCallSummary || hasCallRecording || hasCallTranscript
               const journeyEvents = buildLeadJourney(contact)
+              const isExpanded = expandedId === contact.contact_id
 
               return (
-                <>
+                <Fragment key={contact.contact_id}>
                   <tr
-                    key={contact.contact_id}
+                    id={`lead-${contact.contact_id}`}
                     className={`border-t border-[#F3F4F6] hover:bg-[#FAFAFA] cursor-pointer ${priority === 'immediate' ? 'border-l-2 border-l-red-400' : ''}`}
-                    onClick={() => setExpandedId(expandedId === contact.contact_id ? null : contact.contact_id)}
+                    onClick={() => setExpandedId(isExpanded ? null : contact.contact_id)}
                     >
                       <td className="px-4 py-3 font-medium text-[#0F0F1A]">{contact.full_name}</td>
                       <td className="px-4 py-3 text-[#6B7280]">{contact.company || '—'}</td>
@@ -676,10 +688,10 @@ export default function LeadTracker() {
                       ) : '—'}
                     </td>
                     <td className="px-4 py-3 text-[#6B7280]">
-                      {expandedId === contact.contact_id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                      {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                     </td>
                   </tr>
-                  {expandedId === contact.contact_id && (
+                  {isExpanded && (
                     <tr key={`${contact.contact_id}-exp`} className="border-t border-[#F3F4F6] bg-[#FAFAFA]">
                       <td colSpan={8} className="px-6 py-4">
                         <div className="space-y-6">
@@ -792,7 +804,7 @@ export default function LeadTracker() {
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               )
             })}
           </tbody>
