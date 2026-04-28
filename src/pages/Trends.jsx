@@ -16,8 +16,8 @@ const parseTrendDate = (value) => {
 }
 
 export default function Trends() {
-  const { data: metrics, loading } = useTrendMetricsByDate()
-  const { data: ads } = useAdPerformance()
+  const { data: metrics, loading, error } = useTrendMetricsByDate()
+  const { data: ads, error: adsError } = useAdPerformance()
   const setReportBuilder = useDashboard(s => s.setReportBuilder)
 
   const chartData = (metrics ?? []).reduce((rows, d) => {
@@ -70,6 +70,12 @@ export default function Trends() {
   if (loading) return (
     <div className="space-y-4">
       {[...Array(3)].map((_, i) => <div key={i} className="skeleton h-48 w-full rounded-xl" />)}
+    </div>
+  )
+
+  if (error) return (
+    <div className="bg-white rounded-xl border border-[#E5E7EB] p-12 text-center">
+      <p className="text-sm text-[#B91C1C]">Failed to load trend data. Try refreshing.</p>
     </div>
   )
 
@@ -134,7 +140,9 @@ export default function Trends() {
         <div className="bg-white rounded-xl border border-[#E5E7EB] p-6 shadow-sm">
           <h2 className="text-sm font-bold text-[#0F0F1A] mb-1">Frequency Tracker</h2>
           <p className="text-xs text-[#9CA3AF] mb-5">Per-ad frequency vs 2.5 ceiling — higher means audience fatigue risk</p>
-          {ads?.length ? (
+          {adsError ? (
+            <p className="text-sm text-[#B91C1C] text-center py-12">Failed to load ad frequency data. Try refreshing.</p>
+          ) : ads?.length ? (
             <div className="space-y-3">
               {[...ads]
                 .filter(ad => ad.avg_frequency > 0)

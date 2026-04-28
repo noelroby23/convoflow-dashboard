@@ -8,7 +8,7 @@ import { healthReport } from '../lib/reports/generators'
 
 export default function Health() {
   const dateRange = useDashboard(s => s.dateRange)
-  const { data, loading } = useDashboardOverview(dateRange.from, dateRange.to)
+  const { data, loading, error } = useDashboardOverview(dateRange.from, dateRange.to)
   const { data: targets } = useTargets()
   const setReportBuilder = useDashboard(s => s.setReportBuilder)
 
@@ -61,6 +61,12 @@ export default function Health() {
   if (loading) return (
     <div className="space-y-4">
       {[...Array(3)].map((_, i) => <div key={i} className="skeleton h-32 w-full rounded-xl" />)}
+    </div>
+  )
+
+  if (error) return (
+    <div className="bg-white rounded-xl border border-[#E5E7EB] p-12 text-center">
+      <p className="text-sm text-[#B91C1C]">Failed to load target progress data. Try refreshing.</p>
     </div>
   )
 

@@ -4,20 +4,23 @@ import AISummary from '../components/ui/AISummary'
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { useDashboard } from '../store/dashboard'
 import { revenueReport } from '../lib/reports/generators'
-import { useAdPerformance, useDailyMetrics } from '../hooks/useDashboardData'
+import { useAdPerformance, useDailyMetrics, useLeadTrackerContacts } from '../hooks/useDashboardData'
 import { useDashboardOverview } from '../hooks/useDashboardOverview'
 
 export default function Revenue() {
   const dateRange = useDashboard(s => s.dateRange)
   const setReportBuilder = useDashboard(s => s.setReportBuilder)
-  const { data: overview, loading: overviewLoading } = useDashboardOverview(dateRange.from, dateRange.to)
-  const { data: ads, loading: adsLoading } = useAdPerformance()
-  const { data: dailyMetrics, loading: metricsLoading } = useDailyMetrics()
+  const { data: overview, loading: overviewLoading, error: overviewError } = useDashboardOverview(dateRange.from, dateRange.to)
+  const { data: ads, loading: adsLoading, error: adsError } = useAdPerformance()
+  const { data: dailyMetrics, loading: metricsLoading, error: metricsError } = useDailyMetrics()
+  const { data: leads, loading: leadsLoading, error: leadsError } = useLeadTrackerContacts()
 
   const totalSpend = Number(overview?.total_spend ?? 0)
   const closedRevenue = Number(overview?.closed_revenue ?? 0)
   const activePipelineValue = Number(overview?.pipeline_value ?? 0)
-  const historicalCloseRate = 0.2
+  const showedUp = Number(overview?.showed_up ?? 0)
+  const closedWon = Number(overview?.closed_won ?? 0)
+  const historicalCloseRate = showedUp > 0 ? closedWon / showedUp : 0
   const projectedRevenue = closedRevenue + (activePipelineValue * historicalCloseRate)
   const roas = totalSpend > 0 ? (closedRevenue / totalSpend).toFixed(1) : '0.0'
 
@@ -26,18 +29,21 @@ export default function Revenue() {
     return () => setReportBuilder(null)
   }, [overview, setReportBuilder])
 
-  // Revenue by ad — only ads with closed won > 0
-  const revenueByAd = (ads ?? [])
-    .filter(ad => (ad.closed_won ?? 0) > 0)
-    .map(ad => ({
-      name: ad.ad_name,
-      revenue: Number(ad.closed_won) * 24000,
-    }))
+  const closedWonLeads = (leads ?? []).filter(lead => lead.funnel_closed_won || lead.current_stage === 'closed_won')
+  const revenueByAd = Object.values(closedWonLeads.reduce((acc, lead) => {
+    const name = lead.ad_name || lead.source_ad || 'Unknown source'
+    acc[name] = acc[name] ?? { name, revenue: 0 }
+    acc[name].revenue += Number(lead.deal_value ?? 0)
+    return acc
+  }, {}))
 
   // Spend vs cumulative revenue trend from daily_metrics
   let cumulativeRevenue = 0
   const spendVsRevenue = (dailyMetrics ?? []).map(d => {
-    cumulativeRevenue += Number(d.closes ?? 0) * 24000
+    const dayRevenue = closedWonLeads
+      .filter(lead => (lead.closed_at || lead.status_updated_at || lead.ghl_created_at || lead.created_at)?.slice(0, 10) === d.date)
+      .reduce((sum, lead) => sum + Number(lead.deal_value ?? 0), 0)
+    cumulativeRevenue += dayRevenue
     return {
       date: d.date?.slice(5), // "MM-DD"
       spend: Number(d.spend ?? 0),
@@ -45,11 +51,17 @@ export default function Revenue() {
     }
   })
 
-  const loading = overviewLoading || adsLoading || metricsLoading
+  const loading = overviewLoading || adsLoading || metricsLoading || leadsLoading
 
   return (
     <div>
       {/* Big headline */}
+      {(overviewError || adsError || metricsError || leadsError) && !loading && (
+        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-[#B91C1C]">
+          Failed to load revenue data. Try refreshing.
+        </div>
+      )}
+
       <ErrorBoundary>
         <div className="bg-white rounded-xl border border-[#E5E7EB] p-8 shadow-sm mb-6 text-center">
           <p className="text-sm text-[#6B7280] mb-2">Campaign performance so far</p>
@@ -89,8 +101,10 @@ export default function Revenue() {
       <ErrorBoundary>
         <div className="bg-white rounded-xl border border-[#E5E7EB] p-6 shadow-sm mb-6">
           <h2 className="text-sm font-bold text-[#0F0F1A] mb-4">Revenue by Source Ad</h2>
-          {adsLoading ? (
+          {adsLoading || leadsLoading ? (
             <div className="skeleton h-48 w-full" />
+          ) : adsError || leadsError ? (
+            <p className="text-sm text-[#B91C1C] text-center py-12">Failed to load revenue by ad. Try refreshing.</p>
           ) : revenueByAd.length === 0 ? (
             <p className="text-sm text-[#9CA3AF] text-center py-12">No closed revenue recorded yet.</p>
           ) : (
@@ -111,8 +125,10 @@ export default function Revenue() {
       <ErrorBoundary>
         <div className="bg-white rounded-xl border border-[#E5E7EB] p-6 shadow-sm">
           <h2 className="text-sm font-bold text-[#0F0F1A] mb-4">Spend vs Revenue Trend</h2>
-          {metricsLoading ? (
+          {metricsLoading || leadsLoading ? (
             <div className="skeleton h-52 w-full" />
+          ) : metricsError || leadsError ? (
+            <p className="text-sm text-[#B91C1C] text-center py-12">Failed to load spend vs revenue trend. Try refreshing.</p>
           ) : spendVsRevenue.length === 0 ? (
             <p className="text-sm text-[#9CA3AF] text-center py-12">No daily metrics available for this period.</p>
           ) : (

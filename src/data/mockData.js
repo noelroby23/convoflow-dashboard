@@ -1,4 +1,6 @@
-export const mockAds = [
+const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
+
+export const mockAds = USE_MOCK ? [
   { id: '1', name: 'Video5-Abdus', status: 'active', spend: 3968, impressions: 28420, reach: 19800, frequency: 1.43, clicks: 842, leads: 49, meetings: 13, showed: 8, activeOpps: 6, closedWon: 1, cpl: 81, ctr: 2.96, cpm: 139.5, costPerMeeting: 305, costPerActive: 661 },
   { id: '2', name: 'Video3-Noel', status: 'active', spend: 890, impressions: 9200, reach: 7100, frequency: 1.30, clicks: 198, leads: 8, meetings: 0, showed: 0, activeOpps: 0, closedWon: 0, cpl: 111, ctr: 2.15, cpm: 96.7, costPerMeeting: null, costPerActive: null },
   { id: '3', name: 'Image1-UK', status: 'paused', spend: 620, impressions: 7800, reach: 6200, frequency: 1.26, clicks: 145, leads: 5, meetings: 0, showed: 0, activeOpps: 0, closedWon: 0, cpl: 124, ctr: 1.86, cpm: 79.5, costPerMeeting: null, costPerActive: null },
@@ -11,9 +13,9 @@ export const mockAds = [
   { id: '10', name: 'Image2-Light', status: 'paused', spend: 290, impressions: 3800, reach: 3100, frequency: 1.23, clicks: 71, leads: 2, meetings: 0, showed: 0, activeOpps: 0, closedWon: 0, cpl: 145, ctr: 1.87, cpm: 76.3, costPerMeeting: null, costPerActive: null },
   { id: '11', name: 'Video1-UK', status: 'paused', spend: 310, impressions: 4100, reach: 3300, frequency: 1.24, clicks: 78, leads: 3, meetings: 0, showed: 0, activeOpps: 0, closedWon: 0, cpl: 103.3, ctr: 1.90, cpm: 75.6, costPerMeeting: null, costPerActive: null },
   { id: '12', name: 'Carousel1-UK', status: 'paused', spend: 236, impressions: 3200, reach: 2600, frequency: 1.23, clicks: 62, leads: 2, meetings: 0, showed: 0, activeOpps: 0, closedWon: 0, cpl: 118, ctr: 1.94, cpm: 73.8, costPerMeeting: null, costPerActive: null },
-]
+] : []
 
-export const mockLeads = [
+export const mockLeads = USE_MOCK ? [
   { id: '1', name: 'James Harrington', company: 'Harrington & Co', sourceAd: 'Video5-Abdus', date: '2026-04-10', stage: 'active', status: 'active', callSummary: 'James runs a 12-person accountancy firm. Expressed strong interest in AI lead qualification. Currently using a VA but frustrated with quality. Budget confirmed at £2,000/month. Hot lead.', qualityScore: 9, meetingDate: '2026-04-14', followUpAttempts: 2, dealValue: 24000 },
   { id: '2', name: 'Sophie Mitchell', company: 'Mitchell Legal', sourceAd: 'Video5-Abdus', date: '2026-04-09', stage: 'meeting_booked', status: 'upcoming', callSummary: 'Runs a 3-partner law firm. Interested in automating client intake. Budget flexible. Meeting scheduled.', qualityScore: 8, meetingDate: '2026-04-17', followUpAttempts: 1, dealValue: 18000 },
   { id: '3', name: 'Raj Patel', company: 'Patel Properties', sourceAd: 'Video5-Abdus', date: '2026-04-08', stage: 'showed', status: 'active', callSummary: 'Property developer with 20+ listings per month. Wants to qualify buyer enquiries automatically. Very engaged during call.', qualityScore: 8, meetingDate: '2026-04-12', followUpAttempts: 0, dealValue: 30000 },
@@ -22,9 +24,9 @@ export const mockLeads = [
   { id: '6', name: 'Priya Sharma', company: 'Sharma Clinics', sourceAd: 'Video5-Abdus', date: '2026-04-05', stage: 'disqualified', status: 'disqualified', callSummary: 'Private clinic. Budget only £500/month — below minimum. Disqualified on call.', qualityScore: 3, meetingDate: null, followUpAttempts: 0, dealValue: null },
   { id: '7', name: 'Michael Green', company: 'Green Logistics', sourceAd: 'Video3-Noel', date: '2026-04-04', stage: 'not_interested', status: 'disqualified', callSummary: 'Not the right fit. Has existing automation system. Not interested in switching.', qualityScore: 2, meetingDate: null, followUpAttempts: 1, dealValue: null },
   { id: '8', name: 'Emma Thompson', company: 'Thompson PR', sourceAd: 'Video5-Abdus', date: '2026-04-03', stage: 'active', status: 'active', callSummary: 'PR agency with 8 staff. Handles 40+ client enquiries monthly. Looking for AI to pre-qualify before human follow-up. Strong fit.', qualityScore: 8, meetingDate: '2026-04-09', followUpAttempts: 0, dealValue: 22000 },
-]
+  ] : []
 
-export const mockKPIs = {
+export const mockKPIs = USE_MOCK ? {
   totalSpend: { value: 9194, target: 8400, unit: 'AED', trend: +9.5 },
   leads: { value: 93, target: 100, unit: '', trend: -7 },
   meetingsBooked: { value: 13, target: 15, unit: '', trend: -13.3 },
@@ -37,9 +39,9 @@ export const mockKPIs = {
   showRate: { value: 61.5, target: 75, unit: '%', trend: -18 },
   meetingRate: { value: 14, target: 18, unit: '%', trend: -22.2 },
   roas: { value: 2.6, target: 4, unit: 'x', trend: -35 },
-}
+} : {}
 
-export const mockTrendsData = [
+export const mockTrendsData = USE_MOCK ? [
   { date: 'Apr 4', spend: 680, leads: 7, cpl: 97.1, meetings: 1 },
   { date: 'Apr 5', spend: 720, leads: 8, cpl: 90.0, meetings: 1 },
   { date: 'Apr 6', spend: 810, leads: 9, cpl: 90.0, meetings: 2 },
@@ -52,24 +54,24 @@ export const mockTrendsData = [
   { date: 'Apr 13', spend: 760, leads: 7, cpl: 108.6, meetings: 0 },
   { date: 'Apr 14', spend: 840, leads: 8, cpl: 105.0, meetings: 1 },
   { date: 'Apr 15', spend: 334, leads: 6, cpl: 55.7, meetings: 0 },
-]
+] : []
 
 export const mockActivePipeline = mockLeads.filter(l => ['active', 'meeting_booked', 'showed'].includes(l.stage))
 
-export const mockInsights = [
+export const mockInsights = USE_MOCK ? [
   { severity: 'critical', title: 'CPL is 16% over target (AED 99 vs AED 85)', href: '/creative-performance' },
   { severity: 'warning', title: 'Video5 frequency at 1.43 — approaching ceiling', href: '/week-over-week' },
   { severity: 'info', title: '6 active opportunities — total value AED 45,000', href: '/revenue' },
-]
+] : []
 
-export const mockSarahKPIs = {
+export const mockSarahKPIs = USE_MOCK ? {
   callsAttempted: 187,
   callsConnected: 93,
   qualifiedRate: 14,
   meetingsBooked: 13,
-}
+} : {}
 
-export const mockCallOutcomes = [
+export const mockCallOutcomes = USE_MOCK ? [
   { name: 'Meeting Booked', value: 13, color: '#16A34A' },
   { name: 'Qualified No Meeting', value: 8, color: '#2563EB' },
   { name: 'Disqualified', value: 24, color: '#DC2626' },
@@ -77,15 +79,15 @@ export const mockCallOutcomes = [
   { name: 'No Answer', value: 41, color: '#9CA3AF' },
   { name: 'Wrong Number', value: 12, color: '#F59E0B' },
   { name: 'Callback', value: 7, color: '#EC4899' },
-]
+] : []
 
-export const mockSalesReps = [
+export const mockSalesReps = USE_MOCK ? [
   { name: 'Ron David', meetings: 15, shows: 11, noShows: 3, showRate: 73.3, active: 0, closes: 0, closeRate: 0, avgTimeToContact: '2.1 hrs' },
   { name: 'Abdus Samad', meetings: 9, shows: 3, noShows: 4, showRate: 33.3, active: 0, closes: 0, closeRate: 0, avgTimeToContact: '4.3 hrs' },
-]
+] : []
 
-export const mockWeeklyData = [
+export const mockWeeklyData = USE_MOCK ? [
   { week: 'W1 (Apr 1-7)', spend: 3200, leads: 31, cpl: 103.2, meetings: 4, showRate: 75, active: 2, costPerMeeting: 800, revenue: 0 },
   { week: 'W2 (Apr 8-14)', spend: 4100, leads: 42, cpl: 97.6, meetings: 7, showRate: 57, active: 3, costPerMeeting: 585.7, revenue: 24000 },
   { week: 'W3 (Apr 15-16)', spend: 1894, leads: 20, cpl: 94.7, meetings: 2, showRate: 50, active: 1, costPerMeeting: 947, revenue: 0 },
-]
+] : []

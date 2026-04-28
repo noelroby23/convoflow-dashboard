@@ -30,8 +30,8 @@ export default function Overview() {
   const setReportBuilder = useDashboard(s => s.setReportBuilder)
   const { data: overview, loading: overviewLoading, error: overviewError } = useDashboardOverview(dateRange.from, dateRange.to)
   const { data: targets } = useTargets()
-  const { data: activeLeads, loading: activeLeadsLoading } = useAllContacts()
-  const { data: activePipeline, loading: pipelineLoading } = useContactDetails(['showed', 'active'])
+  const { data: activeLeads, loading: activeLeadsLoading, error: activeLeadsError } = useAllContacts()
+  const { data: activePipeline, loading: pipelineLoading, error: pipelineError } = useContactDetails(['showed', 'active'])
   const [showAllLeads, setShowAllLeads] = useState(false)
 
   useEffect(() => {
@@ -161,6 +161,8 @@ export default function Overview() {
 
           {activeLeadsLoading ? (
             <div className="space-y-3">{[...Array(4)].map((_, i) => <div key={i} className="skeleton h-10 w-full" />)}</div>
+          ) : activeLeadsError ? (
+            <p className="text-sm text-[#B91C1C] text-center py-8">Failed to load active leads. Try refreshing.</p>
           ) : !sortedActiveLeads.length ? (
             <p className="text-sm text-[#9CA3AF] text-center py-8">No leads were created during this date range.</p>
           ) : (
@@ -212,6 +214,8 @@ export default function Overview() {
           <p className="text-xs text-[#6B7280] mb-4">{activePipeline?.length ?? 0} leads currently being worked on</p>
           {pipelineLoading ? (
             <div className="space-y-3">{[...Array(3)].map((_, i) => <div key={i} className="skeleton h-10 w-full" />)}</div>
+          ) : pipelineError ? (
+            <p className="text-sm text-[#B91C1C] text-center py-8">Failed to load active pipeline. Try refreshing.</p>
           ) : !activePipeline?.length ? (
             <p className="text-sm text-[#9CA3AF] text-center py-8">No active pipeline yet.</p>
           ) : (
@@ -225,12 +229,12 @@ export default function Overview() {
               </thead>
               <tbody>
                 {activePipeline.map((lead) => (
-                  <tr key={lead.contact_id} className="border-b border-[#F3F4F6] hover:bg-[#FAFAFA] cursor-pointer" onClick={() => navigate('/lead-tracker')}>
+                  <tr key={lead.contact_id} className="border-b border-[#F3F4F6] hover:bg-[#FAFAFA] cursor-pointer" onClick={() => openLeadTracker(lead.contact_id)}>
                     <td className="py-3 pr-4 font-medium text-[#0F0F1A]">{lead.full_name}</td>
                     <td className="py-3 pr-4 text-[#6B7280]">{lead.company || '—'}</td>
                     <td className="py-3 pr-4"><StatusBadge stage={lead.current_stage} successTone="red" /></td>
-                    <td className="py-3 pr-4 text-[#6B7280]">{lead.source_ad || '—'}</td>
-                    <td className="py-3 pr-4 text-[#6B7280]">{lead.created_at ? new Date(lead.created_at).toLocaleDateString() : '—'}</td>
+                    <td className="py-3 pr-4 text-[#6B7280]">{lead.ad_name || lead.source_ad || '—'}</td>
+                    <td className="py-3 pr-4 text-[#6B7280]">{(lead.ghl_created_at || lead.created_at) ? new Date(lead.ghl_created_at || lead.created_at).toLocaleDateString() : '—'}</td>
                     <td className="py-3 font-medium text-[#0F0F1A]">{lead.deal_value ? `AED ${Number(lead.deal_value).toLocaleString()}` : '—'}</td>
                   </tr>
                 ))}

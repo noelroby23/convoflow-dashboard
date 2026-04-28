@@ -7,22 +7,22 @@ import {
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 
-const fallbackFunnel = {
+const mockFallbackFunnel = USE_MOCK ? {
   client_id: 'mock', client_name: 'ConvoFlow UK', total_leads: 93, meetings_booked: 13,
   showed_up: 8, active_opportunities: 6, closed_won: 1, no_shows: 5, disqualified: 24,
   wrong_numbers: 12, total_spend: 9194, closed_revenue: 24000, pipeline_value: 45000,
-}
+} : null
 
-const fallbackAds = mockAds.map(ad => ({
+const mockFallbackAds = USE_MOCK ? mockAds.map(ad => ({
   ad_id: ad.id, client_id: 'mock', ad_name: ad.name, status: ad.status, total_spend: ad.spend,
   total_impressions: ad.impressions, avg_frequency: ad.frequency, avg_ctr: ad.ctr,
   total_leads: ad.leads, meetings_booked: ad.meetings, showed_up: ad.showed,
   active_opportunities: ad.activeOpps, closed_won: ad.closedWon, cost_per_lead: ad.cpl,
   cost_per_active: ad.costPerActive, meta_ad_id: null, creative_url: null, creative_type: null,
   video_url: null, effective_object_story_id: null,
-}))
+})) : null
 
-const fallbackContacts = mockLeads.map(lead => ({
+const mockFallbackContacts = USE_MOCK ? mockLeads.map(lead => ({
   contact_id: lead.id, client_id: 'mock', full_name: lead.name, email: null, phone: null,
   company: lead.company, created_at: lead.date, source_ad: lead.sourceAd,
   current_stage: lead.stage, current_tags: [], call_summary: lead.callSummary,
@@ -30,9 +30,9 @@ const fallbackContacts = mockLeads.map(lead => ({
   hot_lead: lead.qualityScore >= 8, meeting_date: lead.meetingDate, assigned_to: null,
   deal_value: lead.dealValue, dq_reason: null, follow_up_attempts: lead.followUpAttempts,
   last_activity_at: lead.date,
-}))
+})) : null
 
-const fallbackLeadTracker = fallbackContacts.map(contact => ({
+const mockFallbackLeadTracker = USE_MOCK ? mockFallbackContacts.map(contact => ({
   ...contact,
   ghl_contact_id: null,
   source: 'Facebook',
@@ -49,19 +49,19 @@ const fallbackLeadTracker = fallbackContacts.map(contact => ({
   funnel_closed_won: contact.current_stage === 'closed_won',
   funnel_closed_lost: contact.current_stage === 'closed_lost',
   funnel_no_show: contact.current_stage === 'no_show',
-}))
+})) : null
 
-const fallbackDailyMetrics = mockTrendsData.map(d => ({
+const mockFallbackDailyMetrics = USE_MOCK ? mockTrendsData.map(d => ({
   client_id: 'mock', date: d.date, spend: d.spend, impressions: 0, avg_frequency: 1.43,
   clicks: 0, leads: d.leads, meetings_booked: d.meetings, closes: 0,
-}))
+})) : null
 
-const fallbackSarahStages = {
+const mockFallbackSarahStages = USE_MOCK ? {
   stages: [],
   totalLeads: 0,
   funnelMeetings: 0,
   funnelConversations: 0,
-}
+} : null
 
 const parseDateValue = (value) => {
   if (!value) return null
@@ -83,29 +83,15 @@ const filterRowsByDateRange = (rows, getValue, from, to) => (
   (rows ?? []).filter(row => isWithinDateRange(getValue(row), from, to))
 )
 
-const getDateRangeDays = (from, to) => {
-  if (!from || !to) return []
-
-  const days = []
-  const start = new Date(`${from}T00:00:00Z`)
-  const end = new Date(`${to}T00:00:00Z`)
-
-  for (const date = new Date(start); date <= end; date.setUTCDate(date.getUTCDate() + 1)) {
-    days.push(date.toISOString().slice(0, 10))
-  }
-
-  return days
-}
-
-const fallbackSalesReps = mockSalesReps.map(rep => ({
+const mockFallbackSalesReps = USE_MOCK ? mockSalesReps.map(rep => ({
   client_id: 'mock', sales_rep: rep.name, meetings_scheduled: rep.meetings, shows: rep.shows,
-  no_shows: rep.noShows, closes: rep.closes, revenue_closed: rep.closes * 24000,
-}))
+  no_shows: rep.noShows, closes: rep.closes, revenue_closed: null,
+})) : null
 
 export function useClients() {
   return useSupabaseQuery(
     () => supabase.from('funnel_summary').select('client_id, client_name'),
-    [], [{ client_id: 'mock', client_name: 'ConvoFlow UK' }]
+    [], USE_MOCK ? [{ client_id: 'mock', client_name: 'ConvoFlow UK' }] : null
   )
 }
 
@@ -118,7 +104,7 @@ export function useFunnelByDate() {
       })
       return { data: Array.isArray(data) ? (data[0] ?? null) : data, error }
     },
-    [currentClientId, dateRange.from, dateRange.to, refreshKey], fallbackFunnel
+    [currentClientId, dateRange.from, dateRange.to, refreshKey], mockFallbackFunnel
   )
 }
 
@@ -132,7 +118,7 @@ export function useFunnelSummary() {
       })
       return { data: Array.isArray(data) ? (data[0] ?? null) : data, error }
     },
-    [currentClientId, refreshKey], fallbackFunnel
+    [currentClientId, refreshKey], mockFallbackFunnel
   )
 }
 
@@ -198,6 +184,8 @@ export function useAdPerformance() {
           showed_up: 0,
           active_opportunities: 0,
           closed_won: 0,
+          closed_revenue: 0,
+          pipeline_value: 0,
         }
 
         current.total_leads += 1
@@ -205,6 +193,8 @@ export function useAdPerformance() {
         if (row.funnel_showed_up) current.showed_up += 1
         if (row.funnel_active_opp) current.active_opportunities += 1
         if (row.funnel_closed_won) current.closed_won += 1
+        if (row.funnel_closed_won) current.closed_revenue += Number(row.deal_value ?? 0)
+        if (row.funnel_active_opp) current.pipeline_value += Number(row.deal_value ?? 0)
 
         leadMetricsByAdName.set(adName, current)
       }
@@ -218,6 +208,8 @@ export function useAdPerformance() {
           showed_up: 0,
           active_opportunities: 0,
           closed_won: 0,
+          closed_revenue: 0,
+          pipeline_value: 0,
         }
 
         const totalSpend = Number(dailyMetrics?.total_spend ?? 0)
@@ -247,26 +239,35 @@ export function useAdPerformance() {
           showed_up: Number(leadMetrics.showed_up ?? 0),
           active_opportunities: activeOpps,
           closed_won: Number(leadMetrics.closed_won ?? 0),
+          closed_revenue: Number(leadMetrics.closed_revenue ?? 0),
+          pipeline_value: Number(leadMetrics.pipeline_value ?? 0),
           cost_per_lead: totalLeads > 0 ? totalSpend / totalLeads : null,
           cost_per_active: activeOpps > 0 ? totalSpend / activeOpps : null,
         }
-      })
+      }).filter(row => (
+        Number(row.total_spend ?? 0) > 0 ||
+        Number(row.total_impressions ?? 0) > 0 ||
+        Number(row.total_clicks ?? 0) > 0 ||
+        Number(row.total_leads ?? 0) > 0 ||
+        Number(row.meetings_booked ?? 0) > 0 ||
+        Number(row.showed_up ?? 0) > 0 ||
+        Number(row.active_opportunities ?? 0) > 0 ||
+        Number(row.closed_won ?? 0) > 0
+      ))
 
       return { data: merged, error: null }
     },
-    [currentClientId, dateRange.from, dateRange.to, refreshKey], fallbackAds
+    [currentClientId, dateRange.from, dateRange.to, refreshKey], mockFallbackAds
   )
 }
 
 export function useContactDetails(stageFilter = null) {
   const { currentClientId, dateRange, refreshKey } = useDashboard()
-  const filtered = stageFilter
-    ? fallbackContacts.filter(c => stageFilter.includes(c.current_stage)) : fallbackContacts
   return useSupabaseQuery(
     async () => {
-      const { data, error } = await supabase.from('contact_details').select('*')
+      const { data, error } = await supabase.from('lead_tracker').select('*')
         .eq('client_id', currentClientId)
-        .or('source.eq.Facebook,ad_id.not.is.null')
+        .order('ghl_created_at', { ascending: false, nullsFirst: false })
 
       if (error) return { data: null, error }
 
@@ -275,7 +276,10 @@ export function useContactDetails(stageFilter = null) {
 
       return { data: rows, error: null }
     },
-    [currentClientId, dateRange.from, dateRange.to, JSON.stringify(stageFilter), refreshKey], filtered
+    [currentClientId, dateRange.from, dateRange.to, JSON.stringify(stageFilter), refreshKey],
+    USE_MOCK && mockFallbackContacts
+      ? (stageFilter ? mockFallbackContacts.filter(c => stageFilter.includes(c.current_stage)) : mockFallbackContacts)
+      : null
   )
 }
 
@@ -294,7 +298,7 @@ export function useAllContacts() {
         error: null,
       }
     },
-    [currentClientId, dateRange.from, dateRange.to, refreshKey], fallbackLeadTracker
+    [currentClientId, dateRange.from, dateRange.to, refreshKey], mockFallbackLeadTracker
   )
 }
 
@@ -310,7 +314,7 @@ export function useLeadTrackerContacts() {
         error: null,
       }
     },
-    [currentClientId, dateRange.from, dateRange.to, refreshKey], fallbackLeadTracker
+    [currentClientId, dateRange.from, dateRange.to, refreshKey], mockFallbackLeadTracker
   )
 }
 
@@ -351,7 +355,7 @@ export function useSarahStages() {
       }
     },
     [currentClientId, dateRange.from, dateRange.to, refreshKey],
-    fallbackSarahStages
+    mockFallbackSarahStages
   )
 
   return {
@@ -371,7 +375,7 @@ export function useDailyMetrics() {
       .eq('client_id', currentClientId)
       .gte('date', dateRange.from).lte('date', dateRange.to)
       .order('date', { ascending: true }),
-    [currentClientId, dateRange.from, dateRange.to, refreshKey], fallbackDailyMetrics
+    [currentClientId, dateRange.from, dateRange.to, refreshKey], mockFallbackDailyMetrics
   )
 }
 
@@ -383,71 +387,56 @@ export function useTrendMetricsByDate() {
         return { data: [], error: null }
       }
 
-      const days = getDateRangeDays(dateRange.from, dateRange.to)
+      const { data, error } = await supabase.from('daily_metrics').select('*')
+        .eq('client_id', currentClientId)
+        .gte('date', dateRange.from).lte('date', dateRange.to)
+        .order('date', { ascending: true })
 
-      // TODO(n8n WF2): add ghl_created_at: body.dateAdded || null in the
-      // Prepare Contact Upsert Payload node's contactRow object so future
-      // day bucketing continues to use the real GHL creation timestamp.
-      const [dailyMetricsResult, dailyFunnelResults] = await Promise.all([
-        supabase.from('daily_metrics').select('*')
-          .eq('client_id', currentClientId)
-          .gte('date', dateRange.from).lte('date', dateRange.to)
-          .order('date', { ascending: true }),
-        Promise.all(days.map(async (date) => {
-          const { data, error } = await supabase.rpc('funnel_summary_by_date', {
-            p_client_id: currentClientId,
-            p_from: date,
-            p_to: date,
-            p_paid_only: true,
-          })
-
-          return {
-            date,
-            error,
-            row: Array.isArray(data) ? (data[0] ?? null) : data,
-          }
-        }))
-      ])
-
-      if (dailyMetricsResult.error) {
-        return { data: null, error: dailyMetricsResult.error }
-      }
-
-      const dailyFunnelError = dailyFunnelResults.find(result => result.error)?.error
-      if (dailyFunnelError) {
-        return { data: null, error: dailyFunnelError }
-      }
-
-      const frequencyByDate = new Map((dailyMetricsResult.data ?? []).map(row => [row.date, row]))
-      const merged = days.map((date) => {
-        const funnelRow = dailyFunnelResults.find(result => result.date === date)?.row ?? null
-        const metricRow = frequencyByDate.get(date)
-
-        return {
-          client_id: currentClientId,
-          date,
-          spend: Number(funnelRow?.total_spend ?? 0),
-          impressions: Number(metricRow?.impressions ?? 0),
-          avg_frequency: Number(metricRow?.avg_frequency ?? 0),
-          clicks: Number(metricRow?.clicks ?? 0),
-          leads: Number(funnelRow?.total_leads ?? 0),
-          meetings_booked: Number(funnelRow?.meetings_booked ?? 0),
-          closes: Number(funnelRow?.closed_won ?? 0),
-        }
-      })
-
-      return { data: merged, error: null }
+      return { data: data ?? [], error }
     },
     [currentClientId, dateRange.from, dateRange.to, refreshKey],
-    fallbackDailyMetrics
+    mockFallbackDailyMetrics
   )
 }
 
 export function useSalesRepPerformance() {
-  const { currentClientId, refreshKey } = useDashboard()
+  const { currentClientId, dateRange, refreshKey } = useDashboard()
   return useSupabaseQuery(
-    () => supabase.from('sales_rep_performance').select('*').eq('client_id', currentClientId),
-    [currentClientId, refreshKey], USE_MOCK ? fallbackSalesReps : null
+    async () => {
+      const { data, error } = await supabase.from('lead_tracker').select('*')
+        .eq('client_id', currentClientId)
+
+      if (error) return { data: null, error }
+
+      const rows = filterRowsByDateRange(data, row => row.ghl_created_at || row.created_at, dateRange.from, dateRange.to)
+      const reps = new Map()
+
+      for (const row of rows) {
+        const repName = row.assigned_to_name || row.assigned_to || 'Unassigned'
+        const rep = reps.get(repName) ?? {
+          client_id: currentClientId,
+          sales_rep: repName,
+          meetings_scheduled: 0,
+          shows: 0,
+          no_shows: 0,
+          closes: 0,
+          revenue_closed: 0,
+        }
+
+        if (row.funnel_meeting_booked) rep.meetings_scheduled += 1
+        if (row.funnel_showed_up) rep.shows += 1
+        if (row.funnel_no_show) rep.no_shows += 1
+        if (row.funnel_closed_won) {
+          rep.closes += 1
+          rep.revenue_closed += Number(row.deal_value ?? 0)
+        }
+
+        reps.set(repName, rep)
+      }
+
+      return { data: [...reps.values()].filter(rep => rep.meetings_scheduled || rep.shows || rep.no_shows || rep.closes), error: null }
+    },
+    [currentClientId, dateRange.from, dateRange.to, refreshKey], mockFallbackSalesReps
   )
 }
 

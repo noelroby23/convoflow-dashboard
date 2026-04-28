@@ -4,7 +4,7 @@ import { useSupabaseQuery } from './useSupabaseQuery'
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 
-const fallbackOverview = {
+const mockFallbackOverview = USE_MOCK ? {
   client_id: 'mock',
   client_name: 'ConvoFlow UK',
   total_leads: 93,
@@ -26,7 +26,7 @@ const fallbackOverview = {
   show_rate: 61.5,
   meeting_rate: 14,
   roas: 2.6,
-}
+} : null
 
 export function useDashboardOverview(dateFrom, dateTo, paidOnly = true) {
   const currentClientId = useDashboard(s => s.currentClientId)
@@ -75,6 +75,6 @@ export function useDashboardOverview(dateFrom, dateTo, paidOnly = true) {
 
     },
     [currentClientId, dateFrom, dateTo, paidOnly, refreshKey],
-    USE_MOCK ? fallbackOverview : null
+    mockFallbackOverview
   )
 }

@@ -477,7 +477,7 @@ function getStageCounts(data) {
 }
 
 export default function LeadTracker() {
-  const { data: contacts, loading } = useLeadTrackerContacts()
+  const { data: contacts, loading, error } = useLeadTrackerContacts()
   const [searchParams, setSearchParams] = useSearchParams()
   const stageFromUrl = searchParams.get('stage')
   const expandFromUrl = searchParams.get('expand')
@@ -643,6 +643,12 @@ export default function LeadTracker() {
                   <td colSpan={8} className="px-4 py-3"><div className="skeleton h-6 w-full" /></td>
                 </tr>
               ))
+            ) : error ? (
+              <tr>
+                <td colSpan={8} className="px-4 py-8 text-center text-sm text-[#B91C1C]">
+                  Failed to load leads. Try refreshing.
+                </td>
+              </tr>
             ) : !filtered.length ? (
               <tr>
                 <td colSpan={8} className="px-4 py-8 text-center text-sm text-[#9CA3AF]">

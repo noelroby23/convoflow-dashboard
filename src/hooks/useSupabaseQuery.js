@@ -2,15 +2,8 @@ import { useState, useEffect } from 'react'
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 
-const hasData = (data) => {
-  if (data === null || data === undefined) return false
-  if (Array.isArray(data)) return data.length > 0
-  if (typeof data === 'object') return Object.keys(data).length > 0
-  return true
-}
-
 export function useSupabaseQuery(queryFn, deps = [], fallback = null) {
-  const [data, setData] = useState(fallback)
+  const [data, setData] = useState(USE_MOCK ? fallback : null)
   const [loading, setLoading] = useState(!USE_MOCK)
   const [error, setError] = useState(null)
 
@@ -26,16 +19,16 @@ export function useSupabaseQuery(queryFn, deps = [], fallback = null) {
         if (cancelled) return
         if (error) {
           setError(error.message)
-          setData(fallback)
+          setData(null)
         } else {
-          setData(hasData(data) ? data : fallback)
+          setData(data ?? null)
         }
         setLoading(false)
       })
       .catch(err => {
         if (cancelled) return
         setError(err.message)
-        setData(fallback)
+        setData(null)
         setLoading(false)
       })
 

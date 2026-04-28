@@ -10,9 +10,9 @@ import { salesReport } from '../lib/reports/generators'
 
 export default function SalesPerformance() {
   const [activeTab, setActiveTab] = useState('overview')
-  const { data: salesReps, loading: repsLoading } = useSalesRepPerformance()
+  const { data: salesReps, loading: repsLoading, error: repsError } = useSalesRepPerformance()
   const dateRange = useDashboard(s => s.dateRange)
-  const { data: overview, loading: overviewLoading } = useDashboardOverview(dateRange.from, dateRange.to)
+  const { data: overview, loading: overviewLoading, error: overviewError } = useDashboardOverview(dateRange.from, dateRange.to)
   const { data: targets } = useTargets()
   const setReportBuilder = useDashboard(s => s.setReportBuilder)
 
@@ -76,8 +76,10 @@ export default function SalesPerformance() {
               <h2 className="text-sm font-bold text-[#0F0F1A] mb-4">Per-Salesperson Performance</h2>
               {repsLoading ? (
                 <div className="space-y-3">{[...Array(3)].map((_, i) => <div key={i} className="skeleton h-10 w-full" />)}</div>
+              ) : repsError ? (
+                <p className="text-sm text-[#B91C1C] text-center py-8">Failed to load sales rep data. Try refreshing.</p>
               ) : !salesReps?.length ? (
-                <p className="text-sm text-[#9CA3AF] text-center py-8">No sales rep data available yet.</p>
+                <p className="text-sm text-[#9CA3AF] text-center py-8">No sales rep data for this period.</p>
               ) : (
                 <table className="w-full text-sm">
                   <thead>
@@ -111,6 +113,12 @@ export default function SalesPerformance() {
               )}
             </div>
           </ErrorBoundary>
+
+          {overviewError && !overviewLoading && (
+            <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-[#B91C1C]">
+              Failed to load sales KPIs. Try refreshing.
+            </div>
+          )}
 
           <AISummary loading={loading} summary={
             `The sales team handled ${totalMeetings} meetings this period with ${totalShows} shows and ${totalNoShows} no-shows. ` +

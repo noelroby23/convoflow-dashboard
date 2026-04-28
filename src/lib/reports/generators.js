@@ -165,32 +165,35 @@ export function salesReport(overview, reps) {
 
 // ─── Revenue & ROI ───────────────────────────────────────────────────────────
 export function revenueReport(overview) {
-  const totalSpend = Number(overview?.total_spend ?? 9194)
-  const closedRevenue = Number(overview?.closed_revenue ?? 24000)
-  const activePipelineValue = Number(overview?.pipeline_value ?? 45000)
-  const historicalCloseRate = 0.2
+  const totalSpend = Number(overview?.total_spend ?? 0)
+  const closedRevenue = Number(overview?.closed_revenue ?? 0)
+  const activePipelineValue = Number(overview?.pipeline_value ?? 0)
+  const showedUp = Number(overview?.showed_up ?? 0)
+  const closedWon = Number(overview?.closed_won ?? 0)
+  const historicalCloseRate = showedUp > 0 ? closedWon / showedUp : 0
+  const closeRateLabel = `${(historicalCloseRate * 100).toFixed(0)}%`
   const projectedRevenue = closedRevenue + (activePipelineValue * historicalCloseRate)
   const roas = totalSpend > 0 ? +(closedRevenue / totalSpend).toFixed(1) : 0
 
   const recommendations = []
-  if (roas < 4) recommendations.push(`ROAS is ${roas}x vs the 4x target — closing the AED ${activePipelineValue.toLocaleString()} active pipeline at 20% would bring projected ROAS above target.`)
+  if (roas < 4) recommendations.push(`ROAS is ${roas}x vs the 4x target — closing the AED ${activePipelineValue.toLocaleString()} active pipeline at the current ${closeRateLabel} close rate would improve projected ROAS.`)
   recommendations.push('Scale spend on the highest-ROAS ad creative to improve overall return.')
   recommendations.push('Review the 3–6 week lag between ad click and close — tighten the sales cycle to accelerate revenue recognition.')
 
   return formatReport({
     title: 'Revenue & ROI Report',
-    summary: `You spent AED ${totalSpend.toLocaleString()} and closed AED ${closedRevenue.toLocaleString()} in revenue — a ROAS of ${roas}x. ${roas >= 4 ? 'ROAS is on target.' : 'ROAS is below the 4x target.'} AED ${activePipelineValue.toLocaleString()} in deals are actively being worked. Projected revenue including pipeline at a 20% close rate is AED ${Math.round(projectedRevenue).toLocaleString()}.`,
+    summary: `You spent AED ${totalSpend.toLocaleString()} and closed AED ${closedRevenue.toLocaleString()} in revenue — a ROAS of ${roas}x. ${roas >= 4 ? 'ROAS is on target.' : 'ROAS is below the 4x target.'} AED ${activePipelineValue.toLocaleString()} in deals are actively being worked. Projected revenue including pipeline at a ${closeRateLabel} close rate is AED ${Math.round(projectedRevenue).toLocaleString()}.`,
     metrics: [
       { label: 'Total Spend', value: `AED ${totalSpend.toLocaleString()}`, status: 'info' },
       { label: 'Closed Revenue', value: `AED ${closedRevenue.toLocaleString()}`, status: 'info' },
       { label: 'ROAS', value: `${roas}x`, target: 4, status: metricStatus(roas, 4) },
       { label: 'Active Pipeline', value: `AED ${activePipelineValue.toLocaleString()}`, status: 'info' },
       { label: 'Projected Revenue', value: `AED ${Math.round(projectedRevenue).toLocaleString()}`, status: 'info' },
-      { label: 'Historical Close Rate', value: '20%', status: 'info' },
+      { label: 'Historical Close Rate', value: closeRateLabel, status: 'info' },
     ],
     insights: [
       { severity: roas >= 4 ? 'info' : 'warning', text: `ROAS ${roas}x (target 4x) — ${roas >= 4 ? 'on target' : `gap of ${(4 - roas).toFixed(1)}x`}` },
-      { severity: 'info', text: `AED ${activePipelineValue.toLocaleString()} in active pipeline — estimated AED ${Math.round(activePipelineValue * historicalCloseRate).toLocaleString()} at 20% close rate` },
+      { severity: 'info', text: `AED ${activePipelineValue.toLocaleString()} in active pipeline — estimated AED ${Math.round(activePipelineValue * historicalCloseRate).toLocaleString()} at ${closeRateLabel} close rate` },
     ],
     recommendations,
   })

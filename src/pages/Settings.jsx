@@ -27,17 +27,7 @@ const TARGET_CONFIG = [
 
 const defaultTargets = Object.fromEntries(TARGET_CONFIG.map(t => [t.key, t.default]))
 
-const syncSources = [
-  { name: 'Meta Ads', lastSync: '2 min ago', status: 'live', description: 'Facebook & Instagram ad data' },
-  { name: 'GoHighLevel (GHL)', lastSync: '5 min ago', status: 'live', description: 'CRM pipeline & lead stages' },
-  { name: 'VAPI (AI Calls)', lastSync: '12 min ago', status: 'live', description: 'AI call recordings & summaries' },
-]
-
-const fallbackTeamMembers = [
-  { name: 'Mark Marti', email: 'mark@convoflow.ae', role: 'Admin', avatar: 'MM' },
-  { name: 'Abdus', email: 'abdus@convoflow.ae', role: 'Admin', avatar: 'AB' },
-  { name: 'Noel', email: 'noel@convoflow.ae', role: 'Viewer', avatar: 'NL' },
-]
+const syncSources = []
 
 const alertRules = [
   { id: 'cpl_spike', label: 'CPL spikes above AED 120', description: 'Notify when any ad\'s CPL exceeds AED 120' },
@@ -72,7 +62,7 @@ export default function Settings() {
   const { currentClientId } = useDashboard()
   const { isEnabled, setIsEnabled } = useDailyAISummary()
   const [targets, setTargets] = useState(defaultTargets)
-  const [teamMembers, setTeamMembers] = useState(fallbackTeamMembers)
+  const [teamMembers, setTeamMembers] = useState([])
   const [teamTableAvailable, setTeamTableAvailable] = useState(true)
   const [inviteName, setInviteName] = useState('')
   const [inviteEmail, setInviteEmail] = useState('')
@@ -250,7 +240,7 @@ export default function Settings() {
           <h2 className="text-base font-semibold text-[#0F0F1A]">Data Sources & Sync</h2>
         </div>
         <div className="divide-y divide-[#E5E7EB]">
-          {syncSources.map(src => (
+          {syncSources.length ? syncSources.map(src => (
             <div key={src.name} className="px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
@@ -259,18 +249,16 @@ export default function Settings() {
                   <p className="text-xs text-[#6B7280]">{src.description}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-4">
-                <div className="text-right">
-                  <p className="text-xs text-[#6B7280]">Last sync</p>
-                  <p className="text-sm font-medium text-[#0F0F1A]">{src.lastSync}</p>
-                </div>
-                <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E5E7EB] text-xs font-medium text-[#6B7280] hover:bg-[#F3F4F6] transition-colors">
-                  <RefreshCw className="w-3 h-3" />
-                  Sync now
-                </button>
+              <div className="text-right">
+                <p className="text-xs text-[#6B7280]">Last sync</p>
+                <p className="text-sm font-medium text-[#0F0F1A]">{src.lastSync}</p>
               </div>
             </div>
-          ))}
+          )) : (
+            <div className="px-6 py-8 text-center text-sm text-[#9CA3AF]">
+              Sync status is not connected yet.
+            </div>
+          )}
         </div>
       </div>
 
@@ -320,7 +308,7 @@ export default function Settings() {
             </tr>
           </thead>
           <tbody className="divide-y divide-[#E5E7EB]">
-            {teamMembers.map(member => (
+            {teamMembers.length ? teamMembers.map(member => (
               <tr key={member.email} className="hover:bg-[#F9FAFB] transition-colors">
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
@@ -340,7 +328,13 @@ export default function Settings() {
                   <button className="text-xs text-[#6B7280] hover:text-red-600 transition-colors">Remove</button>
                 </td>
               </tr>
-            ))}
+            )) : (
+              <tr>
+                <td colSpan={4} className="px-6 py-8 text-center text-sm text-[#9CA3AF]">
+                  No team members found.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

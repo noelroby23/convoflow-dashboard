@@ -227,7 +227,6 @@ function ExpandedCreativePreview({ ad }) {
 export default function AdCreatives() {
   const { data, loading, error } = useAdPerformance()
   const ads = data
-  console.log('AD DATA SAMPLE:', data?.[0])
   const setReportBuilder = useDashboard(s => s.setReportBuilder)
   const [expandedId, setExpandedId] = useState(null)
   const [activeFilter, setActiveFilter] = useState('all')
