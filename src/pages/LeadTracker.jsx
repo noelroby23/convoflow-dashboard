@@ -61,6 +61,14 @@ const KNOWN_STAGE_VALUES = new Set(STAGE_FILTERS.filter(stage => stage.id !== 'a
 
 const hasText = (value) => typeof value === 'string' && value.trim().length > 0
 
+function formatDubaiDate(value) {
+  if (!value) return '—'
+
+  const [year, month, day] = value.split('-')
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  return `${monthNames[Number(month) - 1]} ${Number(day)}, ${year}`
+}
+
 const TIMELINE_TONES = {
   blue: {
     dot: 'border-blue-200 bg-blue-50',
@@ -616,7 +624,7 @@ export default function LeadTracker() {
           onClick={() => exportCsv(filtered.map(c => ({
             'Name': c.full_name, 'Company': c.company, 'Email': c.email, 'Phone': c.phone,
             'Stage': c.stage_label || formatStage(c.current_stage), 'Priority': getPriority(c), 'Source Ad': c.ad_name || c.source_ad,
-            'Date': c.ghl_created_at || c.created_at, 'Quality Score': c.lead_quality_score, 'Deal Value': c.deal_value,
+            'Date': c.dubai_date, 'Quality Score': c.lead_quality_score, 'Deal Value': c.deal_value,
             'Meeting Date': c.meeting_date, 'Follow-up Attempts': c.follow_up_attempts,
             'Assigned To': c.assigned_to, 'DQ Reason': c.dq_reason, 'Call Summary': c.call_summary,
           })), 'leads')}
@@ -675,7 +683,7 @@ export default function LeadTracker() {
                       <td className="px-4 py-3 font-medium text-[#0F0F1A]">{contact.full_name}</td>
                       <td className="px-4 py-3 text-[#6B7280]">{contact.company || '—'}</td>
                       <td className="px-4 py-3 text-[#6B7280]">{contact.ad_name || contact.source_ad || '—'}</td>
-                      <td className="px-4 py-3 text-[#6B7280]">{(contact.ghl_created_at || contact.created_at) ? new Date(contact.ghl_created_at || contact.created_at).toLocaleDateString() : '—'}</td>
+                      <td className="px-4 py-3 text-[#6B7280]">{formatDubaiDate(contact.dubai_date)}</td>
                       <td className="px-4 py-3">
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#F3F4F6] text-[#374151]">
                           {contact.stage_label || formatStage(contact.current_stage) || 'Unknown'}
@@ -802,7 +810,7 @@ export default function LeadTracker() {
                                 <div className="flex justify-between gap-3"><span className="text-[#6B7280]">Stage</span><span className="text-right">{contact.stage_label || formatStage(contact.current_stage) || '—'}</span></div>
                                 <div className="flex justify-between gap-3"><span className="text-[#6B7280]">Priority</span><span className="text-right">{priorityConfig.label}</span></div>
                                 <div className="flex justify-between gap-3"><span className="text-[#6B7280]">Source Ad</span><span className="text-right">{contact.ad_name || contact.source_ad || '—'}</span></div>
-                                <div className="flex justify-between gap-3"><span className="text-[#6B7280]">Created</span><span className="text-right">{(contact.ghl_created_at || contact.created_at) ? new Date(contact.ghl_created_at || contact.created_at).toLocaleDateString() : '—'}</span></div>
+                                <div className="flex justify-between gap-3"><span className="text-[#6B7280]">Created</span><span className="text-right">{formatDubaiDate(contact.dubai_date)}</span></div>
                               </div>
                             </div>
                           </div>

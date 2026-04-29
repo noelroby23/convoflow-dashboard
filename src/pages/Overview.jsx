@@ -13,15 +13,15 @@ import { useDashboard } from '../store/dashboard'
 import { homeReport } from '../lib/reports/generators'
 
 function getLeadDateValue(lead) {
-  const raw = lead?.ghl_created_at || lead?.created_at
-  if (!raw) return null
-  const parsed = new Date(raw)
-  return Number.isNaN(parsed.getTime()) ? null : parsed
+  return lead?.dubai_date || ''
 }
 
 function formatLeadDate(lead) {
-  const parsed = getLeadDateValue(lead)
-  return parsed ? parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
+  if (!lead?.dubai_date) return '—'
+
+  const [year, month, day] = lead.dubai_date.split('-')
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  return `${monthNames[Number(month) - 1]} ${Number(day)}, ${year}`
 }
 
 export default function Overview() {
@@ -68,9 +68,7 @@ export default function Overview() {
   const formattedCpl = Number(cpl).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   const sortedActiveLeads = useMemo(() => {
     return [...(activeLeads ?? [])].sort((a, b) => {
-      const aDate = getLeadDateValue(a)?.getTime() ?? 0
-      const bDate = getLeadDateValue(b)?.getTime() ?? 0
-      return bDate - aDate
+      return getLeadDateValue(b).localeCompare(getLeadDateValue(a))
     })
   }, [activeLeads])
   const visibleActiveLeads = showAllLeads ? sortedActiveLeads : sortedActiveLeads.slice(0, 10)
@@ -234,7 +232,7 @@ export default function Overview() {
                     <td className="py-3 pr-4 text-[#6B7280]">{lead.company || '—'}</td>
                     <td className="py-3 pr-4"><StatusBadge stage={lead.current_stage} successTone="red" /></td>
                     <td className="py-3 pr-4 text-[#6B7280]">{lead.ad_name || lead.source_ad || '—'}</td>
-                    <td className="py-3 pr-4 text-[#6B7280]">{(lead.ghl_created_at || lead.created_at) ? new Date(lead.ghl_created_at || lead.created_at).toLocaleDateString() : '—'}</td>
+                    <td className="py-3 pr-4 text-[#6B7280]">{formatLeadDate(lead)}</td>
                     <td className="py-3 font-medium text-[#0F0F1A]">{lead.deal_value ? `AED ${Number(lead.deal_value).toLocaleString()}` : '—'}</td>
                   </tr>
                 ))}

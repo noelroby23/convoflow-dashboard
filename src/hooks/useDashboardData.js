@@ -63,25 +63,18 @@ const mockFallbackSarahStages = USE_MOCK ? {
   funnelConversations: 0,
 } : null
 
-const parseDateValue = (value) => {
-  if (!value) return null
-  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00Z` : value
-  const parsed = new Date(normalized)
-  return Number.isNaN(parsed.getTime()) ? null : parsed
+const filterLeadTrackerByDubaiDate = (query, from, to) => query.gte('dubai_date', from).lte('dubai_date', to)
+
+const getDubaiToday = () => {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Dubai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date())
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]))
+  return `${values.year}-${values.month}-${values.day}`
 }
-
-const isWithinDateRange = (value, from, to) => {
-  const parsed = parseDateValue(value)
-  if (!parsed || !from || !to) return false
-
-  const start = new Date(`${from}T00:00:00Z`)
-  const end = new Date(`${to}T23:59:59.999Z`)
-  return parsed >= start && parsed <= end
-}
-
-const filterRowsByDateRange = (rows, getValue, from, to) => (
-  (rows ?? []).filter(row => isWithinDateRange(getValue(row), from, to))
-)
 
 const mockFallbackSalesReps = USE_MOCK ? mockSalesReps.map(rep => ({
   client_id: 'mock', sales_rep: rep.name, meetings_scheduled: rep.meetings, shows: rep.shows,
@@ -114,7 +107,7 @@ export function useFunnelSummary() {
     async () => {
       const { data, error } = await supabase.rpc('funnel_summary_by_date', {
         p_client_id: currentClientId, p_from: '2020-01-01',
-        p_to: new Date().toISOString().slice(0, 10), p_paid_only: true,
+        p_to: getDubaiToday(), p_paid_only: true,
       })
       return { data: Array.isArray(data) ? (data[0] ?? null) : data, error }
     },
@@ -137,7 +130,11 @@ export function useAdPerformance() {
         adIds.length
           ? supabase.from('ad_daily_metrics').select('*').in('ad_id', adIds).gte('date', dateRange.from).lte('date', dateRange.to)
           : Promise.resolve({ data: [], error: null }),
-        supabase.from('lead_tracker').select('*').eq('client_id', currentClientId).order('ghl_created_at', { ascending: false, nullsFirst: false }),
+        filterLeadTrackerByDubaiDate(
+          supabase.from('lead_tracker').select('*').eq('client_id', currentClientId),
+          dateRange.from,
+          dateRange.to
+        ).order('ghl_created_at', { ascending: false, nullsFirst: false }),
       ])
 
       if (performanceResult.error || dailyMetricsResult.error || leadTrackerResult.error) {
@@ -146,7 +143,7 @@ export function useAdPerformance() {
 
       const performanceRows = performanceResult.data ?? []
       const dailyMetricRows = dailyMetricsResult.data ?? []
-      const leadRows = filterRowsByDateRange(leadTrackerResult.data, row => row.ghl_created_at || row.created_at, dateRange.from, dateRange.to)
+      const leadRows = leadTrackerResult.data ?? []
 
       const adsById = new Map(ads.filter(ad => ad.id).map(ad => [String(ad.id), ad]))
       const adsByMetaAdId = new Map(ads.filter(ad => ad.meta_ad_id).map(ad => [String(ad.meta_ad_id), ad]))
@@ -265,13 +262,15 @@ export function useContactDetails(stageFilter = null) {
   const { currentClientId, dateRange, refreshKey } = useDashboard()
   return useSupabaseQuery(
     async () => {
-      const { data, error } = await supabase.from('lead_tracker').select('*')
-        .eq('client_id', currentClientId)
-        .order('ghl_created_at', { ascending: false, nullsFirst: false })
+      const { data, error } = await filterLeadTrackerByDubaiDate(
+        supabase.from('lead_tracker').select('*').eq('client_id', currentClientId),
+        dateRange.from,
+        dateRange.to
+      ).order('ghl_created_at', { ascending: false, nullsFirst: false })
 
       if (error) return { data: null, error }
 
-      let rows = filterRowsByDateRange(data, row => row.ghl_created_at || row.created_at, dateRange.from, dateRange.to)
+      let rows = data ?? []
       if (stageFilter) rows = rows.filter(row => stageFilter.includes(row.current_stage))
 
       return { data: rows, error: null }
@@ -287,14 +286,16 @@ export function useAllContacts() {
   const { currentClientId, dateRange, refreshKey } = useDashboard()
   return useSupabaseQuery(
     async () => {
-      const { data, error } = await supabase.from('lead_tracker').select('*')
-        .eq('client_id', currentClientId)
-        .order('ghl_created_at', { ascending: false, nullsFirst: false })
+      const { data, error } = await filterLeadTrackerByDubaiDate(
+        supabase.from('lead_tracker').select('*').eq('client_id', currentClientId),
+        dateRange.from,
+        dateRange.to
+      ).order('ghl_created_at', { ascending: false, nullsFirst: false })
 
       if (error) return { data: null, error }
 
       return {
-        data: filterRowsByDateRange(data, row => row.ghl_created_at || row.created_at, dateRange.from, dateRange.to),
+        data: data ?? [],
         error: null,
       }
     },
@@ -306,11 +307,15 @@ export function useLeadTrackerContacts() {
   const { currentClientId, dateRange, refreshKey } = useDashboard()
   return useSupabaseQuery(
     async () => {
-      const { data, error } = await supabase.from('lead_tracker').select('*').eq('client_id', currentClientId).order('ghl_created_at', { ascending: false, nullsFirst: false })
+      const { data, error } = await filterLeadTrackerByDubaiDate(
+        supabase.from('lead_tracker').select('*').eq('client_id', currentClientId),
+        dateRange.from,
+        dateRange.to
+      ).order('ghl_created_at', { ascending: false, nullsFirst: false })
       if (error) return { data: null, error }
 
       return {
-        data: filterRowsByDateRange(data, row => row.ghl_created_at || row.created_at, dateRange.from, dateRange.to),
+        data: data ?? [],
         error: null,
       }
     },
@@ -329,7 +334,11 @@ export function useSarahStages() {
           end_date: dateRange.to,
           p_client_id: currentClientId,
         }),
-        supabase.from('contacts').select('id, ghl_created_at, created_at').eq('client_id', currentClientId).eq('is_test', false),
+        filterLeadTrackerByDubaiDate(
+          supabase.from('lead_tracker').select('contact_id').eq('client_id', currentClientId),
+          dateRange.from,
+          dateRange.to
+        ),
       ])
 
       if (stageResult.error || contactsResult.error) {
@@ -340,8 +349,7 @@ export function useSarahStages() {
       const stages = allRows.filter(row => !row.stage?.startsWith('_funnel_'))
       const funnelMeetings = Number(allRows.find(row => row.stage === '_funnel_meetings_booked')?.count ?? 0)
       const funnelConversations = Number(allRows.find(row => row.stage === '_funnel_conversations')?.count ?? 0)
-      const filteredContactRows = filterRowsByDateRange(contactsResult.data, row => row.ghl_created_at || row.created_at, dateRange.from, dateRange.to)
-      const totalLeads = new Set(filteredContactRows.map(row => row.id)).size
+      const totalLeads = new Set((contactsResult.data ?? []).map(row => row.contact_id)).size
 
 
       return {
@@ -403,12 +411,15 @@ export function useSalesRepPerformance() {
   const { currentClientId, dateRange, refreshKey } = useDashboard()
   return useSupabaseQuery(
     async () => {
-      const { data, error } = await supabase.from('lead_tracker').select('*')
-        .eq('client_id', currentClientId)
+      const { data, error } = await filterLeadTrackerByDubaiDate(
+        supabase.from('lead_tracker').select('*').eq('client_id', currentClientId),
+        dateRange.from,
+        dateRange.to
+      )
 
       if (error) return { data: null, error }
 
-      const rows = filterRowsByDateRange(data, row => row.ghl_created_at || row.created_at, dateRange.from, dateRange.to)
+      const rows = data ?? []
       const reps = new Map()
 
       for (const row of rows) {

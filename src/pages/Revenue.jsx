@@ -41,7 +41,7 @@ export default function Revenue() {
   let cumulativeRevenue = 0
   const spendVsRevenue = (dailyMetrics ?? []).map(d => {
     const dayRevenue = closedWonLeads
-      .filter(lead => (lead.closed_at || lead.status_updated_at || lead.ghl_created_at || lead.created_at)?.slice(0, 10) === d.date)
+      .filter(lead => (lead.closed_dubai_date || lead.dubai_date) === d.date)
       .reduce((sum, lead) => sum + Number(lead.deal_value ?? 0), 0)
     cumulativeRevenue += dayRevenue
     return {
