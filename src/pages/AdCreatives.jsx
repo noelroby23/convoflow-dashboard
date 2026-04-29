@@ -440,12 +440,12 @@ export default function AdCreatives() {
                     {expandedId === ad.ad_id && (
                       <tr key={`${ad.ad_id}-expanded`} className="border-t border-[#F3F4F6] bg-[#FAFAFA]">
                         <td colSpan={14} className="px-6 py-4">
-                          <div className="w-full overflow-hidden">
-                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 overflow-hidden">
-                              <div className="lg:col-span-3 min-w-0">
+                          <div className="w-full min-w-0">
+                            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(180px,220px)_minmax(320px,1fr)] 2xl:grid-cols-[minmax(180px,220px)_minmax(320px,1fr)_minmax(240px,300px)]">
+                              <div className="min-w-0">
                                 <ExpandedCreativePreview ad={ad} />
                               </div>
-                              <div className="lg:col-span-6 min-w-0">
+                              <div className="min-w-0">
                                 <p className="text-xs font-semibold text-[#6B7280] mb-3">PERFORMANCE BREAKDOWN</p>
                                 <ResponsiveContainer width="100%" height={140}>
                                   <BarChart data={[
@@ -483,13 +483,13 @@ export default function AdCreatives() {
                                   </div>
                                 )}
                               </div>
-                              <div className="lg:col-span-3 min-w-0">
+                              <div className="min-w-0 lg:col-span-2 2xl:col-span-1">
                                 <p className="text-xs font-semibold text-[#6B7280] mb-3">AD DETAILS</p>
-                                <div className="space-y-2">
+                                <div className="grid grid-cols-1 gap-x-5 gap-y-2 md:grid-cols-2 2xl:grid-cols-1">
                                   {adDetails.map(({ label, value, bordered }) => (
-                                    <div key={label} className={`flex justify-between py-1 items-center gap-2 ${bordered ? 'pt-2 border-t border-[#E5E7EB]' : ''}`}>
-                                      <span className="text-xs text-[#6B7280] whitespace-nowrap">{label}</span>
-                                      <span className="text-xs font-semibold text-right whitespace-nowrap text-[#0F0F1A]">{value || '—'}</span>
+                                    <div key={label} className={`flex min-w-0 justify-between py-1 items-center gap-3 ${bordered ? 'pt-2 border-t border-[#E5E7EB]' : ''}`}>
+                                      <span className="text-xs text-[#6B7280] shrink-0">{label}</span>
+                                      <span className="min-w-0 break-words text-xs font-semibold text-right text-[#0F0F1A]">{value || '—'}</span>
                                     </div>
                                   ))}
                                 </div>
