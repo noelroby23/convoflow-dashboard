@@ -38,7 +38,7 @@ export default function DailyAISummaryModal() {
   const leads = Number(data?.total_leads ?? 0)
   const spend = Number(data?.total_spend ?? 0)
   const bookings = Number(data?.meetings_booked ?? 0)
-  const conversionRate = Number(data?.meeting_rate ?? 0)
+  const conversionRate = Math.round(Number(data?.meeting_rate ?? 0))
 
   const handleClose = () => {
     if (hideForToday) setHiddenForDate(today)
