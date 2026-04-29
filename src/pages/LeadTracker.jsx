@@ -128,11 +128,11 @@ function getTagText(tags) {
 
 function sortJourneyEvents(events) {
   return [...events].sort((a, b) => {
-    if (a.sortAt === null && b.sortAt === null) return b.fallbackOrder - a.fallbackOrder
-    if (a.sortAt === null) return -1
-    if (b.sortAt === null) return 1
-    if (a.sortAt !== b.sortAt) return b.sortAt - a.sortAt
-    return b.fallbackOrder - a.fallbackOrder
+    if (a.sortAt === null && b.sortAt === null) return a.fallbackOrder - b.fallbackOrder
+    if (a.sortAt === null) return 1
+    if (b.sortAt === null) return -1
+    if (a.sortAt !== b.sortAt) return a.sortAt - b.sortAt
+    return a.fallbackOrder - b.fallbackOrder
   })
 }
 
