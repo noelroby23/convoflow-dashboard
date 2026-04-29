@@ -125,25 +125,19 @@ export function useAdPerformance() {
       const ads = adsResult.data ?? []
       const adIds = ads.map(ad => ad.id).filter(Boolean)
 
-      const [performanceResult, dailyMetricsResult, leadTrackerResult] = await Promise.all([
+      const [performanceResult, dailyMetricsResult] = await Promise.all([
         supabase.from('ad_performance').select('*').eq('client_id', currentClientId),
         adIds.length
           ? supabase.from('ad_daily_metrics').select('*').in('ad_id', adIds).gte('date', dateRange.from).lte('date', dateRange.to)
           : Promise.resolve({ data: [], error: null }),
-        filterLeadTrackerByDubaiDate(
-          supabase.from('lead_tracker').select('*').eq('client_id', currentClientId),
-          dateRange.from,
-          dateRange.to
-        ).order('ghl_created_at', { ascending: false, nullsFirst: false }),
       ])
 
-      if (performanceResult.error || dailyMetricsResult.error || leadTrackerResult.error) {
-        return { data: null, error: performanceResult.error || dailyMetricsResult.error || leadTrackerResult.error }
+      if (performanceResult.error || dailyMetricsResult.error) {
+        return { data: null, error: performanceResult.error || dailyMetricsResult.error }
       }
 
       const performanceRows = performanceResult.data ?? []
       const dailyMetricRows = dailyMetricsResult.data ?? []
-      const leadRows = leadTrackerResult.data ?? []
 
       const adsById = new Map(ads.filter(ad => ad.id).map(ad => [String(ad.id), ad]))
       const adsByMetaAdId = new Map(ads.filter(ad => ad.meta_ad_id).map(ad => [String(ad.meta_ad_id), ad]))
@@ -170,50 +164,18 @@ export function useAdPerformance() {
         dailyMetricsByAdId.set(adId, current)
       }
 
-      const leadMetricsByAdName = new Map()
-      for (const row of leadRows) {
-        const adName = row.ad_name || row.source_ad
-        if (!adName) continue
-
-        const current = leadMetricsByAdName.get(adName) ?? {
-          total_leads: 0,
-          meetings_booked: 0,
-          showed_up: 0,
-          active_opportunities: 0,
-          closed_won: 0,
-          closed_revenue: 0,
-          pipeline_value: 0,
-        }
-
-        current.total_leads += 1
-        if (row.funnel_meeting_booked) current.meetings_booked += 1
-        if (row.funnel_showed_up) current.showed_up += 1
-        if (row.funnel_active_opp) current.active_opportunities += 1
-        if (row.funnel_closed_won) current.closed_won += 1
-        if (row.funnel_closed_won) current.closed_revenue += Number(row.deal_value ?? 0)
-        if (row.funnel_active_opp) current.pipeline_value += Number(row.deal_value ?? 0)
-
-        leadMetricsByAdName.set(adName, current)
-      }
-
       const merged = performanceRows.map(row => {
         const creative = adsByMetaAdId.get(String(row.meta_ad_id ?? '')) || adsById.get(String(row.ad_id ?? row.id ?? ''))
         const dailyMetrics = dailyMetricsByAdId.get(String(row.ad_id ?? row.id ?? ''))
-        const leadMetrics = leadMetricsByAdName.get(row.ad_name) ?? {
-          total_leads: 0,
-          meetings_booked: 0,
-          showed_up: 0,
-          active_opportunities: 0,
-          closed_won: 0,
-          closed_revenue: 0,
-          pipeline_value: 0,
-        }
 
         const totalSpend = Number(dailyMetrics?.total_spend ?? 0)
         const totalImpressions = Number(dailyMetrics?.total_impressions ?? 0)
         const totalClicks = Number(dailyMetrics?.total_clicks ?? 0)
-        const totalLeads = Number(leadMetrics.total_leads ?? 0)
-        const activeOpps = Number(leadMetrics.active_opportunities ?? 0)
+        const totalLeads = Number(row.total_leads ?? 0)
+        const meetingsBooked = Number(row.meetings_booked ?? 0)
+        const showedUp = Number(row.showed_up ?? 0)
+        const activeOpps = Number(row.active_opportunities ?? 0)
+        const closedWon = Number(row.closed_won ?? 0)
 
         return {
           ...row,
@@ -232,12 +194,12 @@ export function useAdPerformance() {
           avg_frequency: dailyMetrics?.frequencyCount ? dailyMetrics.frequencySum / dailyMetrics.frequencyCount : 0,
           avg_ctr: totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0,
           total_leads: totalLeads,
-          meetings_booked: Number(leadMetrics.meetings_booked ?? 0),
-          showed_up: Number(leadMetrics.showed_up ?? 0),
+          meetings_booked: meetingsBooked,
+          showed_up: showedUp,
           active_opportunities: activeOpps,
-          closed_won: Number(leadMetrics.closed_won ?? 0),
-          closed_revenue: Number(leadMetrics.closed_revenue ?? 0),
-          pipeline_value: Number(leadMetrics.pipeline_value ?? 0),
+          closed_won: closedWon,
+          closed_revenue: Number(row.closed_revenue ?? 0),
+          pipeline_value: Number(row.pipeline_value ?? 0),
           cost_per_lead: totalLeads > 0 ? totalSpend / totalLeads : null,
           cost_per_active: activeOpps > 0 ? totalSpend / activeOpps : null,
         }
