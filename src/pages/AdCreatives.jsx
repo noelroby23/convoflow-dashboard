@@ -76,6 +76,18 @@ function formatCurrency(value) {
   return `AED ${Number(value).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
 }
 
+function formatCurrencyWhole(value) {
+  const numeric = Number(value)
+  if (value == null || !Number.isFinite(numeric)) return '—'
+  return `AED ${numeric.toFixed(0)}`
+}
+
+function formatPercent(value, digits = 2) {
+  const numeric = Number(value)
+  if (value == null || !Number.isFinite(numeric)) return '—'
+  return `${numeric.toFixed(digits)}%`
+}
+
 function getAdViewUrl(ad) {
   if (ad.video_url) return ad.fb_post_url || ad.video_url
   if (ad.meta_ad_id) {
@@ -359,7 +371,8 @@ export default function AdCreatives() {
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-[#E5E7EB] shadow-sm overflow-hidden">
-          <table className="w-full text-sm">
+          <div style={{ overflowX: 'auto', width: '100%', WebkitOverflowScrolling: 'touch' }}>
+          <table className="w-full min-w-[1200px] text-sm">
             <thead className="bg-[#F3F4F6]">
               <tr>
                 {cols.map(({ key, label }) => (
@@ -379,14 +392,14 @@ export default function AdCreatives() {
                 const watchThrough = getWatchThroughValue(ad)
                 const isVideo = ad.creative_type === 'VIDEO'
                 const adDetails = [
-                  { label: 'Total Impressions', value: ad.total_impressions?.toLocaleString() || '—' },
-                  { label: 'Avg Frequency', value: ad.avg_frequency != null ? Number(ad.avg_frequency).toFixed(2) : '—' },
-                  { label: 'CTR', value: ad.avg_ctr != null ? `${formatDecimal(ad.avg_ctr)}%` : '—' },
-                  { label: 'Cost per Lead', value: ad.cost_per_lead ? `AED ${Number(ad.cost_per_lead).toLocaleString()}` : '—' },
-                  { label: 'Cost per Active', value: ad.cost_per_active ? `AED ${Number(ad.cost_per_active).toLocaleString()}` : '—' },
+                  { label: 'Total Impressions', value: formatWholeNumber(ad.total_impressions) },
+                  { label: 'Avg Frequency', value: formatDecimal(ad.avg_frequency) },
+                  { label: 'CTR', value: formatPercent(ad.avg_ctr) },
+                  { label: 'Cost per Lead', value: formatCurrencyWhole(ad.cost_per_lead) },
+                  { label: 'Cost per Active', value: formatCurrencyWhole(ad.cost_per_active) },
                   ...(isVideo ? [
-                    { label: 'Hook Rate', value: ad.hook_rate_pct != null ? `${ad.hook_rate_pct}%` : '—', bordered: true },
-                    { label: 'Watch-Through', value: ad.watch_through_pct != null ? `${ad.watch_through_pct}%` : '—' },
+                    { label: 'Hook Rate', value: formatPercent(hookRate, 1), bordered: true },
+                    { label: 'Watch-Through', value: formatPercent(watchThrough, 1) },
                   ] : []),
                 ]
                 const rowAccent = classification === 'action' ? 'border-l-2 border-l-red-400' :
@@ -440,14 +453,14 @@ export default function AdCreatives() {
                     {expandedId === ad.ad_id && (
                       <tr key={`${ad.ad_id}-expanded`} className="border-t border-[#F3F4F6] bg-[#FAFAFA]">
                         <td colSpan={14} className="px-6 py-4">
-                          <div className="flex w-full flex-col gap-4 overflow-hidden xl:flex-row xl:flex-wrap 2xl:flex-nowrap">
-                            <div className="w-full shrink-0 xl:w-[250px]">
+                          <div className="box-border grid w-full grid-cols-[240px_minmax(0,1fr)_280px] gap-4 overflow-hidden">
+                            <div className="min-w-0">
                               <ExpandedCreativePreview ad={ad} />
                             </div>
-                            <div className="min-w-0 flex-1 xl:max-w-[450px]">
+                            <div className="min-w-0 overflow-hidden">
                               <p className="text-xs font-semibold text-[#6B7280] mb-3">PERFORMANCE BREAKDOWN</p>
                               <div className="max-w-[380px]">
-                                <ResponsiveContainer width="100%" height={140}>
+                                <ResponsiveContainer width="100%" height={200}>
                                   <BarChart data={[
                                     { name: 'Leads', value: ad.total_leads ?? 0 },
                                     { name: 'Meetings', value: ad.meetings_booked ?? 0 },
@@ -466,7 +479,7 @@ export default function AdCreatives() {
                               {(ad.total_video_plays_3s ?? 0) > 0 && (
                                 <div className="mt-5 pt-4 border-t border-[#E5E7EB]">
                                   <p className="text-xs font-semibold text-[#6B7280] mb-3">VIDEO RETENTION FUNNEL</p>
-                                  <ResponsiveContainer width="100%" height={120}>
+                                  <ResponsiveContainer width="100%" height={200}>
                                     <BarChart data={[
                                       { name: '3-sec', value: ad.total_video_plays_3s ?? 0 },
                                       { name: '25%', value: ad.total_video_plays_25pct ?? 0 },
@@ -484,9 +497,9 @@ export default function AdCreatives() {
                                 </div>
                               )}
                             </div>
-                            <div className="min-w-0 shrink-0 xl:w-full 2xl:w-[280px] 2xl:basis-[280px]">
+                            <div className="min-w-0">
                               <p className="text-xs font-semibold text-[#6B7280] mb-3">AD DETAILS</p>
-                              <div className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-[13px] xl:max-w-[560px] 2xl:max-w-none">
+                              <div className="grid grid-cols-[auto_auto] justify-between gap-x-3 gap-y-1 text-[13px]">
                                 {adDetails.map(({ label, value, bordered }) => (
                                   <Fragment key={label}>
                                     {bordered && <div className="col-span-2 mt-1 border-t border-[#E5E7EB] pt-1" />}
@@ -505,6 +518,7 @@ export default function AdCreatives() {
               })}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </ErrorBoundary>
