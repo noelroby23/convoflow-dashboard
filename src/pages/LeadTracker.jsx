@@ -43,14 +43,20 @@ const STAGE_FILTERS = [
   { id: 'all', label: 'All Stages' },
   { id: 'new', label: 'New' },
   { id: 'follow_up', label: 'Follow Up' },
+  { id: 'wa_chatbot', label: 'WA - Chatbot' },
   { id: 'contacted', label: 'Contacted' },
+  { id: 'call_no_engagement', label: 'Call Connected - No Engagement' },
   { id: 'callback', label: 'Callback' },
+  { id: 'details_requested', label: 'Details Requested On Whatsapp (AI FAILED)' },
+  { id: 'interested_no_meeting', label: 'Interested no meeting' },
+  { id: 'human_requested', label: 'Human-Requested' },
   { id: 'qualified_no_meeting', label: 'Qualified No Meeting' },
   { id: 'meeting_booked', label: 'Meeting Booked' },
   { id: 'no_show', label: 'No Show' },
   { id: 'not_interested', label: 'Not Interested' },
   { id: 'disqualified', label: 'Disqualified' },
   { id: 'wrong_number', label: 'Wrong Number' },
+  { id: 'voicemail', label: 'Voicemail' },
   { id: 'showed', label: 'Showed Up' },
   { id: 'active', label: 'Active Opportunities' },
   { id: 'closed_won', label: 'Closed Won' },
@@ -99,7 +105,8 @@ function formatJourneyDate(value) {
   const parsed = parseTimestamp(value)
   if (!parsed || parsed.getFullYear() < 2025) return 'Date unavailable'
 
-  return parsed.toLocaleString([], {
+  return parsed.toLocaleString('en-GB', {
+    timeZone: 'Asia/Dubai',
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -469,14 +476,20 @@ function getStageCounts(data) {
     all: data.length,
     new: data.filter(c => c.current_stage === 'new').length,
     follow_up: data.filter(c => c.current_stage === 'follow_up').length,
+    wa_chatbot: data.filter(c => c.current_stage === 'wa_chatbot').length,
     contacted: data.filter(c => c.current_stage === 'contacted').length,
+    call_no_engagement: data.filter(c => c.current_stage === 'call_no_engagement').length,
     callback: data.filter(c => c.current_stage === 'callback').length,
+    details_requested: data.filter(c => c.current_stage === 'details_requested').length,
+    interested_no_meeting: data.filter(c => c.current_stage === 'interested_no_meeting').length,
+    human_requested: data.filter(c => c.current_stage === 'human_requested').length,
     qualified_no_meeting: data.filter(c => c.current_stage === 'qualified_no_meeting').length,
     meeting_booked: data.filter(c => c.current_stage === 'meeting_booked').length,
     no_show: data.filter(c => c.current_stage === 'no_show').length,
     not_interested: data.filter(c => c.current_stage === 'not_interested').length,
     disqualified: data.filter(c => c.current_stage === 'disqualified').length,
     wrong_number: data.filter(c => c.current_stage === 'wrong_number').length,
+    voicemail: data.filter(c => c.current_stage === 'voicemail').length,
     showed: data.filter(c => c.current_stage === 'showed').length,
     active: data.filter(c => c.current_stage === 'active').length,
     closed_won: data.filter(c => c.current_stage === 'closed_won').length,
@@ -795,7 +808,7 @@ export default function LeadTracker() {
                                 <div className="flex justify-between gap-3"><span className="text-[#6B7280]">Email</span><span className="text-right">{contact.email || '—'}</span></div>
                                 <div className="flex justify-between gap-3"><span className="text-[#6B7280]">Phone</span><span className="text-right">{contact.phone || '—'}</span></div>
                                 <div className="flex justify-between gap-3"><span className="text-[#6B7280]">Industry</span><span className="text-right">{contact.industry || '—'}</span></div>
-                                <div className="flex justify-between gap-3"><span className="text-[#6B7280]">Meeting Date</span><span className="text-right">{contact.meeting_date ? new Date(contact.meeting_date).toLocaleDateString() : '—'}</span></div>
+                                <div className="flex justify-between gap-3"><span className="text-[#6B7280]">Meeting Date</span><span className="text-right">{contact.meeting_date ? new Date(contact.meeting_date).toLocaleDateString('en-GB', { timeZone: 'Asia/Dubai' }) : '—'}</span></div>
                                 <div className="flex justify-between gap-3"><span className="text-[#6B7280]">Deal Value</span><span className="text-right font-medium">{contact.deal_value ? `AED ${Number(contact.deal_value).toLocaleString()}` : '—'}</span></div>
                                 <div className="flex justify-between gap-3"><span className="text-[#6B7280]">Pipeline</span><span className="text-right">{contact.ghl_pipeline_name || '—'}</span></div>
                                 <div className="flex justify-between gap-3"><span className="text-[#6B7280]">Lead Score</span><span className="text-right">{contact.lead_quality_score || '—'}</span></div>
