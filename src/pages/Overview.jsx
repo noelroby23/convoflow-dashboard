@@ -24,6 +24,18 @@ function formatLeadDate(lead) {
   return `${monthNames[Number(month) - 1]} ${Number(day)}, ${year}`
 }
 
+const ACTIVE_LEAD_STAGE_FILTERS = [
+  { id: 'all', label: 'All', color: 'text-[#6B7280] bg-white border-[#E5E7EB]' },
+  { id: 'follow_up', label: 'Follow Up', color: 'text-[#D97706] bg-amber-50 border-amber-200' },
+  { id: 'wa_chatbot', label: 'WA - Chatbot', color: 'text-[#2563EB] bg-blue-50 border-blue-200' },
+  { id: 'meeting_booked', label: 'Meeting Booked', color: 'text-[#16A34A] bg-green-50 border-green-200' },
+  { id: 'showed', label: 'Show', color: 'text-[#16A34A] bg-green-50 border-green-200' },
+  { id: 'no_show', label: 'No Show', color: 'text-[#F59E0B] bg-amber-50 border-amber-200' },
+  { id: 'not_interested', label: 'Not Interested', color: 'text-[#DC2626] bg-red-50 border-red-200' },
+  { id: 'disqualified', label: 'Disqualified', color: 'text-[#DC2626] bg-red-50 border-red-200' },
+  { id: 'wrong_number', label: 'Wrong Number', color: 'text-[#6B7280] bg-gray-50 border-gray-200' },
+]
+
 export default function Overview() {
   const navigate = useNavigate()
   const dateRange = useDashboard(s => s.dateRange)
@@ -33,6 +45,7 @@ export default function Overview() {
   const { data: activeLeads, loading: activeLeadsLoading, error: activeLeadsError } = useAllContacts()
   const { data: activePipeline, loading: pipelineLoading, error: pipelineError } = useContactDetails(['showed', 'active'])
   const [showAllLeads, setShowAllLeads] = useState(false)
+  const [activeLeadStageFilter, setActiveLeadStageFilter] = useState('all')
 
   useEffect(() => {
     setReportBuilder(() => homeReport(overview, activePipeline))
@@ -71,7 +84,23 @@ export default function Overview() {
       return getLeadDateValue(b).localeCompare(getLeadDateValue(a))
     })
   }, [activeLeads])
-  const visibleActiveLeads = showAllLeads ? sortedActiveLeads : sortedActiveLeads.slice(0, 10)
+  const activeLeadStageCounts = useMemo(() => {
+    return ACTIVE_LEAD_STAGE_FILTERS.reduce((counts, filter) => {
+      counts[filter.id] = filter.id === 'all'
+        ? sortedActiveLeads.length
+        : sortedActiveLeads.filter(lead => lead.current_stage === filter.id).length
+      return counts
+    }, {})
+  }, [sortedActiveLeads])
+  const filteredActiveLeads = useMemo(() => {
+    if (activeLeadStageFilter === 'all') return sortedActiveLeads
+    return sortedActiveLeads.filter(lead => lead.current_stage === activeLeadStageFilter)
+  }, [activeLeadStageFilter, sortedActiveLeads])
+  const visibleActiveLeads = showAllLeads ? filteredActiveLeads : filteredActiveLeads.slice(0, 10)
+  const handleActiveLeadStageFilter = (stageId) => {
+    setActiveLeadStageFilter(stageId)
+    setShowAllLeads(false)
+  }
   const openLeadTracker = (contactId) => {
     navigate(contactId ? `/lead-tracker?expand=${encodeURIComponent(contactId)}` : '/lead-tracker')
   }
@@ -144,9 +173,9 @@ export default function Overview() {
           <div className="flex items-center justify-between gap-4 mb-4">
             <div>
               <h2 className="text-sm font-bold text-[#0F0F1A] mb-1">Active Leads</h2>
-              <p className="text-xs text-[#6B7280]">{sortedActiveLeads.length} leads came in during this period</p>
+              <p className="text-xs text-[#6B7280]">{filteredActiveLeads.length} of {sortedActiveLeads.length} leads shown for this period</p>
             </div>
-            {sortedActiveLeads.length > 10 && (
+            {filteredActiveLeads.length > 10 && (
               <button
                 type="button"
                 onClick={() => setShowAllLeads(current => !current)}
@@ -157,12 +186,32 @@ export default function Overview() {
             )}
           </div>
 
+          {!activeLeadsLoading && !activeLeadsError && sortedActiveLeads.length > 0 && (
+            <div className="flex items-center gap-2 mb-4 flex-wrap">
+              {ACTIVE_LEAD_STAGE_FILTERS.map(filter => (
+                <button
+                  key={filter.id}
+                  type="button"
+                  onClick={() => handleActiveLeadStageFilter(filter.id)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${filter.color} ${activeLeadStageFilter === filter.id ? 'shadow-sm ring-2 ring-offset-1 ring-current opacity-100' : 'opacity-70 hover:opacity-100'}`}
+                >
+                  {filter.label}
+                  <span className="ml-0.5 bg-current bg-opacity-20 rounded-full px-1.5 py-0.5 text-[10px] font-bold">
+                    {activeLeadStageCounts[filter.id] ?? 0}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+
           {activeLeadsLoading ? (
             <div className="space-y-3">{[...Array(4)].map((_, i) => <div key={i} className="skeleton h-10 w-full" />)}</div>
           ) : activeLeadsError ? (
             <p className="text-sm text-[#B91C1C] text-center py-8">Failed to load active leads. Try refreshing.</p>
           ) : !sortedActiveLeads.length ? (
             <p className="text-sm text-[#9CA3AF] text-center py-8">No leads were created during this date range.</p>
+          ) : !filteredActiveLeads.length ? (
+            <p className="text-sm text-[#9CA3AF] text-center py-8">No leads match this stage filter.</p>
           ) : (
             <div className="overflow-x-auto">
               <div className={showAllLeads ? 'max-h-[540px] overflow-y-auto' : 'max-h-[460px] overflow-y-auto'}>
