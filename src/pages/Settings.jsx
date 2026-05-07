@@ -75,10 +75,21 @@ export default function Settings() {
   const [inviting, setInviting] = useState(false)
 
   useEffect(() => {
-    supabase
+    setLoadError(null)
+
+    if (!currentClientId) {
+      setTargets(defaultTargets)
+      return
+    }
+
+    setTargets(defaultTargets)
+
+    let query = supabase
       .from('targets')
       .select('metric_name, target_value')
-      .eq('client_id', currentClientId)
+
+    query = query.eq('client_id', currentClientId)
+    query
       .then(({ data, error }) => {
         if (error) {
           setLoadError(error.message)
@@ -97,10 +108,19 @@ export default function Settings() {
   }, [currentClientId])
 
   useEffect(() => {
-    supabase
+    if (!currentClientId) {
+      setTeamMembers([])
+      return
+    }
+
+    setTeamMembers([])
+
+    let query = supabase
       .from('team_members')
       .select('name, email, role')
-      .eq('client_id', currentClientId)
+
+    query = query.eq('client_id', currentClientId)
+    query
       .order('invited_at', { ascending: false })
       .then(({ data, error }) => {
         if (error) {
@@ -119,6 +139,11 @@ export default function Settings() {
   }, [currentClientId])
 
   const handleSave = async () => {
+    if (!currentClientId) {
+      setLoadError('Select a single market before saving target settings.')
+      return
+    }
+
     setSaving(true)
     setLoadError(null)
     const rows = TARGET_CONFIG.map(t => ({
@@ -142,6 +167,11 @@ export default function Settings() {
     if (!teamTableAvailable) return
 
     setInviteError(null)
+
+    if (!currentClientId) {
+      setInviteError('Select a single market before inviting team members.')
+      return
+    }
 
     if (!inviteName.trim() || !inviteEmail.trim()) {
       setInviteError('Name and email are required.')

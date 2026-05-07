@@ -4,6 +4,7 @@ import {
   TrendingUp, Target, Search, Settings, ChevronDown, LogOut
 } from 'lucide-react'
 import { useDashboard } from '../../store/dashboard'
+import { useClients } from '../../hooks/useDashboardData'
 
 const navItems = [
   { to: '/home', label: 'Home', icon: LayoutDashboard },
@@ -17,7 +18,21 @@ const navItems = [
 ]
 
 export default function Sidebar({ onLogout }) {
-  const { currentClientName } = useDashboard()
+  const { currentClientId, currentClientName, setClient } = useDashboard()
+  const { data: clients } = useClients()
+  const realClients = clients ?? []
+  const hasCurrentClient = currentClientId && realClients.some(client => client.client_id === currentClientId)
+  const clientOptions = [
+    { client_id: null, client_name: 'All Markets' },
+    ...(!currentClientId || hasCurrentClient ? [] : [{ client_id: currentClientId, client_name: currentClientName || 'Current Market' }]),
+    ...realClients,
+  ]
+
+  const handleClientChange = (event) => {
+    const nextClientId = event.target.value || null
+    const nextClient = clientOptions.find(client => (client.client_id ?? '') === (nextClientId ?? ''))
+    setClient(nextClient?.client_id ?? null, nextClient?.client_name ?? 'All Markets')
+  }
 
   return (
     <div className="fixed left-0 top-0 h-full w-[220px] bg-white border-r border-[#E5E7EB] flex flex-col z-40">
@@ -28,10 +43,20 @@ export default function Sidebar({ onLogout }) {
 
       {/* Client selector */}
       <div className="px-3 py-3 border-b border-[#E5E7EB]">
-        <button className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-[#F3F4F6] hover:bg-[#E5E7EB] transition-colors">
-          <span className="text-xs font-semibold text-[#333333] truncate">{currentClientName}</span>
-          <ChevronDown size={13} className="text-[#6B7280] flex-shrink-0" />
-        </button>
+        <div className="relative">
+          <select
+            value={currentClientId ?? ''}
+            onChange={handleClientChange}
+            className="w-full appearance-none rounded-lg bg-[#F3F4F6] px-3 py-2 pr-8 text-xs font-semibold text-[#333333] outline-none transition-colors hover:bg-[#E5E7EB] focus:ring-2 focus:ring-pink-100"
+          >
+            {clientOptions.map(client => (
+              <option key={client.client_id ?? 'all-markets'} value={client.client_id ?? ''}>
+                {client.client_name}
+              </option>
+            ))}
+          </select>
+          <ChevronDown size={13} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7280]" />
+        </div>
       </div>
 
       {/* Nav */}

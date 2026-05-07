@@ -81,6 +81,8 @@ const mockFallbackSalesReps = USE_MOCK ? mockSalesReps.map(rep => ({
   no_shows: rep.noShows, closes: rep.closes, revenue_closed: null,
 })) : null
 
+const filterByClient = (query, clientId) => clientId ? query.eq('client_id', clientId) : query
+
 export function useClients() {
   return useSupabaseQuery(
     () => supabase.from('funnel_summary').select('client_id, client_name'),
@@ -119,14 +121,14 @@ export function useAdPerformance() {
   const { currentClientId, dateRange, refreshKey } = useDashboard()
   return useSupabaseQuery(
     async () => {
-      const adsResult = await supabase.from('ads').select('*').eq('client_id', currentClientId)
+      const adsResult = await filterByClient(supabase.from('ads').select('*'), currentClientId)
       if (adsResult.error) return { data: null, error: adsResult.error }
 
       const ads = adsResult.data ?? []
       const adIds = ads.map(ad => ad.id).filter(Boolean)
 
       const [performanceResult, dailyMetricsResult] = await Promise.all([
-        supabase.from('ad_performance').select('*').eq('client_id', currentClientId),
+        filterByClient(supabase.from('ad_performance').select('*'), currentClientId),
         adIds.length
           ? supabase.from('ad_daily_metrics').select('*').in('ad_id', adIds).gte('date', dateRange.from).lte('date', dateRange.to)
           : Promise.resolve({ data: [], error: null }),
@@ -225,7 +227,7 @@ export function useContactDetails(stageFilter = null) {
   return useSupabaseQuery(
     async () => {
       const { data, error } = await filterLeadTrackerByDubaiDate(
-        supabase.from('lead_tracker').select('*').eq('client_id', currentClientId),
+        filterByClient(supabase.from('lead_tracker').select('*'), currentClientId),
         dateRange.from,
         dateRange.to
       ).order('ghl_created_at', { ascending: false, nullsFirst: false })
@@ -249,7 +251,7 @@ export function useAllContacts() {
   return useSupabaseQuery(
     async () => {
       const { data, error } = await filterLeadTrackerByDubaiDate(
-        supabase.from('lead_tracker').select('*').eq('client_id', currentClientId),
+        filterByClient(supabase.from('lead_tracker').select('*'), currentClientId),
         dateRange.from,
         dateRange.to
       ).order('ghl_created_at', { ascending: false, nullsFirst: false })
@@ -270,7 +272,7 @@ export function useLeadTrackerContacts() {
   return useSupabaseQuery(
     async () => {
       const { data, error } = await filterLeadTrackerByDubaiDate(
-        supabase.from('lead_tracker').select('*').eq('client_id', currentClientId),
+        filterByClient(supabase.from('lead_tracker').select('*'), currentClientId),
         dateRange.from,
         dateRange.to
       ).order('ghl_created_at', { ascending: false, nullsFirst: false })
@@ -297,7 +299,7 @@ export function useSarahStages() {
           p_client_id: currentClientId,
         }),
         filterLeadTrackerByDubaiDate(
-          supabase.from('lead_tracker').select('contact_id').eq('client_id', currentClientId),
+          filterByClient(supabase.from('lead_tracker').select('contact_id'), currentClientId),
           dateRange.from,
           dateRange.to
         ),
@@ -341,8 +343,7 @@ export function useSarahStages() {
 export function useDailyMetrics() {
   const { currentClientId, dateRange, refreshKey } = useDashboard()
   return useSupabaseQuery(
-    () => supabase.from('daily_metrics').select('*')
-      .eq('client_id', currentClientId)
+    () => filterByClient(supabase.from('daily_metrics').select('*'), currentClientId)
       .gte('date', dateRange.from).lte('date', dateRange.to)
       .order('date', { ascending: true }),
     [currentClientId, dateRange.from, dateRange.to, refreshKey], mockFallbackDailyMetrics
@@ -353,12 +354,11 @@ export function useTrendMetricsByDate() {
   const { currentClientId, dateRange, refreshKey } = useDashboard()
   return useSupabaseQuery(
     async () => {
-      if (!dateRange.from || !dateRange.to || !currentClientId) {
+      if (!dateRange.from || !dateRange.to) {
         return { data: [], error: null }
       }
 
-      const { data, error } = await supabase.from('daily_metrics').select('*')
-        .eq('client_id', currentClientId)
+      const { data, error } = await filterByClient(supabase.from('daily_metrics').select('*'), currentClientId)
         .gte('date', dateRange.from).lte('date', dateRange.to)
         .order('date', { ascending: true })
 
@@ -374,7 +374,7 @@ export function useSalesRepPerformance() {
   return useSupabaseQuery(
     async () => {
       const { data, error } = await filterLeadTrackerByDubaiDate(
-        supabase.from('lead_tracker').select('*').eq('client_id', currentClientId),
+        filterByClient(supabase.from('lead_tracker').select('*'), currentClientId),
         dateRange.from,
         dateRange.to
       )
@@ -417,7 +417,7 @@ export function useTargets() {
   const { currentClientId, refreshKey } = useDashboard()
   return useSupabaseQuery(
     async () => {
-      const { data, error } = await supabase.from('targets').select('metric_name, target_value').eq('client_id', currentClientId)
+      const { data, error } = await filterByClient(supabase.from('targets').select('metric_name, target_value'), currentClientId)
       if (error) return { data: null, error }
       const pivot = {}
       for (const row of data || []) { pivot[row.metric_name] = Number(row.target_value) }
