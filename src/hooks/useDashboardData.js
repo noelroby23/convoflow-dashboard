@@ -121,58 +121,18 @@ export function useAdPerformance() {
   const { currentClientId, dateRange, refreshKey } = useDashboard()
   return useSupabaseQuery(
     async () => {
-      const adsResult = await filterByClient(supabase.from('ads').select('*'), currentClientId)
-      if (adsResult.error) return { data: null, error: adsResult.error }
+      const { data, error } = await supabase.rpc('ad_performance_by_date', {
+        start_date: dateRange.from,
+        end_date: dateRange.to,
+        p_client_id: currentClientId,
+      })
 
-      const ads = adsResult.data ?? []
-      const adIds = ads.map(ad => ad.id).filter(Boolean)
+      if (error) return { data: null, error }
 
-      const [performanceResult, dailyMetricsResult] = await Promise.all([
-        filterByClient(supabase.from('ad_performance').select('*'), currentClientId),
-        adIds.length
-          ? supabase.from('ad_daily_metrics').select('*').in('ad_id', adIds).gte('date', dateRange.from).lte('date', dateRange.to)
-          : Promise.resolve({ data: [], error: null }),
-      ])
-
-      if (performanceResult.error || dailyMetricsResult.error) {
-        return { data: null, error: performanceResult.error || dailyMetricsResult.error }
-      }
-
-      const performanceRows = performanceResult.data ?? []
-      const dailyMetricRows = dailyMetricsResult.data ?? []
-
-      const adsById = new Map(ads.filter(ad => ad.id).map(ad => [String(ad.id), ad]))
-      const adsByMetaAdId = new Map(ads.filter(ad => ad.meta_ad_id).map(ad => [String(ad.meta_ad_id), ad]))
-
-      const dailyMetricsByAdId = new Map()
-      for (const row of dailyMetricRows) {
-        const adId = String(row.ad_id)
-        const current = dailyMetricsByAdId.get(adId) ?? {
-          total_spend: 0,
-          total_impressions: 0,
-          total_clicks: 0,
-          frequencySum: 0,
-          frequencyCount: 0,
-        }
-
-        current.total_spend += Number(row.spend ?? 0)
-        current.total_impressions += Number(row.impressions ?? 0)
-        current.total_clicks += Number(row.clicks ?? 0)
-        if (row.frequency != null) {
-          current.frequencySum += Number(row.frequency)
-          current.frequencyCount += 1
-        }
-
-        dailyMetricsByAdId.set(adId, current)
-      }
-
-      const merged = performanceRows.map(row => {
-        const creative = adsByMetaAdId.get(String(row.meta_ad_id ?? '')) || adsById.get(String(row.ad_id ?? row.id ?? ''))
-        const dailyMetrics = dailyMetricsByAdId.get(String(row.ad_id ?? row.id ?? ''))
-
-        const totalSpend = Number(dailyMetrics?.total_spend ?? 0)
-        const totalImpressions = Number(dailyMetrics?.total_impressions ?? 0)
-        const totalClicks = Number(dailyMetrics?.total_clicks ?? 0)
+      const normalized = (data ?? []).map(row => {
+        const totalSpend = Number(row.total_spend ?? 0)
+        const totalImpressions = Number(row.total_impressions ?? 0)
+        const totalClicks = Number(row.total_clicks ?? 0)
         const totalLeads = Number(row.total_leads ?? 0)
         const meetingsBooked = Number(row.meetings_booked ?? 0)
         const showedUp = Number(row.showed_up ?? 0)
@@ -181,20 +141,11 @@ export function useAdPerformance() {
 
         return {
           ...row,
-          ad_name: row.ad_name ?? creative?.ad_name ?? null,
-          status: row.status ?? creative?.status ?? null,
-          campaign_name: row.campaign_name ?? creative?.campaign_name ?? null,
-          meta_ad_id: row.meta_ad_id ?? creative?.meta_ad_id ?? null,
-          creative_url: row.creative_url ?? creative?.creative_url ?? null,
-          creative_type: row.creative_type ?? creative?.creative_type ?? null,
-          video_url: row.video_url ?? creative?.video_url ?? null,
-          effective_object_story_id: row.effective_object_story_id ?? creative?.effective_object_story_id ?? null,
-          fb_post_url: row.fb_post_url ?? creative?.fb_post_url ?? null,
           total_spend: totalSpend,
           total_impressions: totalImpressions,
           total_clicks: totalClicks,
-          avg_frequency: dailyMetrics?.frequencyCount ? dailyMetrics.frequencySum / dailyMetrics.frequencyCount : 0,
-          avg_ctr: totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0,
+          avg_frequency: Number(row.avg_frequency ?? 0),
+          avg_ctr: Number(row.avg_ctr ?? 0),
           total_leads: totalLeads,
           meetings_booked: meetingsBooked,
           showed_up: showedUp,
@@ -202,8 +153,8 @@ export function useAdPerformance() {
           closed_won: closedWon,
           closed_revenue: Number(row.closed_revenue ?? 0),
           pipeline_value: Number(row.pipeline_value ?? 0),
-          cost_per_lead: totalLeads > 0 ? totalSpend / totalLeads : null,
-          cost_per_active: activeOpps > 0 ? totalSpend / activeOpps : null,
+          cost_per_lead: row.cost_per_lead == null ? null : Number(row.cost_per_lead),
+          cost_per_active: row.cost_per_active == null ? null : Number(row.cost_per_active),
         }
       }).filter(row => (
         Number(row.total_spend ?? 0) > 0 ||
@@ -216,7 +167,7 @@ export function useAdPerformance() {
         Number(row.closed_won ?? 0) > 0
       ))
 
-      return { data: merged, error: null }
+      return { data: normalized, error: null }
     },
     [currentClientId, dateRange.from, dateRange.to, refreshKey], mockFallbackAds
   )
