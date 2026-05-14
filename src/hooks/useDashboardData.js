@@ -81,6 +81,19 @@ const mockFallbackSalesReps = USE_MOCK ? mockSalesReps.map(rep => ({
   no_shows: rep.noShows, closes: rep.closes, revenue_closed: null,
 })) : null
 
+const mockFallbackSalesPerformance = USE_MOCK ? {
+  totals: {
+    meetings_scheduled: mockFallbackSalesReps.reduce((sum, rep) => sum + Number(rep.meetings_scheduled ?? 0), 0),
+    shows: mockFallbackSalesReps.reduce((sum, rep) => sum + Number(rep.shows ?? 0), 0),
+    no_shows: mockFallbackSalesReps.reduce((sum, rep) => sum + Number(rep.no_shows ?? 0), 0),
+    closes: mockFallbackSalesReps.reduce((sum, rep) => sum + Number(rep.closes ?? 0), 0),
+    disqualified: 0,
+    lost_not_interested: 0,
+    revenue_closed: mockFallbackSalesReps.reduce((sum, rep) => sum + Number(rep.revenue_closed ?? 0), 0),
+  },
+  per_rep: mockFallbackSalesReps,
+} : null
+
 const filterByClient = (query, clientId) => clientId ? query.eq('client_id', clientId) : query
 
 export function useClients() {
@@ -320,47 +333,44 @@ export function useTrendMetricsByDate() {
   )
 }
 
-export function useSalesRepPerformance() {
+export function useSalesPerformance() {
   const { currentClientId, dateRange, refreshKey } = useDashboard()
   return useSupabaseQuery(
     async () => {
-      const { data, error } = await filterLeadTrackerByDubaiDate(
-        filterByClient(supabase.from('lead_tracker').select('*'), currentClientId),
-        dateRange.from,
-        dateRange.to
-      )
-
+      const { data, error } = await supabase.rpc('sales_performance_by_date', {
+        start_date: dateRange.from,
+        end_date: dateRange.to,
+        p_client_id: currentClientId,
+      })
       if (error) return { data: null, error }
 
-      const rows = data ?? []
-      const reps = new Map()
+      const totals = data?.totals ?? {}
+      const perRep = Array.isArray(data?.per_rep) ? data.per_rep : []
 
-      for (const row of rows) {
-        const repName = row.assigned_to_name || row.assigned_to || 'Unassigned'
-        const rep = reps.get(repName) ?? {
-          client_id: currentClientId,
-          sales_rep: repName,
-          meetings_scheduled: 0,
-          shows: 0,
-          no_shows: 0,
-          closes: 0,
-          revenue_closed: 0,
-        }
-
-        if (row.funnel_meeting_booked) rep.meetings_scheduled += 1
-        if (row.funnel_showed_up) rep.shows += 1
-        if (row.funnel_no_show) rep.no_shows += 1
-        if (row.funnel_closed_won) {
-          rep.closes += 1
-          rep.revenue_closed += Number(row.deal_value ?? 0)
-        }
-
-        reps.set(repName, rep)
+      return {
+        data: {
+          totals: {
+            meetings_scheduled: Number(totals.meetings_scheduled ?? 0),
+            shows: Number(totals.shows ?? 0),
+            no_shows: Number(totals.no_shows ?? 0),
+            closes: Number(totals.closes ?? 0),
+            disqualified: Number(totals.disqualified ?? 0),
+            lost_not_interested: Number(totals.lost_not_interested ?? 0),
+            revenue_closed: Number(totals.revenue_closed ?? 0),
+          },
+          per_rep: perRep.map(rep => ({
+            ...rep,
+            meetings_scheduled: Number(rep.meetings_scheduled ?? 0),
+            shows: Number(rep.shows ?? 0),
+            no_shows: Number(rep.no_shows ?? 0),
+            closes: Number(rep.closes ?? 0),
+            revenue_closed: Number(rep.revenue_closed ?? 0),
+          })),
+        },
+        error: null,
       }
-
-      return { data: [...reps.values()].filter(rep => rep.meetings_scheduled || rep.shows || rep.no_shows || rep.closes), error: null }
     },
-    [currentClientId, dateRange.from, dateRange.to, refreshKey], mockFallbackSalesReps
+    [currentClientId, dateRange.from, dateRange.to, refreshKey], mockFallbackSalesPerformance
   )
 }
 

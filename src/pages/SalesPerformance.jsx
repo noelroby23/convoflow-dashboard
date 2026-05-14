@@ -1,35 +1,39 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import KPICard from '../components/ui/KPICard'
 import Tabs from '../components/ui/Tabs'
 import ErrorBoundary from '../components/ui/ErrorBoundary'
 import AISummary from '../components/ui/AISummary'
-import { useSalesRepPerformance, useTargets } from '../hooks/useDashboardData'
-import { useDashboardOverview } from '../hooks/useDashboardOverview'
+import { useSalesPerformance, useTargets } from '../hooks/useDashboardData'
 import { useDashboard } from '../store/dashboard'
 import { salesReport } from '../lib/reports/generators'
 
 export default function SalesPerformance() {
   const [activeTab, setActiveTab] = useState('overview')
-  const { data: salesReps, loading: repsLoading, error: repsError } = useSalesRepPerformance()
-  const dateRange = useDashboard(s => s.dateRange)
-  const { data: overview, loading: overviewLoading, error: overviewError } = useDashboardOverview(dateRange.from, dateRange.to)
+  const { data: salesPerformance, loading: salesLoading, error: salesError } = useSalesPerformance()
   const { data: targets } = useTargets()
   const setReportBuilder = useDashboard(s => s.setReportBuilder)
 
+  const totals = salesPerformance?.totals ?? {}
+  const salesReps = salesPerformance?.per_rep ?? []
+  const totalMeetings = Number(totals.meetings_scheduled ?? 0)
+  const totalShows = Number(totals.shows ?? 0)
+  const totalNoShows = Number(totals.no_shows ?? 0)
+  const totalCloses = Number(totals.closes ?? 0)
+  const totalDisqualified = Number(totals.disqualified ?? 0)
+  const totalLostNotInterested = Number(totals.lost_not_interested ?? 0)
+  const salesOverview = useMemo(() => ({
+    meetings_booked: totalMeetings,
+    showed_up: totalShows,
+    no_shows: totalNoShows,
+    closed_won: totalCloses,
+  }), [totalCloses, totalMeetings, totalNoShows, totalShows])
+
   useEffect(() => {
-    setReportBuilder(() => salesReport(overview, salesReps))
+    setReportBuilder(() => salesReport(salesOverview, salesReps))
     return () => setReportBuilder(null)
-  }, [overview, salesReps, setReportBuilder])
+  }, [salesOverview, salesReps, setReportBuilder])
 
-  const loading = repsLoading || overviewLoading
-
-  const totalMeetings = (salesReps ?? []).reduce((sum, rep) => sum + Number(rep.meetings_scheduled ?? 0), 0)
-  const totalShows = (salesReps ?? []).reduce((sum, rep) => sum + Number(rep.shows ?? 0), 0)
-  const totalNoShows = (salesReps ?? []).reduce((sum, rep) => sum + Number(rep.no_shows ?? 0), 0)
-  const totalCloses = (salesReps ?? []).reduce((sum, rep) => sum + Number(rep.closes ?? 0), 0)
-  const totalDisqualified = Number(overview?.disqualified ?? 0)
-  const totalLost = Number(overview?.closed_lost ?? 0)
-  const totalNotInterested = Number(overview?.not_interested ?? 0)
+  const loading = salesLoading
   const meetingsTarget = targets?.monthly_meetings ?? 30
   const showsTarget = 23
   const closeRateTarget = 20
@@ -53,20 +57,20 @@ export default function SalesPerformance() {
           {/* Row 1 — Meetings */}
           <ErrorBoundary>
             <div className="grid grid-cols-4 gap-3 mb-3">
-              <KPICard label="Meetings Scheduled" value={totalMeetings} loading={overviewLoading} description="Total meetings booked this period" target={meetingsTarget} />
-              <KPICard label="Shows" value={totalShows} loading={overviewLoading} description="People who attended their meeting" target={showsTarget} />
-              <KPICard label="No-Shows" value={totalNoShows} loading={overviewLoading} inverse={true} description="People who missed their meeting" />
-              <KPICard label="Closes" value={totalCloses} loading={overviewLoading} description="New customers signed" target={2} />
+              <KPICard label="Meetings Scheduled" value={totalMeetings} loading={salesLoading} description="Total meetings booked this period" target={meetingsTarget} />
+              <KPICard label="Shows" value={totalShows} loading={salesLoading} description="People who attended their meeting" target={showsTarget} />
+              <KPICard label="No-Shows" value={totalNoShows} loading={salesLoading} inverse={true} description="People who missed their meeting" />
+              <KPICard label="Closes" value={totalCloses} loading={salesLoading} description="New customers signed" target={2} />
             </div>
           </ErrorBoundary>
 
           {/* Row 2 — Lead outcomes */}
           <ErrorBoundary>
             <div className="grid grid-cols-4 gap-3 mb-6">
-              <KPICard label="Show Rate" value={showRate} suffix="%" loading={overviewLoading} description="% of booked meetings that showed up" target={75} />
-              <KPICard label="Close Rate" value={closeRate} suffix="%" loading={overviewLoading} description="% of showed meetings that closed" target={closeRateTarget} />
-              <KPICard label="Disqualified" value={totalDisqualified} loading={overviewLoading} inverse={true} description="Leads disqualified by AI or sales team" />
-              <KPICard label="Lost / Not Interested" value={totalLost + totalNotInterested} loading={overviewLoading} inverse={true} description="Leads lost or marked not interested" />
+              <KPICard label="Show Rate" value={showRate} suffix="%" loading={salesLoading} description="% of booked meetings that showed up" target={75} />
+              <KPICard label="Close Rate" value={closeRate} suffix="%" loading={salesLoading} description="% of showed meetings that closed" target={closeRateTarget} />
+              <KPICard label="Disqualified" value={totalDisqualified} loading={salesLoading} inverse={true} description="Leads disqualified by AI or sales team" />
+              <KPICard label="Lost / Not Interested" value={totalLostNotInterested} loading={salesLoading} inverse={true} description="Leads lost or marked not interested" />
             </div>
           </ErrorBoundary>
 
@@ -74,9 +78,9 @@ export default function SalesPerformance() {
           <ErrorBoundary>
             <div className="bg-white rounded-xl border border-[#E5E7EB] p-6 shadow-sm mb-6">
               <h2 className="text-sm font-bold text-[#0F0F1A] mb-4">Per-Salesperson Performance</h2>
-              {repsLoading ? (
+              {salesLoading ? (
                 <div className="space-y-3">{[...Array(3)].map((_, i) => <div key={i} className="skeleton h-10 w-full" />)}</div>
-              ) : repsError ? (
+              ) : salesError ? (
                 <p className="text-sm text-[#B91C1C] text-center py-8">Failed to load sales rep data. Try refreshing.</p>
               ) : !salesReps?.length ? (
                 <p className="text-sm text-[#9CA3AF] text-center py-8">No sales rep data for this period.</p>
@@ -114,7 +118,7 @@ export default function SalesPerformance() {
             </div>
           </ErrorBoundary>
 
-          {overviewError && !overviewLoading && (
+          {salesError && !salesLoading && (
             <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-[#B91C1C]">
               Failed to load sales KPIs. Try refreshing.
             </div>
@@ -124,7 +128,7 @@ export default function SalesPerformance() {
             `The sales team handled ${totalMeetings} meetings this period with ${totalShows} shows and ${totalNoShows} no-shows. ` +
             `Show rate is ${showRate}% — ${showRate >= 75 ? 'on target.' : 'below the 75% target. Consider adding pre-meeting WhatsApp reminders.'} ` +
             `The team closed ${totalCloses} deal${totalCloses !== 1 ? 's' : ''} this period (${closeRate}% close rate). ` +
-            `${totalDisqualified} leads were disqualified and ${totalLost + totalNotInterested} were lost or not interested. ` +
+            `${totalDisqualified} leads were disqualified and ${totalLostNotInterested} were lost or not interested. ` +
             `${totalNoShows > 3 ? `No-shows are elevated at ${totalNoShows} — review follow-up sequences after booking.` : 'No-show volume is manageable.'}`
           } />
         </>
