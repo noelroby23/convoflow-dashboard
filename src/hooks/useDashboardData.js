@@ -63,13 +63,6 @@ const mockFallbackSarahStages = USE_MOCK ? {
   funnelConversations: 0,
 } : null
 
-const mockFallbackPipelineState = USE_MOCK ? [
-  { pipeline_id: 'mock-mainflow', pipeline_name: 'mainFlow UAE', pipeline_stage_id: 'mock-follow-up', stage_name: 'Follow Up Pending', stage_position: 1, client_id: 'mock', opp_count: 12, unique_contact_count: 12 },
-  { pipeline_id: 'mock-mainflow', pipeline_name: 'mainFlow UAE', pipeline_stage_id: 'mock-meeting-booked', stage_name: 'Meeting Booked', stage_position: 8, client_id: 'mock', opp_count: 5, unique_contact_count: 5 },
-  { pipeline_id: 'mock-mainflow', pipeline_name: 'mainFlow UAE', pipeline_stage_id: 'mock-meeting-attended', stage_name: 'Meeting Attended', stage_position: 9, client_id: 'mock', opp_count: 2, unique_contact_count: 2 },
-  { pipeline_id: 'mock-post-meeting', pipeline_name: 'Post Meeting Sales UAE', pipeline_stage_id: 'mock-audit-call', stage_name: 'Audit Call Done', stage_position: 1, client_id: 'mock', opp_count: 2, unique_contact_count: 2 },
-] : null
-
 const filterLeadTrackerByDubaiDate = (query, from, to) => query.gte('dubai_date', from).lte('dubai_date', to)
 
 const getDubaiToday = () => {
@@ -238,31 +231,12 @@ export function useAllContacts() {
   )
 }
 
-export function useLeadTrackerContacts({ pipelineId = null, pipelineStageId = null } = {}) {
+export function useLeadTrackerContacts() {
   const { currentClientId, dateRange, refreshKey } = useDashboard()
-  const hasPipelineStageFilter = Boolean(pipelineId && pipelineStageId)
-
   return useSupabaseQuery(
     async () => {
-      let query = filterByClient(supabase.from('lead_tracker').select('*'), currentClientId)
-
-      if (hasPipelineStageFilter) {
-        const opportunitiesResult = await supabase
-          .from('ghl_opportunities')
-          .select('contact_id')
-          .eq('pipeline_id', pipelineId)
-          .eq('pipeline_stage_id', pipelineStageId)
-
-        if (opportunitiesResult.error) return { data: null, error: opportunitiesResult.error }
-
-        const contactIds = [...new Set((opportunitiesResult.data ?? []).map(row => row.contact_id).filter(Boolean))]
-        if (!contactIds.length) return { data: [], error: null }
-
-        query = query.in('contact_id', contactIds)
-      }
-
       const { data, error } = await filterLeadTrackerByDubaiDate(
-        query,
+        filterByClient(supabase.from('lead_tracker').select('*'), currentClientId),
         dateRange.from,
         dateRange.to
       ).order('ghl_created_at', { ascending: false, nullsFirst: false })
@@ -273,35 +247,7 @@ export function useLeadTrackerContacts({ pipelineId = null, pipelineStageId = nu
         error: null,
       }
     },
-    [currentClientId, dateRange.from, dateRange.to, pipelineId, pipelineStageId, refreshKey], mockFallbackLeadTracker
-  )
-}
-
-export function usePipelineState() {
-  const { currentClientId, dateRange, refreshKey } = useDashboard()
-
-  return useSupabaseQuery(
-    async () => {
-      const { data, error } = await supabase.rpc('dashboard_pipeline_state', {
-        p_start_date: dateRange.from || '2026-05-03',
-        p_end_date: dateRange.to || null,
-        p_client_id: currentClientId,
-      })
-
-      if (error) return { data: null, error }
-
-      return {
-        data: (data ?? []).map(row => ({
-          ...row,
-          stage_position: Number(row.stage_position ?? 999),
-          opp_count: Number(row.opp_count ?? 0),
-          unique_contact_count: Number(row.unique_contact_count ?? 0),
-        })),
-        error: null,
-      }
-    },
-    [currentClientId, dateRange.from, dateRange.to, refreshKey],
-    mockFallbackPipelineState
+    [currentClientId, dateRange.from, dateRange.to, refreshKey], mockFallbackLeadTracker
   )
 }
 

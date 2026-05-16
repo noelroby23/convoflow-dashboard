@@ -498,14 +498,9 @@ function getStageCounts(data) {
 }
 
 export default function LeadTracker() {
+  const { data: contacts, loading, error } = useLeadTrackerContacts()
   const [searchParams, setSearchParams] = useSearchParams()
-  const pipelineFromUrl = searchParams.get('pipeline')
   const stageFromUrl = searchParams.get('stage')
-  const hasPipelineStageFilter = Boolean(pipelineFromUrl && stageFromUrl)
-  const { data: contacts, loading, error } = useLeadTrackerContacts({
-    pipelineId: pipelineFromUrl,
-    pipelineStageId: hasPipelineStageFilter ? stageFromUrl : null,
-  })
   const expandFromUrl = searchParams.get('expand')
   const setReportBuilder = useDashboard(s => s.setReportBuilder)
   const [expandedId, setExpandedId] = useState(null)
@@ -521,18 +516,13 @@ export default function LeadTracker() {
   }, [contacts, setReportBuilder])
 
   useEffect(() => {
-    if (hasPipelineStageFilter) {
-      setStageFilter('all')
-      return
-    }
-
     if (stageFromUrl && KNOWN_STAGE_VALUES.has(stageFromUrl)) {
       setStageFilter(stageFromUrl)
       return
     }
 
     setStageFilter('all')
-  }, [hasPipelineStageFilter, stageFromUrl])
+  }, [stageFromUrl])
 
   useEffect(() => {
     const expandedContact = contacts?.find(contact => String(contact.contact_id) === expandFromUrl)
