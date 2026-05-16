@@ -282,9 +282,12 @@ export function healthReport(data, healthScore, healthStatus, targets = {}) {
 // ─── Lead Tracker ────────────────────────────────────────────────────────────
 export function leadsReport(contacts) {
   const total = contacts?.length ?? 0
-  const active = contacts?.filter(c => ['active', 'proposal_sent', 'follow_up_meeting', 'meeting_booked'].includes(c.current_stage)).length ?? 0
-  const closed = contacts?.filter(c => c.current_stage === 'closed_won').length ?? 0
-  const dq = contacts?.filter(c => c.current_stage === 'disqualified').length ?? 0
+  const hasStage = (contact, stage) => Array.isArray(contact.stage_filter_values)
+    ? contact.stage_filter_values.includes(stage)
+    : contact.current_stage === stage
+  const active = contacts?.filter(c => ['active', 'proposal_sent', 'follow_up_meeting', 'meeting_booked'].some(stage => hasStage(c, stage))).length ?? 0
+  const closed = contacts?.filter(c => hasStage(c, 'closed_won')).length ?? 0
+  const dq = contacts?.filter(c => hasStage(c, 'disqualified')).length ?? 0
   const hot = contacts?.filter(c => (c.lead_quality_score ?? 0) >= 7).length ?? 0
   const dqRate = total > 0 ? +((dq / total) * 100).toFixed(0) : 0
 

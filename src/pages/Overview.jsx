@@ -36,6 +36,12 @@ const ACTIVE_LEAD_STAGE_FILTERS = [
   { id: 'wrong_number', label: 'Wrong Number', color: 'text-[#6B7280] bg-gray-50 border-gray-200' },
 ]
 
+function matchesMappedStage(lead, stage) {
+  return Array.isArray(lead?.stage_filter_values)
+    ? lead.stage_filter_values.includes(stage)
+    : lead?.current_stage === stage
+}
+
 export default function Overview() {
   const navigate = useNavigate()
   const dateRange = useDashboard(s => s.dateRange)
@@ -88,13 +94,13 @@ export default function Overview() {
     return ACTIVE_LEAD_STAGE_FILTERS.reduce((counts, filter) => {
       counts[filter.id] = filter.id === 'all'
         ? sortedActiveLeads.length
-        : sortedActiveLeads.filter(lead => lead.current_stage === filter.id).length
+        : sortedActiveLeads.filter(lead => matchesMappedStage(lead, filter.id)).length
       return counts
     }, {})
   }, [sortedActiveLeads])
   const filteredActiveLeads = useMemo(() => {
     if (activeLeadStageFilter === 'all') return sortedActiveLeads
-    return sortedActiveLeads.filter(lead => lead.current_stage === activeLeadStageFilter)
+    return sortedActiveLeads.filter(lead => matchesMappedStage(lead, activeLeadStageFilter))
   }, [activeLeadStageFilter, sortedActiveLeads])
   const visibleActiveLeads = showAllLeads ? filteredActiveLeads : filteredActiveLeads.slice(0, 10)
   const handleActiveLeadStageFilter = (stageId) => {

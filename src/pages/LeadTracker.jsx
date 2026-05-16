@@ -12,11 +12,11 @@ const formatStage = (s) => s ? s.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUp
 
 // Priority: derived from stage + quality score
 function getPriority(contact) {
-  const stage = contact.current_stage
+  const stages = Array.isArray(contact.stage_filter_values) ? contact.stage_filter_values : [contact.current_stage]
   const score = contact.lead_quality_score ?? 0
 
-  if (['active', 'meeting_booked', 'showed'].includes(stage) && score >= 7) return 'immediate'
-  if (['meeting_booked', 'callback', 'qualified_no_meeting'].includes(stage)) return 'immediate'
+  if (stages.some(stage => ['active', 'meeting_booked', 'showed', 'meeting_attended'].includes(stage)) && score >= 7) return 'immediate'
+  if (stages.some(stage => ['meeting_booked', 'callback', 'qualified_no_meeting'].includes(stage))) return 'immediate'
   if (score >= 7) return 'hot'
   if (score >= 4) return 'warm'
   return 'cold'
@@ -468,32 +468,42 @@ function buildLeadJourney(contact) {
 
 function applyFunnelFilter(data, filter) {
   if (filter === 'all') return data
-  return data.filter(c => c.current_stage === filter)
+  return data.filter(c => hasStage(c, filter))
+}
+
+function countStage(data, stage) {
+  return data.filter(c => hasStage(c, stage)).length
+}
+
+function hasStage(contact, stage) {
+  return Array.isArray(contact.stage_filter_values)
+    ? contact.stage_filter_values.includes(stage)
+    : contact.current_stage === stage
 }
 
 function getStageCounts(data) {
   return {
     all: data.length,
-    new: data.filter(c => c.current_stage === 'new').length,
-    follow_up: data.filter(c => c.current_stage === 'follow_up').length,
-    wa_chatbot: data.filter(c => c.current_stage === 'wa_chatbot').length,
-    contacted: data.filter(c => c.current_stage === 'contacted').length,
-    call_no_engagement: data.filter(c => c.current_stage === 'call_no_engagement').length,
-    callback: data.filter(c => c.current_stage === 'callback').length,
-    details_requested: data.filter(c => c.current_stage === 'details_requested').length,
-    interested_no_meeting: data.filter(c => c.current_stage === 'interested_no_meeting').length,
-    human_requested: data.filter(c => c.current_stage === 'human_requested').length,
-    qualified_no_meeting: data.filter(c => c.current_stage === 'qualified_no_meeting').length,
-    meeting_booked: data.filter(c => c.current_stage === 'meeting_booked').length,
-    no_show: data.filter(c => c.current_stage === 'no_show').length,
-    not_interested: data.filter(c => c.current_stage === 'not_interested').length,
-    disqualified: data.filter(c => c.current_stage === 'disqualified').length,
-    wrong_number: data.filter(c => c.current_stage === 'wrong_number').length,
-    voicemail: data.filter(c => c.current_stage === 'voicemail').length,
-    showed: data.filter(c => c.current_stage === 'showed').length,
-    active: data.filter(c => c.current_stage === 'active').length,
-    closed_won: data.filter(c => c.current_stage === 'closed_won').length,
-    closed_lost: data.filter(c => c.current_stage === 'closed_lost').length,
+    new: countStage(data, 'new'),
+    follow_up: countStage(data, 'follow_up'),
+    wa_chatbot: countStage(data, 'wa_chatbot'),
+    contacted: countStage(data, 'contacted'),
+    call_no_engagement: countStage(data, 'call_no_engagement'),
+    callback: countStage(data, 'callback'),
+    details_requested: countStage(data, 'details_requested'),
+    interested_no_meeting: countStage(data, 'interested_no_meeting'),
+    human_requested: countStage(data, 'human_requested'),
+    qualified_no_meeting: countStage(data, 'qualified_no_meeting'),
+    meeting_booked: countStage(data, 'meeting_booked'),
+    no_show: countStage(data, 'no_show'),
+    not_interested: countStage(data, 'not_interested'),
+    disqualified: countStage(data, 'disqualified'),
+    wrong_number: countStage(data, 'wrong_number'),
+    voicemail: countStage(data, 'voicemail'),
+    showed: countStage(data, 'showed'),
+    active: countStage(data, 'active'),
+    closed_won: countStage(data, 'closed_won'),
+    closed_lost: countStage(data, 'closed_lost'),
   }
 }
 
@@ -848,8 +858,8 @@ function LeadSummary({ contacts, loading }) {
   if (loading || !contacts?.length) return null
   const immediate = contacts.filter(c => getPriority(c) === 'immediate').length
   const hot = contacts.filter(c => getPriority(c) === 'hot').length
-  const dq = contacts.filter(c => c.current_stage === 'disqualified').length
-  const closed = contacts.filter(c => c.current_stage === 'closed_won').length
+  const dq = contacts.filter(c => hasStage(c, 'disqualified')).length
+  const closed = contacts.filter(c => hasStage(c, 'closed_won')).length
   return (
     <AISummary summary={
       `There are ${contacts.length} total leads in the tracker. ` +

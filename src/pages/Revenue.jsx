@@ -29,7 +29,7 @@ export default function Revenue() {
     return () => setReportBuilder(null)
   }, [overview, setReportBuilder])
 
-  const closedWonLeads = (leads ?? []).filter(lead => lead.funnel_closed_won || lead.current_stage === 'closed_won')
+  const closedWonLeads = (leads ?? []).filter(lead => lead.funnel_closed_won)
   const revenueByAd = Object.values(closedWonLeads.reduce((acc, lead) => {
     const name = lead.ad_name || lead.source_ad || 'Unknown source'
     acc[name] = acc[name] ?? { name, revenue: 0 }
