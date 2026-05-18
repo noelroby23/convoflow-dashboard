@@ -82,69 +82,10 @@ function formatCurrencyWhole(value) {
   return `AED ${numeric.toFixed(0)}`
 }
 
-function formatCurrencyDecimal(value) {
-  const numeric = Number(value)
-  if (value == null || !Number.isFinite(numeric)) return '—'
-  return `AED ${numeric.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-}
-
 function formatPercent(value, digits = 2) {
   const numeric = Number(value)
   if (value == null || !Number.isFinite(numeric)) return '—'
   return `${numeric.toFixed(digits)}%`
-}
-
-function safeDivide(numerator, denominator) {
-  const top = Number(numerator ?? 0)
-  const bottom = Number(denominator ?? 0)
-  if (!Number.isFinite(top) || !Number.isFinite(bottom) || bottom <= 0) return null
-  return top / bottom
-}
-
-function getAdSpend(ad) {
-  return Number(ad.total_spend ?? ad.spend ?? 0)
-}
-
-function getAdDealValue(ad) {
-  return Number(ad.deal_value ?? ad.closed_revenue ?? 0)
-}
-
-function getAdMetric(ad, key) {
-  const spend = getAdSpend(ad)
-  const leads = Number(ad.total_leads ?? 0)
-  const meetings = Number(ad.meetings_booked ?? 0)
-  const showed = Number(ad.showed_up ?? 0)
-  const closed = Number(ad.closed_won ?? 0)
-
-  switch (key) {
-    case 'cost_per_meeting': return safeDivide(spend, meetings)
-    case 'cost_per_sale': return safeDivide(spend, closed)
-    case 'show_rate': return safeDivide(showed * 100, meetings)
-    case 'meeting_rate': return safeDivide(meetings * 100, leads)
-    case 'roas': return safeDivide(getAdDealValue(ad), spend)
-    default: return ad[key]
-  }
-}
-
-function getCostColor(value, target) {
-  if (value == null) return 'text-[#9CA3AF]'
-  if (value <= target) return 'text-[#16A34A] font-semibold'
-  if (value <= target * 1.25) return 'text-[#F59E0B] font-semibold'
-  return 'text-[#DC2626] font-semibold'
-}
-
-function getRateColor(value, target) {
-  if (value == null) return 'text-[#9CA3AF]'
-  if (value >= target) return 'text-[#16A34A] font-semibold'
-  if (value >= target * 0.75) return 'text-[#F59E0B] font-semibold'
-  return 'text-[#DC2626] font-semibold'
-}
-
-function getRoasColor(value) {
-  if (value == null) return 'text-[#9CA3AF]'
-  if (value >= 4) return 'text-[#16A34A] font-semibold'
-  if (value >= 3) return 'text-[#F59E0B] font-semibold'
-  return 'text-[#DC2626] font-semibold'
 }
 
 function getAdViewUrl(ad) {
@@ -316,7 +257,7 @@ export default function AdCreatives() {
   }
 
   const sorted = ads ? [...ads].sort((a, b) => {
-    const av = getAdMetric(a, sortKey) ?? 0, bv = getAdMetric(b, sortKey) ?? 0
+    const av = a[sortKey] ?? 0, bv = b[sortKey] ?? 0
     return sortDir === 'asc' ? av - bv : bv - av
   }) : []
 
@@ -364,11 +305,6 @@ export default function AdCreatives() {
     { key: 'total_spend', label: 'Spend (AED)' },
     { key: 'total_leads', label: 'Leads' },
     { key: 'cost_per_lead', label: 'CPL (AED)' },
-    { key: 'cost_per_meeting', label: 'Cost Per Meeting' },
-    { key: 'cost_per_sale', label: 'Cost Per Sale' },
-    { key: 'show_rate', label: 'Show Rate' },
-    { key: 'meeting_rate', label: 'Meeting Rate' },
-    { key: 'roas', label: 'ROAS' },
     { key: 'meetings_booked', label: 'Meetings' },
     { key: 'showed_up', label: 'Showed' },
     { key: 'active_opportunities', label: 'Active Opps' },
@@ -400,10 +336,7 @@ export default function AdCreatives() {
   const handleExport = () => {
     exportCsv(filtered.map(ad => ({
       'Ad Name': ad.ad_name, 'Status': ad.status, 'Spend (AED)': ad.total_spend,
-      'Leads': ad.total_leads, 'CPL (AED)': ad.cost_per_lead,
-      'Cost Per Meeting': getAdMetric(ad, 'cost_per_meeting'), 'Cost Per Sale': getAdMetric(ad, 'cost_per_sale'),
-      'Show Rate %': getAdMetric(ad, 'show_rate'), 'Meeting Rate %': getAdMetric(ad, 'meeting_rate'), 'ROAS': getAdMetric(ad, 'roas'),
-      'Meetings': ad.meetings_booked,
+      'Leads': ad.total_leads, 'CPL (AED)': ad.cost_per_lead, 'Meetings': ad.meetings_booked,
       'Showed': ad.showed_up, 'Active Opps': ad.active_opportunities, 'Cost/Active': ad.cost_per_active,
       'Frequency': ad.avg_frequency, 'CTR %': ad.avg_ctr,
       'Hook Rate %': ad.hook_rate_pct, 'Watch-Through %': ad.watch_through_pct,
@@ -439,7 +372,7 @@ export default function AdCreatives() {
       ) : (
         <div className="bg-white rounded-xl border border-[#E5E7EB] shadow-sm overflow-hidden">
           <div style={{ overflowX: 'auto', width: '100%', WebkitOverflowScrolling: 'touch' }}>
-          <table className="w-full min-w-[1700px] text-sm">
+          <table className="w-full min-w-[1200px] text-sm">
             <thead className="bg-[#F3F4F6]">
               <tr>
                 {cols.map(({ key, label }) => (
@@ -458,11 +391,6 @@ export default function AdCreatives() {
                 const hookRate = getHookRateValue(ad)
                 const watchThrough = getWatchThroughValue(ad)
                 const isVideo = ad.creative_type === 'VIDEO'
-                const costPerMeeting = getAdMetric(ad, 'cost_per_meeting')
-                const costPerSale = getAdMetric(ad, 'cost_per_sale')
-                const showRate = getAdMetric(ad, 'show_rate')
-                const meetingRate = getAdMetric(ad, 'meeting_rate')
-                const roas = getAdMetric(ad, 'roas')
                 const adDetails = [
                   { label: 'Total Impressions', value: formatWholeNumber(ad.total_impressions) },
                   { label: 'Avg Frequency', value: formatDecimal(ad.avg_frequency) },
@@ -508,11 +436,6 @@ export default function AdCreatives() {
                       <td className="px-4 py-3">{ad.total_spend ? `AED ${Number(ad.total_spend).toLocaleString()}` : '—'}</td>
                       <td className="px-4 py-3">{ad.total_leads ?? '—'}</td>
                       <td className={`px-4 py-3 ${getCPLColor(ad.cost_per_lead)}`}>{ad.cost_per_lead ? `AED ${Number(ad.cost_per_lead).toFixed(0)}` : '—'}</td>
-                      <td className={`px-4 py-3 ${getCostColor(costPerMeeting, 600)}`}>{formatCurrencyDecimal(costPerMeeting)}</td>
-                      <td className={`px-4 py-3 ${getCostColor(costPerSale, 4000)}`}>{formatCurrencyDecimal(costPerSale)}</td>
-                      <td className={`px-4 py-3 ${getRateColor(showRate, 75)}`}>{formatPercent(showRate, 1)}</td>
-                      <td className={`px-4 py-3 ${getRateColor(meetingRate, 18)}`}>{formatPercent(meetingRate, 1)}</td>
-                      <td className={`px-4 py-3 ${getRoasColor(roas)}`}>{roas == null ? '—' : `${roas.toFixed(2)}x`}</td>
                       <td className="px-4 py-3">{ad.meetings_booked ?? '—'}</td>
                       <td className="px-4 py-3">{ad.showed_up ?? '—'}</td>
                       <td className={`px-4 py-3 font-medium ${(ad.active_opportunities ?? 0) > 0 ? 'text-[#16A34A]' : (ad.total_leads ?? 0) > 0 ? 'text-[#DC2626]' : ''}`}>
@@ -529,7 +452,7 @@ export default function AdCreatives() {
                     </tr>
                     {expandedId === ad.ad_id && (
                       <tr key={`${ad.ad_id}-expanded`} className="border-t border-[#F3F4F6] bg-[#FAFAFA]">
-                        <td colSpan={19} className="px-6 pt-4 pb-3">
+                        <td colSpan={14} className="px-6 pt-4 pb-3">
                           <div className="mb-3 box-border grid w-full grid-cols-1 gap-4 overflow-hidden rounded-lg bg-[#F9FAFB] p-4 lg:grid-cols-[220px_minmax(0,1fr)]">
                             <div className="min-w-0">
                               <ExpandedCreativePreview ad={ad} />

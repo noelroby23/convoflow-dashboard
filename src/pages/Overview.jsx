@@ -159,6 +159,21 @@ export default function Overview() {
         )}
       </ErrorBoundary>
 
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-[#6B7280] mb-3">Unit Economics</h2>
+      <ErrorBoundary>
+        {overviewError && !overviewLoading ? null : (
+          <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-7 gap-3 mb-6">
+            <KPICard label="Cost per Lead" value={cpl} prefix="AED " decimals={2} inverse={true} loading={overviewLoading} description="What each interested person costs you" target={cplTarget} recommendation="If CPL is above target, pause underperforming ads." />
+            <KPICard label="Cost per Meeting" value={costPerMeeting} prefix="AED " decimals={2} inverse={true} loading={overviewLoading} description="What each booked sales conversation costs you" target={costPerMeetingTarget} />
+            <KPICard label="Cost per Sale" value={costPerSale} prefix="AED " decimals={2} inverse={true} loading={overviewLoading} description="What each closed won deal costs in ad spend" />
+            <KPICard label="Cost per Active Opp" value={costPerActive} prefix="AED " inverse={true} loading={overviewLoading} description="What it costs to get each real engaged buyer" target={costPerActiveTarget} />
+            <KPICard label="Show Rate" value={showRate} suffix="%" loading={overviewLoading} description="Out of 10 booked meetings, how many show up" target={showRateTarget} recommendation="Add WhatsApp reminders 24h and 1h before meetings." />
+            <KPICard label="Meeting Rate" value={meetingRate} suffix="%" decimals={2} loading={overviewLoading} description="Out of 100 interested people, how many book" target={meetingRateTarget} />
+            <KPICard label="ROAS" value={roas} suffix="x" loading={overviewLoading} description="For every AED spent, how many you make back" target={roasTarget} recommendation="Close active opportunities to improve ROAS." />
+          </div>
+        )}
+      </ErrorBoundary>
+
       <ErrorBoundary>
         <div className="bg-white rounded-xl border border-[#E5E7EB] p-6 shadow-sm mb-6">
           <h2 className="text-sm font-bold text-[#0F0F1A] mb-4">Pipeline Funnel</h2>
