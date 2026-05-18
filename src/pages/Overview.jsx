@@ -49,7 +49,7 @@ export default function Overview() {
   const { data: overview, loading: overviewLoading, error: overviewError } = useDashboardOverview(dateRange.from, dateRange.to)
   const { data: targets } = useTargets()
   const { data: activeLeads, loading: activeLeadsLoading, error: activeLeadsError } = useAllContacts()
-  const { data: activePipeline, loading: pipelineLoading, error: pipelineError } = useContactDetails(['showed', 'active'])
+  const { data: activePipeline, loading: pipelineLoading, error: pipelineError } = useContactDetails('active')
   const [showAllLeads, setShowAllLeads] = useState(false)
   const [activeLeadStageFilter, setActiveLeadStageFilter] = useState('all')
 

@@ -96,107 +96,30 @@ const mockFallbackSalesPerformance = USE_MOCK ? {
 
 const filterByClient = (query, clientId) => clientId ? query.eq('client_id', clientId) : query
 
-const STAGE_ALIASES = {
-  showed: ['showed', 'meeting_attended'],
-  meeting_attended: ['meeting_attended', 'showed'],
-}
-
-const expandMappedStages = (stages) => {
-  const values = Array.isArray(stages) ? stages : [stages]
-  return [...new Set(values.filter(Boolean).flatMap(stage => STAGE_ALIASES[stage] ?? [stage]))]
-}
-
-const getMappedStageIds = async (stages) => {
-  const mappedStages = expandMappedStages(stages)
-  if (!mappedStages.length) return { stageIds: [], mappedStageById: new Map(), error: null }
-
-  const { data, error } = await supabase
-    .from('ghl_stage_map')
-    .select('stage_id, mapped_current_stage')
-    .in('mapped_current_stage', mappedStages)
-
-  if (error) return { stageIds: [], mappedStageById: new Map(), error }
-
-  const mappedStageById = new Map((data ?? []).map(row => [row.stage_id, row.mapped_current_stage]))
-  return { stageIds: [...mappedStageById.keys()], mappedStageById, error: null }
-}
-
-const getOpportunityContactIdsByMappedStage = async ({ stages, clientId }) => {
-  const { stageIds, error: stageError } = await getMappedStageIds(stages)
-  if (stageError) return { contactIds: [], error: stageError }
-  if (!stageIds.length) return { contactIds: [], error: null }
-
-  const { data, error } = await filterByClient(
-    supabase.from('ghl_opportunities').select('contact_id').in('pipeline_stage_id', stageIds),
-    clientId
-  )
-
-  if (error) return { contactIds: [], error }
-
-  return { contactIds: [...new Set((data ?? []).map(row => row.contact_id).filter(Boolean))], error: null }
-}
-
-const getStageFilterValues = (mappedStages) => {
-  const values = new Set(mappedStages)
-  if (values.has('meeting_attended')) values.add('showed')
-  if (values.has('showed')) values.add('meeting_attended')
-  return [...values]
-}
-
-const decorateContactsWithOpportunityStages = async (rows) => {
-  const contactIds = [...new Set((rows ?? []).map(row => row.contact_id).filter(Boolean))]
-  if (!contactIds.length) return { data: rows ?? [], error: null }
-
-  const opportunitiesResult = await supabase
-    .from('ghl_opportunities')
-    .select('contact_id, pipeline_stage_id')
-    .in('contact_id', contactIds)
-
-  if (opportunitiesResult.error) return { data: null, error: opportunitiesResult.error }
-
-  const stageIds = [...new Set((opportunitiesResult.data ?? []).map(row => row.pipeline_stage_id).filter(Boolean))]
-  if (!stageIds.length) return { data: rows.map(row => ({ ...row, mapped_current_stages: [], stage_filter_values: [] })), error: null }
-
-  const stageMapResult = await supabase
-    .from('ghl_stage_map')
-    .select('stage_id, mapped_current_stage')
-    .in('stage_id', stageIds)
-
-  if (stageMapResult.error) return { data: null, error: stageMapResult.error }
-
-  const mappedStageById = new Map((stageMapResult.data ?? []).map(row => [row.stage_id, row.mapped_current_stage]))
-  const mappedStagesByContactId = new Map()
-
-  for (const opportunity of opportunitiesResult.data ?? []) {
-    const mappedStage = mappedStageById.get(opportunity.pipeline_stage_id)
-    if (!mappedStage) continue
-
-    const stages = mappedStagesByContactId.get(opportunity.contact_id) ?? new Set()
-    stages.add(mappedStage)
-    mappedStagesByContactId.set(opportunity.contact_id, stages)
-  }
+const normalizeContactRows = (rows) => (rows ?? []).map(row => {
+  const currentStage = row.current_stage ?? row.mapped_current_stage ?? row.stage ?? null
+  const stageFilterValues = Array.isArray(row.stage_filter_values)
+    ? row.stage_filter_values
+    : (currentStage ? [currentStage] : [])
+  const fallbackName = [row.first_name, row.last_name].filter(Boolean).join(' ')
+  const fullName = (row.full_name ?? row.contact_name ?? row.name ?? fallbackName) || null
 
   return {
-    data: rows.map(row => {
-      const mappedStages = [...(mappedStagesByContactId.get(row.contact_id) ?? [])]
-      const stageFilterValues = getStageFilterValues(mappedStages)
-      const hasMappedStages = mappedStages.length > 0
-
-      return {
-        ...row,
-        mapped_current_stages: mappedStages,
-        stage_filter_values: stageFilterValues,
-        funnel_meeting_booked: hasMappedStages ? stageFilterValues.some(stage => ['meeting_booked', 'meeting_attended', 'showed', 'no_show', 'active', 'closed_won', 'closed_lost'].includes(stage)) : row.funnel_meeting_booked,
-        funnel_showed_up: hasMappedStages ? stageFilterValues.some(stage => ['meeting_attended', 'showed', 'active', 'closed_won', 'closed_lost'].includes(stage)) : row.funnel_showed_up,
-        funnel_active_opp: hasMappedStages ? stageFilterValues.includes('active') : row.funnel_active_opp,
-        funnel_closed_won: hasMappedStages ? stageFilterValues.includes('closed_won') : row.funnel_closed_won,
-        funnel_closed_lost: hasMappedStages ? stageFilterValues.includes('closed_lost') : row.funnel_closed_lost,
-        funnel_no_show: hasMappedStages ? stageFilterValues.includes('no_show') : row.funnel_no_show,
-      }
-    }),
-    error: null,
+    ...row,
+    contact_id: row.contact_id ?? row.contact_uuid ?? row.id ?? row.ghl_contact_id,
+    full_name: fullName,
+    company: row.company ?? row.company_name ?? null,
+    source_ad: row.source_ad ?? row.source ?? null,
+    current_stage: currentStage,
+    stage_filter_values: stageFilterValues,
+    funnel_meeting_booked: row.funnel_meeting_booked ?? stageFilterValues.some(stage => ['meeting_booked', 'showed', 'no_show', 'active', 'closed_won', 'closed_lost'].includes(stage)),
+    funnel_showed_up: row.funnel_showed_up ?? stageFilterValues.some(stage => ['showed', 'active', 'closed_won', 'closed_lost'].includes(stage)),
+    funnel_active_opp: row.funnel_active_opp ?? stageFilterValues.includes('active'),
+    funnel_closed_won: row.funnel_closed_won ?? stageFilterValues.includes('closed_won'),
+    funnel_closed_lost: row.funnel_closed_lost ?? stageFilterValues.includes('closed_lost'),
+    funnel_no_show: row.funnel_no_show ?? stageFilterValues.includes('no_show'),
   }
-}
+})
 
 export function useClients() {
   return useSupabaseQuery(
@@ -288,36 +211,33 @@ export function useAdPerformance() {
   )
 }
 
-export function useContactDetails(stageFilter = null) {
+export function useContactDetails(bucket = null) {
   const { currentClientId, dateRange, refreshKey } = useDashboard()
   return useSupabaseQuery(
     async () => {
-      let query = filterByClient(supabase.from('lead_tracker').select('*'), currentClientId)
-
-      if (stageFilter) {
-        const { contactIds, error: opportunityError } = await getOpportunityContactIdsByMappedStage({
-          stages: stageFilter,
-          clientId: currentClientId,
+      if (bucket) {
+        const { data, error } = await supabase.rpc('dashboard_contacts_by_bucket', {
+          p_bucket: bucket,
+          p_start_date: dateRange.from,
+          p_end_date: dateRange.to,
+          p_client_id: currentClientId ?? null,
         })
 
-        if (opportunityError) return { data: null, error: opportunityError }
-        if (!contactIds.length) return { data: [], error: null }
-
-        query = query.in('contact_id', contactIds)
+        return { data: error ? null : normalizeContactRows(data), error }
       }
 
       const { data, error } = await filterLeadTrackerByDubaiDate(
-        query,
+        filterByClient(supabase.from('lead_tracker').select('*'), currentClientId),
         dateRange.from,
         dateRange.to
       ).order('ghl_created_at', { ascending: false, nullsFirst: false })
 
       if (error) return { data: null, error }
-      return decorateContactsWithOpportunityStages(data ?? [])
+      return { data: normalizeContactRows(data), error: null }
     },
-    [currentClientId, dateRange.from, dateRange.to, JSON.stringify(stageFilter), refreshKey],
+    [currentClientId, dateRange.from, dateRange.to, bucket, refreshKey],
     USE_MOCK && mockFallbackContacts
-      ? (stageFilter ? mockFallbackContacts.filter(c => stageFilter.includes(c.current_stage)) : mockFallbackContacts)
+      ? (bucket ? mockFallbackContacts.filter(c => c.current_stage === bucket) : mockFallbackContacts)
       : null
   )
 }
@@ -334,7 +254,7 @@ export function useAllContacts() {
 
       if (error) return { data: null, error }
 
-      return decorateContactsWithOpportunityStages(data ?? [])
+      return { data: normalizeContactRows(data), error: null }
     },
     [currentClientId, dateRange.from, dateRange.to, refreshKey], mockFallbackLeadTracker
   )
@@ -351,7 +271,7 @@ export function useLeadTrackerContacts() {
       ).order('ghl_created_at', { ascending: false, nullsFirst: false })
       if (error) return { data: null, error }
 
-      return decorateContactsWithOpportunityStages(data ?? [])
+      return { data: normalizeContactRows(data), error: null }
     },
     [currentClientId, dateRange.from, dateRange.to, refreshKey], mockFallbackLeadTracker
   )
