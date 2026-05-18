@@ -1,11 +1,9 @@
 import { Fragment, useState, useEffect } from 'react'
-import { useAdPerformance, useTargets } from '../hooks/useDashboardData'
-import { useDashboardOverview } from '../hooks/useDashboardOverview'
+import { useAdPerformance } from '../hooks/useDashboardData'
 import { useDashboard } from '../store/dashboard'
 import { creativeReport } from '../lib/reports/generators'
 import ErrorBoundary from '../components/ui/ErrorBoundary'
 import AISummary from '../components/ui/AISummary'
-import KPICard from '../components/ui/KPICard'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { ChevronDown, ChevronUp, Download, Play, FileText, ExternalLink } from 'lucide-react'
 import { exportCsv } from '../lib/exportCsv'
@@ -84,10 +82,69 @@ function formatCurrencyWhole(value) {
   return `AED ${numeric.toFixed(0)}`
 }
 
+function formatCurrencyDecimal(value) {
+  const numeric = Number(value)
+  if (value == null || !Number.isFinite(numeric)) return '—'
+  return `AED ${numeric.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
 function formatPercent(value, digits = 2) {
   const numeric = Number(value)
   if (value == null || !Number.isFinite(numeric)) return '—'
   return `${numeric.toFixed(digits)}%`
+}
+
+function safeDivide(numerator, denominator) {
+  const top = Number(numerator ?? 0)
+  const bottom = Number(denominator ?? 0)
+  if (!Number.isFinite(top) || !Number.isFinite(bottom) || bottom <= 0) return null
+  return top / bottom
+}
+
+function getAdSpend(ad) {
+  return Number(ad.total_spend ?? ad.spend ?? 0)
+}
+
+function getAdDealValue(ad) {
+  return Number(ad.deal_value ?? ad.closed_revenue ?? 0)
+}
+
+function getAdMetric(ad, key) {
+  const spend = getAdSpend(ad)
+  const leads = Number(ad.total_leads ?? 0)
+  const meetings = Number(ad.meetings_booked ?? 0)
+  const showed = Number(ad.showed_up ?? 0)
+  const closed = Number(ad.closed_won ?? 0)
+
+  switch (key) {
+    case 'cost_per_meeting': return safeDivide(spend, meetings)
+    case 'cost_per_sale': return safeDivide(spend, closed)
+    case 'show_rate': return safeDivide(showed * 100, meetings)
+    case 'meeting_rate': return safeDivide(meetings * 100, leads)
+    case 'roas': return safeDivide(getAdDealValue(ad), spend)
+    default: return ad[key]
+  }
+}
+
+function getCostColor(value, target) {
+  if (value == null) return 'text-[#9CA3AF]'
+  if (value <= target) return 'text-[#16A34A] font-semibold'
+  if (value <= target * 1.25) return 'text-[#F59E0B] font-semibold'
+  return 'text-[#DC2626] font-semibold'
+}
+
+function getRateColor(value, target) {
+  if (value == null) return 'text-[#9CA3AF]'
+  if (value >= target) return 'text-[#16A34A] font-semibold'
+  if (value >= target * 0.75) return 'text-[#F59E0B] font-semibold'
+  return 'text-[#DC2626] font-semibold'
+}
+
+function getRoasColor(value) {
+  if (value == null) return 'text-[#9CA3AF]'
+  if (value >= 4) return 'text-[#16A34A] font-semibold'
+  if (value >= 3) return 'text-[#F59E0B] font-semibold'
+  return 'text-[#DC2626] font-semibold'
 }
 
 function getAdViewUrl(ad) {
@@ -241,10 +298,7 @@ function ExpandedCreativePreview({ ad }) {
 export default function AdCreatives() {
   const { data, loading, error } = useAdPerformance()
   const ads = data
-  const dateRange = useDashboard(s => s.dateRange)
   const setReportBuilder = useDashboard(s => s.setReportBuilder)
-  const { data: overview, loading: overviewLoading, error: overviewError } = useDashboardOverview(dateRange.from, dateRange.to)
-  const { data: targets } = useTargets()
   const [expandedId, setExpandedId] = useState(null)
   const [activeFilter, setActiveFilter] = useState('all')
 
@@ -262,7 +316,7 @@ export default function AdCreatives() {
   }
 
   const sorted = ads ? [...ads].sort((a, b) => {
-    const av = a[sortKey] ?? 0, bv = b[sortKey] ?? 0
+    const av = getAdMetric(a, sortKey) ?? 0, bv = getAdMetric(b, sortKey) ?? 0
     return sortDir === 'asc' ? av - bv : bv - av
   }) : []
 
@@ -310,6 +364,11 @@ export default function AdCreatives() {
     { key: 'total_spend', label: 'Spend (AED)' },
     { key: 'total_leads', label: 'Leads' },
     { key: 'cost_per_lead', label: 'CPL (AED)' },
+    { key: 'cost_per_meeting', label: 'Cost Per Meeting' },
+    { key: 'cost_per_sale', label: 'Cost Per Sale' },
+    { key: 'show_rate', label: 'Show Rate' },
+    { key: 'meeting_rate', label: 'Meeting Rate' },
+    { key: 'roas', label: 'ROAS' },
     { key: 'meetings_booked', label: 'Meetings' },
     { key: 'showed_up', label: 'Showed' },
     { key: 'active_opportunities', label: 'Active Opps' },
@@ -320,79 +379,31 @@ export default function AdCreatives() {
     { key: 'watch_through_pct', label: 'Watch-Thru' },
   ]
 
-  const totalSpend = Number(overview?.total_spend ?? 0)
-  const totalLeads = Number(overview?.total_leads ?? 0)
-  const meetingsBooked = Number(overview?.meetings_booked ?? 0)
-  const showedUp = Number(overview?.showed_up ?? 0)
-  const activeOpps = Number(overview?.active_opportunities ?? 0)
-  const closedWon = Number(overview?.closed_won ?? 0)
-  const closedRevenue = Number(overview?.closed_revenue ?? 0)
-  const cpl = overview?.cost_per_lead ?? (totalLeads > 0 ? totalSpend / totalLeads : 0)
-  const costPerMeeting = overview?.cost_per_meeting ?? (meetingsBooked > 0 ? totalSpend / meetingsBooked : 0)
-  const costPerSale = closedWon > 0 ? totalSpend / closedWon : 0
-  const costPerActive = overview?.cost_per_active ?? (activeOpps > 0 ? totalSpend / activeOpps : 0)
-  const showRate = overview?.show_rate ?? (meetingsBooked > 0 ? (showedUp / meetingsBooked) * 100 : 0)
-  const meetingRate = overview?.meeting_rate ?? (totalLeads > 0 ? (meetingsBooked / totalLeads) * 100 : 0)
-  const roas = overview?.roas ?? (totalSpend > 0 ? closedRevenue / totalSpend : 0)
-  const cplTarget = targets?.cpl_target ?? 85
-  const costPerMeetingTarget = targets?.cost_per_meeting ?? 600
-  const costPerSaleTarget = 4000
-  const costPerActiveTarget = targets?.cost_per_active ?? 1200
-  const showRateTarget = targets?.show_rate ?? 75
-  const meetingRateTarget = targets?.meeting_rate ?? 18
-  const roasTarget = targets?.roas_target ?? 4
-  const unitEconomicsCards = (
-    <ErrorBoundary>
-      <h2 className="text-xs font-semibold uppercase tracking-wide text-[#6B7280] mb-3">Unit Economics</h2>
-      {overviewError && !overviewLoading ? (
-        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-[#B91C1C]">
-          Failed to load Unit Economics for the selected date range.
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-7 gap-3 mb-6">
-          <KPICard label="Cost per Lead" value={cpl} prefix="AED " decimals={2} inverse={true} loading={overviewLoading} description="What each interested person costs you" target={cplTarget} />
-          <KPICard label="Cost per Meeting" value={costPerMeeting} prefix="AED " decimals={2} inverse={true} loading={overviewLoading} description="What each booked sales conversation costs you" target={costPerMeetingTarget} />
-          <KPICard label="Cost per Sale" value={costPerSale} prefix="AED " decimals={2} inverse={true} loading={overviewLoading} description="What each closed won deal costs in ad spend" target={costPerSaleTarget} />
-          <KPICard label="Cost per Active Opp" value={costPerActive} prefix="AED " inverse={true} loading={overviewLoading} description="What it costs to get each real engaged buyer" target={costPerActiveTarget} />
-          <KPICard label="Show Rate" value={showRate} suffix="%" loading={overviewLoading} description="Out of 10 booked meetings, how many show up" target={showRateTarget} />
-          <KPICard label="Meeting Rate" value={meetingRate} suffix="%" decimals={2} loading={overviewLoading} description="Out of 100 interested people, how many book" target={meetingRateTarget} />
-          <KPICard label="ROAS" value={roas} suffix="x" loading={overviewLoading} description="For every AED spent, how many you make back" target={roasTarget} />
-        </div>
-      )}
-    </ErrorBoundary>
-  )
-
   if (loading) return (
-    <>
-      {unitEconomicsCards}
-      <div className="bg-white rounded-xl border border-[#E5E7EB] p-6">
-        <div className="space-y-3">{[...Array(8)].map((_, i) => <div key={i} className="skeleton h-10 w-full" />)}</div>
-      </div>
-    </>
+    <div className="bg-white rounded-xl border border-[#E5E7EB] p-6">
+      <div className="space-y-3">{[...Array(8)].map((_, i) => <div key={i} className="skeleton h-10 w-full" />)}</div>
+    </div>
   )
 
   if (error) return (
-    <>
-      {unitEconomicsCards}
-      <div className="bg-white rounded-xl border border-[#E5E7EB] p-8 text-center">
-        <p className="text-sm text-[#DC2626]">Failed to load ad performance data.</p>
-      </div>
-    </>
+    <div className="bg-white rounded-xl border border-[#E5E7EB] p-8 text-center">
+      <p className="text-sm text-[#DC2626]">Failed to load ad performance data.</p>
+    </div>
   )
 
   if (!ads?.length) return (
-    <>
-      {unitEconomicsCards}
-      <div className="bg-white rounded-xl border border-[#E5E7EB] p-12 text-center">
-        <p className="text-sm text-[#9CA3AF]">No ad campaigns running yet.</p>
-      </div>
-    </>
+    <div className="bg-white rounded-xl border border-[#E5E7EB] p-12 text-center">
+      <p className="text-sm text-[#9CA3AF]">No ad campaigns running yet.</p>
+    </div>
   )
 
   const handleExport = () => {
     exportCsv(filtered.map(ad => ({
       'Ad Name': ad.ad_name, 'Status': ad.status, 'Spend (AED)': ad.total_spend,
-      'Leads': ad.total_leads, 'CPL (AED)': ad.cost_per_lead, 'Meetings': ad.meetings_booked,
+      'Leads': ad.total_leads, 'CPL (AED)': ad.cost_per_lead,
+      'Cost Per Meeting': getAdMetric(ad, 'cost_per_meeting'), 'Cost Per Sale': getAdMetric(ad, 'cost_per_sale'),
+      'Show Rate %': getAdMetric(ad, 'show_rate'), 'Meeting Rate %': getAdMetric(ad, 'meeting_rate'), 'ROAS': getAdMetric(ad, 'roas'),
+      'Meetings': ad.meetings_booked,
       'Showed': ad.showed_up, 'Active Opps': ad.active_opportunities, 'Cost/Active': ad.cost_per_active,
       'Frequency': ad.avg_frequency, 'CTR %': ad.avg_ctr,
       'Hook Rate %': ad.hook_rate_pct, 'Watch-Through %': ad.watch_through_pct,
@@ -401,8 +412,6 @@ export default function AdCreatives() {
 
   return (
     <>
-    {unitEconomicsCards}
-
     <ErrorBoundary>
       {/* Filter chips */}
       <div className="flex items-center gap-2 mb-4 flex-wrap">
@@ -430,7 +439,7 @@ export default function AdCreatives() {
       ) : (
         <div className="bg-white rounded-xl border border-[#E5E7EB] shadow-sm overflow-hidden">
           <div style={{ overflowX: 'auto', width: '100%', WebkitOverflowScrolling: 'touch' }}>
-          <table className="w-full min-w-[1200px] text-sm">
+          <table className="w-full min-w-[1700px] text-sm">
             <thead className="bg-[#F3F4F6]">
               <tr>
                 {cols.map(({ key, label }) => (
@@ -449,6 +458,11 @@ export default function AdCreatives() {
                 const hookRate = getHookRateValue(ad)
                 const watchThrough = getWatchThroughValue(ad)
                 const isVideo = ad.creative_type === 'VIDEO'
+                const costPerMeeting = getAdMetric(ad, 'cost_per_meeting')
+                const costPerSale = getAdMetric(ad, 'cost_per_sale')
+                const showRate = getAdMetric(ad, 'show_rate')
+                const meetingRate = getAdMetric(ad, 'meeting_rate')
+                const roas = getAdMetric(ad, 'roas')
                 const adDetails = [
                   { label: 'Total Impressions', value: formatWholeNumber(ad.total_impressions) },
                   { label: 'Avg Frequency', value: formatDecimal(ad.avg_frequency) },
@@ -494,6 +508,11 @@ export default function AdCreatives() {
                       <td className="px-4 py-3">{ad.total_spend ? `AED ${Number(ad.total_spend).toLocaleString()}` : '—'}</td>
                       <td className="px-4 py-3">{ad.total_leads ?? '—'}</td>
                       <td className={`px-4 py-3 ${getCPLColor(ad.cost_per_lead)}`}>{ad.cost_per_lead ? `AED ${Number(ad.cost_per_lead).toFixed(0)}` : '—'}</td>
+                      <td className={`px-4 py-3 ${getCostColor(costPerMeeting, 600)}`}>{formatCurrencyDecimal(costPerMeeting)}</td>
+                      <td className={`px-4 py-3 ${getCostColor(costPerSale, 4000)}`}>{formatCurrencyDecimal(costPerSale)}</td>
+                      <td className={`px-4 py-3 ${getRateColor(showRate, 75)}`}>{formatPercent(showRate, 1)}</td>
+                      <td className={`px-4 py-3 ${getRateColor(meetingRate, 18)}`}>{formatPercent(meetingRate, 1)}</td>
+                      <td className={`px-4 py-3 ${getRoasColor(roas)}`}>{roas == null ? '—' : `${roas.toFixed(2)}x`}</td>
                       <td className="px-4 py-3">{ad.meetings_booked ?? '—'}</td>
                       <td className="px-4 py-3">{ad.showed_up ?? '—'}</td>
                       <td className={`px-4 py-3 font-medium ${(ad.active_opportunities ?? 0) > 0 ? 'text-[#16A34A]' : (ad.total_leads ?? 0) > 0 ? 'text-[#DC2626]' : ''}`}>
@@ -510,17 +529,17 @@ export default function AdCreatives() {
                     </tr>
                     {expandedId === ad.ad_id && (
                       <tr key={`${ad.ad_id}-expanded`} className="border-t border-[#F3F4F6] bg-[#FAFAFA]">
-                        <td colSpan={14} className="px-6 pt-4 pb-3">
+                        <td colSpan={19} className="px-6 pt-4 pb-3">
                           <div className="mb-3 box-border grid w-full grid-cols-1 gap-4 overflow-hidden rounded-lg bg-[#F9FAFB] p-4 lg:grid-cols-[220px_minmax(0,1fr)]">
                             <div className="min-w-0">
                               <ExpandedCreativePreview ad={ad} />
                             </div>
                             <div className="grid min-w-0 grid-cols-1 items-stretch gap-4 xl:grid-cols-2">
-                              <div className="min-w-0 rounded-lg border border-[#E5E7EB] bg-white p-4">
+                              <div className="flex min-w-0 flex-col rounded-lg border border-[#E5E7EB] bg-white p-4">
                                 <p className="text-xs font-semibold text-[#6B7280] mb-3">PERFORMANCE BREAKDOWN</p>
-                                <div className="h-[220px] max-h-[220px]">
+                                <div className="h-[220px] max-h-[220px] overflow-hidden">
                                   <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={[
+                                    <BarChart margin={{ top: 8, right: 12, bottom: 0, left: -12 }} data={[
                                       { name: 'Leads', value: ad.total_leads ?? 0 },
                                       { name: 'Meetings', value: ad.meetings_booked ?? 0 },
                                       { name: 'Showed', value: ad.showed_up ?? 0 },
@@ -530,7 +549,7 @@ export default function AdCreatives() {
                                       <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
                                       <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                                       <YAxis tick={{ fontSize: 11 }} />
-                                      <Tooltip />
+                                      <Tooltip wrapperStyle={{ zIndex: 20 }} />
                                       <Bar dataKey="value" fill="#EC4899" radius={[4, 4, 0, 0]} />
                                     </BarChart>
                                   </ResponsiveContainer>
@@ -538,9 +557,9 @@ export default function AdCreatives() {
                                 {(ad.total_video_plays_3s ?? 0) > 0 && (
                                   <div className="mt-4 border-t border-[#E5E7EB] pt-4">
                                     <p className="text-xs font-semibold text-[#6B7280] mb-3">VIDEO RETENTION FUNNEL</p>
-                                    <div className="h-[160px] max-h-[160px]">
+                                    <div className="h-[160px] max-h-[160px] overflow-hidden">
                                       <ResponsiveContainer width="100%" height="100%">
-                                        <BarChart data={[
+                                        <BarChart margin={{ top: 8, right: 12, bottom: 0, left: -12 }} data={[
                                           { name: '3-sec', value: ad.total_video_plays_3s ?? 0 },
                                           { name: '25%', value: ad.total_video_plays_25pct ?? 0 },
                                           { name: '50%', value: ad.total_video_plays_50pct ?? 0 },
@@ -550,7 +569,7 @@ export default function AdCreatives() {
                                           <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
                                           <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                                           <YAxis tick={{ fontSize: 11 }} />
-                                          <Tooltip />
+                                          <Tooltip wrapperStyle={{ zIndex: 20 }} />
                                           <Bar dataKey="value" fill="#2563EB" radius={[4, 4, 0, 0]} />
                                         </BarChart>
                                       </ResponsiveContainer>
@@ -558,7 +577,7 @@ export default function AdCreatives() {
                                   </div>
                                 )}
                               </div>
-                              <div className="min-w-0 rounded-lg border border-[#E5E7EB] bg-white p-4 h-full">
+                              <div className="h-full min-w-0 rounded-lg border border-[#E5E7EB] bg-white p-4">
                                 <p className="text-xs font-semibold text-[#6B7280] mb-3">AD DETAILS</p>
                                 <div className="grid grid-cols-[auto_auto] justify-between gap-x-3 gap-y-1 text-[13px]">
                                   {adDetails.map(({ label, value, bordered }) => (
