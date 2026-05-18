@@ -18,11 +18,15 @@ export function homeReport(funnel, pipeline) {
   const spend = funnel?.total_spend ?? 0
   const revenue = funnel?.closed_revenue ?? 0
   const cpl = funnel?.cost_per_lead ?? (leads > 0 ? +(spend / leads).toFixed(1) : 0)
+  const costPerMeeting = funnel?.cost_per_meeting ?? (meetings > 0 ? spend / meetings : 0)
+  const costPerSale = closed > 0 ? spend / closed : 0
   const showRate = funnel?.show_rate ?? (meetings > 0 ? +((showed / meetings) * 100).toFixed(1) : 0)
   const meetingRate = funnel?.meeting_rate ?? (leads > 0 ? +((meetings / leads) * 100).toFixed(1) : 0)
   const roas = funnel?.roas ?? (spend > 0 ? +(revenue / spend).toFixed(1) : 0)
   const pipelineValue = funnel?.pipeline_value ?? 0
   const cplDisplay = formatDashboardValue(cpl)
+  const costPerMeetingDisplay = formatDashboardValue(costPerMeeting)
+  const costPerSaleDisplay = formatDashboardValue(costPerSale)
   const showRateDisplay = formatDashboardValue(showRate)
   const meetingRateDisplay = formatDashboardValue(meetingRate)
   const roasDisplay = formatDashboardValue(roas)
@@ -36,11 +40,13 @@ export function homeReport(funnel, pipeline) {
 
   return formatReport({
     title: 'Home — Performance Overview',
-    summary: `This period you generated ${leads} leads at AED ${cplDisplay} CPL against a target of AED 85. Sarah booked ${meetings} meetings of which ${showed} showed up — a show rate of ${showRateDisplay}%. ${active} opportunities are active in the pipeline worth AED ${pipelineValue.toLocaleString()}. ${closed > 0 ? `You closed ${closed} deal${closed > 1 ? 's' : ''} generating AED ${revenue.toLocaleString()} in revenue and a ROAS of ${roasDisplay}x.` : 'No deals have closed yet — focus on progressing active opportunities to improve ROAS.'}`,
+    summary: `This period you generated ${leads} leads at AED ${cplDisplay} CPL and AED ${costPerMeetingDisplay} per meeting. Sarah booked ${meetings} meetings of which ${showed} showed up — a meeting rate of ${meetingRateDisplay}% and show rate of ${showRateDisplay}%. ${active} opportunities are active in the pipeline worth AED ${pipelineValue.toLocaleString()}. ${closed > 0 ? `You closed ${closed} deal${closed > 1 ? 's' : ''} generating AED ${revenue.toLocaleString()} in revenue at AED ${costPerSaleDisplay} per sale and a ROAS of ${roasDisplay}x.` : 'No deals have closed yet — focus on progressing active opportunities to improve ROAS.'}`,
     metrics: [
       { label: 'Total Leads', value: leads, target: 100, unit: '', status: metricStatus(leads, 100) },
       { label: 'CPL', value: `AED ${cplDisplay}`, target: 85, prefix: 'AED ', status: metricStatus(cpl, 85, true) },
       { label: 'Meetings Booked', value: meetings, target: 15, status: metricStatus(meetings, 15) },
+      { label: 'Cost Per Meeting', value: `AED ${costPerMeetingDisplay}`, target: 600, prefix: 'AED ', status: metricStatus(costPerMeeting, 600, true) },
+      { label: 'Cost Per Sale', value: closed > 0 ? `AED ${costPerSaleDisplay}` : '—', status: closed > 0 ? 'info' : 'amber' },
       { label: 'Show Rate', value: `${showRateDisplay}%`, target: 75, status: metricStatus(showRate, 75) },
       { label: 'Meeting Rate', value: `${meetingRateDisplay}%`, target: 18, status: metricStatus(meetingRate, 18) },
       { label: 'ROAS', value: `${roasDisplay}x`, target: 4, status: metricStatus(roas, 4) },
@@ -58,7 +64,7 @@ export function homeReport(funnel, pipeline) {
 // ─── Creative Performance ────────────────────────────────────────────────────
 export function creativeReport(ads) {
   if (!ads?.length) return formatReport({ title: 'Creative Performance', summary: 'No ad data available yet.', metrics: [], insights: [], recommendations: [] })
-  const active = ads.filter(a => a.status === 'active')
+  const active = ads.filter(a => String(a.status ?? '').trim().toUpperCase() === 'ACTIVE')
   const sorted = [...ads].filter(a => a.cost_per_lead).sort((a, b) => a.cost_per_lead - b.cost_per_lead)
   const best = sorted[0]
   const worst = sorted[sorted.length - 1]

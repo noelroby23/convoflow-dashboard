@@ -72,6 +72,7 @@ export default function Overview() {
   const closedRevenue = overview?.closed_revenue ?? 0
   const cpl = overview?.cost_per_lead ?? 0
   const costPerMeeting = overview?.cost_per_meeting ?? 0
+  const costPerSale = closedWon > 0 ? totalSpend / closedWon : 0
   const costPerActive = overview?.cost_per_active ?? 0
   const showRate = overview?.show_rate ?? 0
   const meetingRate = overview?.meeting_rate ?? 0
@@ -90,6 +91,9 @@ export default function Overview() {
   const roasTarget = targets?.roas_target ?? 4
   const formattedSpend = Number(totalSpend).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   const formattedCpl = Number(cpl).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const formattedCostPerMeeting = Number(costPerMeeting).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const formattedCostPerSale = Number(costPerSale).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const formattedClosedRevenue = Number(closedRevenue).toLocaleString('en-US', { maximumFractionDigits: 0 })
   const sortedActiveLeads = useMemo(() => {
     return [...(activeLeads ?? [])].sort((a, b) => {
       return getLeadDateValue(b).localeCompare(getLeadDateValue(a))
@@ -143,13 +147,14 @@ export default function Overview() {
             <p className="text-sm text-[#B91C1C]">KPI data is unavailable right now.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-6 gap-3 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-7 gap-3 mb-6">
             <KPICard label="Total Spend" value={totalSpend} prefix="AED " inverse={true} loading={overviewLoading} description="What you spent on ads this period" target={spendTarget} />
             <KPICard label="Total Leads" value={totalLeads} loading={overviewLoading} description="People who raised their hand interested in you" target={leadsTarget} />
             <KPICard label="Meetings Booked" value={meetingsBooked} loading={overviewLoading} description="Sales conversations Sarah booked" target={meetingsTarget} />
             <KPICard label="Showed Up" value={showedUp} loading={overviewLoading} description="People who actually attended their meeting" target={showsTarget} />
             <KPICard label="Active Opportunities" value={activeOpps} loading={overviewLoading} description="Leads your sales team is currently working" target={activeOppsTarget} />
             <KPICard label="Closed Won" value={closedWon} loading={overviewLoading} description="New customers who signed and paid" target={closesTarget} />
+            <KPICard label="Deal Value" value={closedRevenue} prefix="AED " loading={overviewLoading} description="Revenue from closed won deals" />
           </div>
         )}
       </ErrorBoundary>
@@ -157,12 +162,13 @@ export default function Overview() {
       <h2 className="text-xs font-semibold uppercase tracking-wide text-[#6B7280] mb-3">Unit Economics</h2>
       <ErrorBoundary>
         {overviewError && !overviewLoading ? null : (
-          <div className="grid grid-cols-6 gap-3 mb-6">
-            <KPICard label="Cost per Lead" value={cpl} prefix="AED " inverse={true} loading={overviewLoading} description="What each interested person costs you" target={cplTarget} recommendation="If CPL is above target, pause underperforming ads." />
-            <KPICard label="Cost per Meeting" value={costPerMeeting} prefix="AED " inverse={true} loading={overviewLoading} description="What each booked sales conversation costs you" target={costPerMeetingTarget} />
+          <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-7 gap-3 mb-6">
+            <KPICard label="Cost per Lead" value={cpl} prefix="AED " decimals={2} inverse={true} loading={overviewLoading} description="What each interested person costs you" target={cplTarget} recommendation="If CPL is above target, pause underperforming ads." />
+            <KPICard label="Cost per Meeting" value={costPerMeeting} prefix="AED " decimals={2} inverse={true} loading={overviewLoading} description="What each booked sales conversation costs you" target={costPerMeetingTarget} />
+            <KPICard label="Cost per Sale" value={costPerSale} prefix="AED " decimals={2} inverse={true} loading={overviewLoading} description="What each closed won deal costs in ad spend" />
             <KPICard label="Cost per Active Opp" value={costPerActive} prefix="AED " inverse={true} loading={overviewLoading} description="What it costs to get each real engaged buyer" target={costPerActiveTarget} />
             <KPICard label="Show Rate" value={showRate} suffix="%" loading={overviewLoading} description="Out of 10 booked meetings, how many show up" target={showRateTarget} recommendation="Add WhatsApp reminders 24h and 1h before meetings." />
-            <KPICard label="Meeting Rate" value={meetingRate} suffix="%" loading={overviewLoading} description="Out of 100 interested people, how many book" target={meetingRateTarget} />
+            <KPICard label="Meeting Rate" value={meetingRate} suffix="%" decimals={2} loading={overviewLoading} description="Out of 100 interested people, how many book" target={meetingRateTarget} />
             <KPICard label="ROAS" value={roas} suffix="x" loading={overviewLoading} description="For every AED spent, how many you make back" target={roasTarget} recommendation="Close active opportunities to improve ROAS." />
           </div>
         )}
@@ -253,7 +259,7 @@ export default function Overview() {
                         </td>
                         <td className="py-3 pr-4 text-[#6B7280] hidden md:table-cell">{lead.company_name || lead.company || '—'}</td>
                         <td className="py-3 pr-4 text-[#6B7280]">{lead.ad_name || lead.source_ad || '—'}</td>
-                        <td className="py-3 pr-4"><StatusBadge stage={lead.current_stage} /></td>
+                        <td className="py-3 pr-4"><StatusBadge stage={lead.current_stage} label={lead.stage_name || lead.stage_label || 'Unknown'} /></td>
                         <td className="py-3 pr-4 text-[#6B7280] whitespace-nowrap">{formatLeadDate(lead)}</td>
                         <td className="py-3 text-[#0F0F1A] font-medium hidden md:table-cell">{lead.deal_value ? `AED ${Number(lead.deal_value).toLocaleString()}` : '—'}</td>
                       </tr>
@@ -290,7 +296,7 @@ export default function Overview() {
                   <tr key={lead.contact_id} className="border-b border-[#F3F4F6] hover:bg-[#FAFAFA] cursor-pointer" onClick={() => openLeadTracker(lead.contact_id)}>
                     <td className="py-3 pr-4 font-medium text-[#0F0F1A]">{lead.full_name}</td>
                     <td className="py-3 pr-4 text-[#6B7280]">{lead.company || '—'}</td>
-                    <td className="py-3 pr-4"><StatusBadge stage={lead.current_stage} label={lead.stage_name} successTone="red" /></td>
+                    <td className="py-3 pr-4"><StatusBadge stage={lead.current_stage} label={lead.stage_name || lead.stage_label || 'Unknown'} successTone="red" /></td>
                     <td className="py-3 pr-4 text-[#6B7280]">{lead.ad_name || lead.source_ad || '—'}</td>
                     <td className="py-3 pr-4 text-[#6B7280]">{formatLeadDate(lead)}</td>
                     <td className="py-3 font-medium text-[#0F0F1A]">{lead.deal_value ? `AED ${Number(lead.deal_value).toLocaleString()}` : '—'}</td>
@@ -302,10 +308,10 @@ export default function Overview() {
         </div>
       </ErrorBoundary>
       <AISummary summary={
-        `This period you spent AED ${formattedSpend} and generated ${totalLeads} leads at a cost of AED ${formattedCpl} per lead, against a target of AED ${cplTarget}. ` +
-        `Sarah booked ${meetingsBooked} meetings, of which ${showedUp} showed up — a show rate of ${showRate}%. ` +
+        `This period you spent AED ${formattedSpend} and generated ${totalLeads} leads at a cost of AED ${formattedCpl} per lead, AED ${formattedCostPerMeeting} per meeting, and AED ${formattedCostPerSale} per sale. ` +
+        `Sarah booked ${meetingsBooked} meetings, of which ${showedUp} showed up — a meeting rate of ${Number(meetingRate).toFixed(2)}% and a show rate of ${Number(showRate).toFixed(1)}%. ` +
         `${activeOpps} opportunities are currently active in the pipeline with a total value of AED ${(overview?.pipeline_value ?? 0).toLocaleString()}. ` +
-        `${closedWon > 0 ? `You closed ${closedWon} deal${closedWon > 1 ? 's' : ''}, generating AED ${closedRevenue.toLocaleString()} in revenue and a ROAS of ${roas}x.` : 'No deals have closed yet this period — focus on progressing active opportunities.'}` +
+        `${closedWon > 0 ? `You closed ${closedWon} deal${closedWon > 1 ? 's' : ''}, generating AED ${formattedClosedRevenue} in revenue and a ROAS of ${Number(roas).toFixed(2)}x.` : 'No deals have closed yet this period — focus on progressing active opportunities.'}` +
         (showRate > 0 && showRate < showRateTarget ? ` Show rate is below the ${showRateTarget}% target — consider adding WhatsApp reminders before meetings.` : '')
       } loading={overviewLoading} />
     </div>

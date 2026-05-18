@@ -534,7 +534,7 @@ function AdsSummary({ ads, loading }) {
   const best = withCPL.length ? [...withCPL].sort((a, b) => a.cost_per_lead - b.cost_per_lead)[0] : null
   const worst = withCPL.length ? [...withCPL].sort((a, b) => b.cost_per_lead - a.cost_per_lead)[0] : null
   const highFreq = ads.filter(a => (a.avg_frequency ?? 0) > 1.5)
-  const activeCount = ads.filter(a => a.status === 'active').length
+  const activeCount = ads.filter(a => getAdStatusDisplay(a.status).isActive).length
   const withHook = ads.filter(a => a.hook_rate_pct != null)
   const killZone = withHook.filter(a => a.hook_rate_pct < 25)
   const bestHook = withHook.length ? [...withHook].sort((a, b) => b.hook_rate_pct - a.hook_rate_pct)[0] : null

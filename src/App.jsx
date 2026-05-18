@@ -17,6 +17,8 @@ import ReportModal from './components/ui/ReportModal'
 import { Toaster } from 'sonner'
 import { DailyAISummaryProvider } from './context/DailyAISummaryContext'
 
+const WINDOW_FOCUS_STALE_MS = 30_000
+
 function ProtectedRoute({ session, children }) {
   if (session === null) return <Navigate to="/login" replace />
   return children
@@ -39,6 +41,21 @@ export default function App() {
           useDashboardStore.getState().setClient(data.client_id, data.client_name)
         }
       })
+  }, [])
+
+  useEffect(() => {
+    let lastFocusRefreshAt = Date.now()
+
+    const handleFocus = () => {
+      const now = Date.now()
+      if (now - lastFocusRefreshAt < WINDOW_FOCUS_STALE_MS) return
+
+      lastFocusRefreshAt = now
+      useDashboardStore.getState().refresh()
+    }
+
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
   }, [])
 
   const handleLogout = async () => { await supabase.auth.signOut() }

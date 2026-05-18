@@ -10,6 +10,8 @@ import AISummary from '../components/ui/AISummary'
 
 const formatStage = (s) => s ? s.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : ''
 
+const getDisplayStage = (contact) => contact?.stage_name || contact?.stage_label || formatStage(contact?.current_stage)
+
 // Priority: derived from stage + quality score
 function getPriority(contact) {
   const stages = Array.isArray(contact.stage_filter_values) ? contact.stage_filter_values : [contact.current_stage]
@@ -177,7 +179,7 @@ function getCurrentStageEvent(contact, statusTime) {
 
   return {
     key: 'current-stage',
-    label: `Current Stage: ${contact.stage_label || formatStage(contact.current_stage)}`,
+    label: `Current Stage: ${getDisplayStage(contact)}`,
     timestamp: statusTime,
     sortAt: parseTimestamp(statusTime)?.getTime() ?? null,
     detail: config.detail,
@@ -646,7 +648,7 @@ export default function LeadTracker() {
         <button
           onClick={() => exportCsv(filtered.map(c => ({
             'Name': c.full_name, 'Company': c.company, 'Email': c.email, 'Phone': c.phone,
-            'Stage': c.stage_label || formatStage(c.current_stage), 'Priority': getPriority(c), 'Source Ad': c.ad_name || c.source_ad,
+            'Stage': getDisplayStage(c), 'Priority': getPriority(c), 'Source Ad': c.ad_name || c.source_ad,
             'Date': c.dubai_date, 'Quality Score': c.lead_quality_score, 'Deal Value': c.deal_value,
             'Meeting Date': c.meeting_date, 'Follow-up Attempts': c.follow_up_attempts,
             'Assigned To': c.assigned_to, 'DQ Reason': c.dq_reason, 'Call Summary': c.call_summary,
@@ -709,7 +711,7 @@ export default function LeadTracker() {
                       <td className="px-4 py-3 text-[#6B7280]">{formatDubaiDate(contact.dubai_date)}</td>
                       <td className="px-4 py-3">
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#F3F4F6] text-[#374151]">
-                          {contact.stage_label || formatStage(contact.current_stage) || 'Unknown'}
+                          {getDisplayStage(contact) || 'Unknown'}
                         </span>
                       </td>
                       <td className="px-4 py-3">
@@ -830,7 +832,7 @@ export default function LeadTracker() {
                             <div className="rounded-xl border border-[#E5E7EB] bg-white p-4">
                               <p className="text-xs font-semibold text-[#6B7280] mb-2">LEAD STATUS</p>
                               <div className="space-y-2 text-sm">
-                                <div className="flex justify-between gap-3"><span className="text-[#6B7280]">Stage</span><span className="text-right">{contact.stage_label || formatStage(contact.current_stage) || '—'}</span></div>
+                                <div className="flex justify-between gap-3"><span className="text-[#6B7280]">Stage</span><span className="text-right">{getDisplayStage(contact) || '—'}</span></div>
                                 <div className="flex justify-between gap-3"><span className="text-[#6B7280]">Priority</span><span className="text-right">{priorityConfig.label}</span></div>
                                 <div className="flex justify-between gap-3"><span className="text-[#6B7280]">Source Ad</span><span className="text-right">{contact.ad_name || contact.source_ad || '—'}</span></div>
                                 <div className="flex justify-between gap-3"><span className="text-[#6B7280]">Created</span><span className="text-right">{formatDubaiDate(contact.dubai_date)}</span></div>

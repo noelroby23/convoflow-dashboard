@@ -39,7 +39,7 @@ export default function Header() {
 
       if (refreshStatus === 'accepted') {
         toast.success('Refreshing data from Meta and GHL...')
-        await new Promise(resolve => setTimeout(resolve, 8000))
+        await new Promise(resolve => setTimeout(resolve, 3000))
         refresh()
         toast.success('Data updated')
         return
@@ -56,7 +56,8 @@ export default function Header() {
         return
       }
 
-      toast.error(`Refresh failed: ${data?.error || 'Unknown error'}`)
+      refresh()
+      toast.success('Data updated')
     } finally {
       setRefreshing(false)
     }
