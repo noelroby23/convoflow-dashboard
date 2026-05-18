@@ -154,7 +154,6 @@ export default function Overview() {
             <KPICard label="Showed Up" value={showedUp} loading={overviewLoading} description="People who actually attended their meeting" target={showsTarget} />
             <KPICard label="Active Opportunities" value={activeOpps} loading={overviewLoading} description="Leads your sales team is currently working" target={activeOppsTarget} />
             <KPICard label="Closed Won" value={closedWon} loading={overviewLoading} description="New customers who signed and paid" target={closesTarget} />
-            <KPICard label="Deal Value" value={closedRevenue} prefix="AED " loading={overviewLoading} description="Revenue from closed won deals" />
           </div>
         )}
       </ErrorBoundary>
@@ -165,7 +164,6 @@ export default function Overview() {
           <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-7 gap-3 mb-6">
             <KPICard label="Cost per Lead" value={cpl} prefix="AED " decimals={2} inverse={true} loading={overviewLoading} description="What each interested person costs you" target={cplTarget} recommendation="If CPL is above target, pause underperforming ads." />
             <KPICard label="Cost per Meeting" value={costPerMeeting} prefix="AED " decimals={2} inverse={true} loading={overviewLoading} description="What each booked sales conversation costs you" target={costPerMeetingTarget} />
-            <KPICard label="Cost per Sale" value={costPerSale} prefix="AED " decimals={2} inverse={true} loading={overviewLoading} description="What each closed won deal costs in ad spend" />
             <KPICard label="Cost per Active Opp" value={costPerActive} prefix="AED " inverse={true} loading={overviewLoading} description="What it costs to get each real engaged buyer" target={costPerActiveTarget} />
             <KPICard label="Show Rate" value={showRate} suffix="%" loading={overviewLoading} description="Out of 10 booked meetings, how many show up" target={showRateTarget} recommendation="Add WhatsApp reminders 24h and 1h before meetings." />
             <KPICard label="Meeting Rate" value={meetingRate} suffix="%" decimals={2} loading={overviewLoading} description="Out of 100 interested people, how many book" target={meetingRateTarget} />
