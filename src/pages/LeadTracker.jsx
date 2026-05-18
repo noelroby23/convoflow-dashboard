@@ -10,7 +10,7 @@ import AISummary from '../components/ui/AISummary'
 
 const formatStage = (s) => s ? s.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : ''
 
-const getDisplayStage = (contact) => contact?.stage_name || contact?.stage_label || formatStage(contact?.current_stage)
+const getDisplayStage = (contact) => contact?.stage_name || ''
 
 // Priority: derived from stage + quality score
 function getPriority(contact) {
@@ -139,7 +139,8 @@ function sortJourneyEvents(events) {
 }
 
 function getCurrentStageEvent(contact, statusTime) {
-  if (!contact.current_stage) return null
+  const displayStage = getDisplayStage(contact)
+  if (!displayStage) return null
 
   const stageConfig = {
     follow_up: {
@@ -179,7 +180,7 @@ function getCurrentStageEvent(contact, statusTime) {
 
   return {
     key: 'current-stage',
-    label: `Current Stage: ${getDisplayStage(contact)}`,
+    label: `Current Stage: ${displayStage}`,
     timestamp: statusTime,
     sortAt: parseTimestamp(statusTime)?.getTime() ?? null,
     detail: config.detail,

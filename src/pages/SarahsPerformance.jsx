@@ -62,7 +62,7 @@ function formatPercent(percent) {
 }
 
 function formatContactStage(contact) {
-  return contact?.stage_name || contact?.stage_label || contact?.current_stage?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Unknown'
+  return contact?.stage_name || 'Unknown'
 }
 
 export default function SarahsPerformance() {

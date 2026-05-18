@@ -121,6 +121,24 @@ const normalizeContactRows = (rows) => (rows ?? []).map(row => {
   }
 })
 
+const getContactLookupKeys = (row) => [row?.contact_id, row?.ghl_contact_id].filter(Boolean).map(String)
+
+const mergeStageNames = (rows, stageRows) => {
+  const stageNameByContactKey = new Map()
+
+  for (const stageRow of stageRows ?? []) {
+    if (!stageRow.stage_name) continue
+    for (const key of getContactLookupKeys(stageRow)) {
+      stageNameByContactKey.set(key, stageRow.stage_name)
+    }
+  }
+
+  return (rows ?? []).map(row => {
+    const stageName = getContactLookupKeys(row).map(key => stageNameByContactKey.get(key)).find(Boolean)
+    return stageName ? { ...row, stage_name: stageName } : row
+  })
+}
+
 function useDashboardQueryState({ includeDateRange = true } = {}) {
   const currentClientId = useDashboard(s => s.currentClientId)
   const dateRange = useDashboard(s => s.dateRange)
@@ -244,11 +262,25 @@ export function useContactDetails(bucket = null) {
         })
       }
 
-      return filterLeadTrackerByDubaiDate(
-        filterByClient(supabase.from('lead_tracker').select('*'), currentClientId),
-        dateRange.from,
-        dateRange.to
-      ).order('ghl_created_at', { ascending: false, nullsFirst: false })
+      const [contactsResult, stagesResult] = await Promise.all([
+        filterLeadTrackerByDubaiDate(
+          filterByClient(supabase.from('lead_tracker').select('*'), currentClientId),
+          dateRange.from,
+          dateRange.to
+        ).order('ghl_created_at', { ascending: false, nullsFirst: false }),
+        supabase.rpc('dashboard_contacts_by_bucket', {
+          p_bucket: 'leads',
+          p_start_date: dateRange.from,
+          p_end_date: dateRange.to,
+          p_client_id: currentClientId ?? null,
+        }),
+      ])
+
+      if (contactsResult.error || stagesResult.error) {
+        return { data: null, error: contactsResult.error || stagesResult.error }
+      }
+
+      return { data: mergeStageNames(contactsResult.data, stagesResult.data), error: null }
     },
     [currentClientId, dateRange.from, dateRange.to, bucket, refreshKey],
     USE_MOCK && mockFallbackContacts
@@ -278,11 +310,27 @@ export function useDashboardContactsByBucket(bucket = null) {
 export function useAllContacts() {
   const { currentClientId, dateRange, refreshKey } = useDashboardQueryState()
   return useNormalizedContactQuery(
-    () => filterLeadTrackerByDubaiDate(
-        filterByClient(supabase.from('lead_tracker').select('*'), currentClientId),
-        dateRange.from,
-        dateRange.to
-      ).order('ghl_created_at', { ascending: false, nullsFirst: false }),
+    async () => {
+      const [contactsResult, stagesResult] = await Promise.all([
+        filterLeadTrackerByDubaiDate(
+          filterByClient(supabase.from('lead_tracker').select('*'), currentClientId),
+          dateRange.from,
+          dateRange.to
+        ).order('ghl_created_at', { ascending: false, nullsFirst: false }),
+        supabase.rpc('dashboard_contacts_by_bucket', {
+          p_bucket: 'leads',
+          p_start_date: dateRange.from,
+          p_end_date: dateRange.to,
+          p_client_id: currentClientId ?? null,
+        }),
+      ])
+
+      if (contactsResult.error || stagesResult.error) {
+        return { data: null, error: contactsResult.error || stagesResult.error }
+      }
+
+      return { data: mergeStageNames(contactsResult.data, stagesResult.data), error: null }
+    },
     [currentClientId, dateRange.from, dateRange.to, refreshKey], mockFallbackLeadTracker
   )
 }
@@ -290,11 +338,27 @@ export function useAllContacts() {
 export function useLeadTrackerContacts() {
   const { currentClientId, dateRange, refreshKey } = useDashboardQueryState()
   return useNormalizedContactQuery(
-    () => filterLeadTrackerByDubaiDate(
-        filterByClient(supabase.from('lead_tracker').select('*'), currentClientId),
-        dateRange.from,
-        dateRange.to
-      ).order('ghl_created_at', { ascending: false, nullsFirst: false }),
+    async () => {
+      const [contactsResult, stagesResult] = await Promise.all([
+        filterLeadTrackerByDubaiDate(
+          filterByClient(supabase.from('lead_tracker').select('*'), currentClientId),
+          dateRange.from,
+          dateRange.to
+        ).order('ghl_created_at', { ascending: false, nullsFirst: false }),
+        supabase.rpc('dashboard_contacts_by_bucket', {
+          p_bucket: 'leads',
+          p_start_date: dateRange.from,
+          p_end_date: dateRange.to,
+          p_client_id: currentClientId ?? null,
+        }),
+      ])
+
+      if (contactsResult.error || stagesResult.error) {
+        return { data: null, error: contactsResult.error || stagesResult.error }
+      }
+
+      return { data: mergeStageNames(contactsResult.data, stagesResult.data), error: null }
+    },
     [currentClientId, dateRange.from, dateRange.to, refreshKey], mockFallbackLeadTracker
   )
 }
