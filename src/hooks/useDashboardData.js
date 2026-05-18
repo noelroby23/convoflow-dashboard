@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { useDashboard } from '../store/dashboard'
 import { useSupabaseQuery } from './useSupabaseQuery'
@@ -121,6 +122,26 @@ const normalizeContactRows = (rows) => (rows ?? []).map(row => {
   }
 })
 
+function useDashboardQueryState({ includeDateRange = true } = {}) {
+  const currentClientId = useDashboard(s => s.currentClientId)
+  const dateRange = useDashboard(s => s.dateRange)
+  const refreshKey = useDashboard(s => s.refreshKey)
+
+  return includeDateRange
+    ? { currentClientId, dateRange, refreshKey }
+    : { currentClientId, refreshKey }
+}
+
+function useNormalizedContactQuery(queryFn, deps, fallback) {
+  const result = useSupabaseQuery(queryFn, deps, fallback)
+  const data = useMemo(
+    () => result.data ? normalizeContactRows(result.data) : result.data,
+    [result.data]
+  )
+
+  return { ...result, data }
+}
+
 export function useClients() {
   return useSupabaseQuery(
     () => supabase.from('funnel_summary').select('client_id, client_name'),
@@ -129,7 +150,7 @@ export function useClients() {
 }
 
 export function useFunnelByDate() {
-  const { currentClientId, dateRange, refreshKey } = useDashboard()
+  const { currentClientId, dateRange, refreshKey } = useDashboardQueryState()
   return useSupabaseQuery(
     async () => {
       const { data, error } = await supabase.rpc('funnel_summary_by_date', {
@@ -142,7 +163,7 @@ export function useFunnelByDate() {
 }
 
 export function useFunnelSummary() {
-  const { currentClientId, refreshKey } = useDashboard()
+  const { currentClientId, refreshKey } = useDashboardQueryState({ includeDateRange: false })
   return useSupabaseQuery(
     async () => {
       const { data, error } = await supabase.rpc('funnel_summary_by_date', {
@@ -156,7 +177,7 @@ export function useFunnelSummary() {
 }
 
 export function useAdPerformance() {
-  const { currentClientId, dateRange, refreshKey } = useDashboard()
+  const { currentClientId, dateRange, refreshKey } = useDashboardQueryState()
   return useSupabaseQuery(
     async () => {
       const { data, error } = await supabase.rpc('ad_performance_by_date', {
@@ -212,28 +233,23 @@ export function useAdPerformance() {
 }
 
 export function useContactDetails(bucket = null) {
-  const { currentClientId, dateRange, refreshKey } = useDashboard()
-  return useSupabaseQuery(
+  const { currentClientId, dateRange, refreshKey } = useDashboardQueryState()
+  return useNormalizedContactQuery(
     async () => {
       if (bucket) {
-        const { data, error } = await supabase.rpc('dashboard_contacts_by_bucket', {
+        return supabase.rpc('dashboard_contacts_by_bucket', {
           p_bucket: bucket,
           p_start_date: dateRange.from,
           p_end_date: dateRange.to,
           p_client_id: currentClientId ?? null,
         })
-
-        return { data: error ? null : normalizeContactRows(data), error }
       }
 
-      const { data, error } = await filterLeadTrackerByDubaiDate(
+      return filterLeadTrackerByDubaiDate(
         filterByClient(supabase.from('lead_tracker').select('*'), currentClientId),
         dateRange.from,
         dateRange.to
       ).order('ghl_created_at', { ascending: false, nullsFirst: false })
-
-      if (error) return { data: null, error }
-      return { data: normalizeContactRows(data), error: null }
     },
     [currentClientId, dateRange.from, dateRange.to, bucket, refreshKey],
     USE_MOCK && mockFallbackContacts
@@ -243,42 +259,31 @@ export function useContactDetails(bucket = null) {
 }
 
 export function useAllContacts() {
-  const { currentClientId, dateRange, refreshKey } = useDashboard()
-  return useSupabaseQuery(
-    async () => {
-      const { data, error } = await filterLeadTrackerByDubaiDate(
+  const { currentClientId, dateRange, refreshKey } = useDashboardQueryState()
+  return useNormalizedContactQuery(
+    () => filterLeadTrackerByDubaiDate(
         filterByClient(supabase.from('lead_tracker').select('*'), currentClientId),
         dateRange.from,
         dateRange.to
-      ).order('ghl_created_at', { ascending: false, nullsFirst: false })
-
-      if (error) return { data: null, error }
-
-      return { data: normalizeContactRows(data), error: null }
-    },
+      ).order('ghl_created_at', { ascending: false, nullsFirst: false }),
     [currentClientId, dateRange.from, dateRange.to, refreshKey], mockFallbackLeadTracker
   )
 }
 
 export function useLeadTrackerContacts() {
-  const { currentClientId, dateRange, refreshKey } = useDashboard()
-  return useSupabaseQuery(
-    async () => {
-      const { data, error } = await filterLeadTrackerByDubaiDate(
+  const { currentClientId, dateRange, refreshKey } = useDashboardQueryState()
+  return useNormalizedContactQuery(
+    () => filterLeadTrackerByDubaiDate(
         filterByClient(supabase.from('lead_tracker').select('*'), currentClientId),
         dateRange.from,
         dateRange.to
-      ).order('ghl_created_at', { ascending: false, nullsFirst: false })
-      if (error) return { data: null, error }
-
-      return { data: normalizeContactRows(data), error: null }
-    },
+      ).order('ghl_created_at', { ascending: false, nullsFirst: false }),
     [currentClientId, dateRange.from, dateRange.to, refreshKey], mockFallbackLeadTracker
   )
 }
 
 export function useSarahStages() {
-  const { currentClientId, dateRange, refreshKey } = useDashboard()
+  const { currentClientId, dateRange, refreshKey } = useDashboardQueryState()
 
   const { data, loading, error } = useSupabaseQuery(
     async () => {
@@ -331,7 +336,7 @@ export function useSarahStages() {
 }
 
 export function useDailyMetrics() {
-  const { currentClientId, dateRange, refreshKey } = useDashboard()
+  const { currentClientId, dateRange, refreshKey } = useDashboardQueryState()
   return useSupabaseQuery(
     () => filterByClient(supabase.from('daily_metrics').select('*'), currentClientId)
       .gte('date', dateRange.from).lte('date', dateRange.to)
@@ -341,7 +346,7 @@ export function useDailyMetrics() {
 }
 
 export function useTrendMetricsByDate() {
-  const { currentClientId, dateRange, refreshKey } = useDashboard()
+  const { currentClientId, dateRange, refreshKey } = useDashboardQueryState()
   return useSupabaseQuery(
     async () => {
       if (!dateRange.from || !dateRange.to) {
@@ -360,7 +365,7 @@ export function useTrendMetricsByDate() {
 }
 
 export function useSalesPerformance() {
-  const { currentClientId, dateRange, refreshKey } = useDashboard()
+  const { currentClientId, dateRange, refreshKey } = useDashboardQueryState()
   return useSupabaseQuery(
     async () => {
       const { data, error } = await supabase.rpc('sales_performance_by_date', {
@@ -401,7 +406,7 @@ export function useSalesPerformance() {
 }
 
 export function useTargets() {
-  const { currentClientId, refreshKey } = useDashboard()
+  const { currentClientId, refreshKey } = useDashboardQueryState({ includeDateRange: false })
   return useSupabaseQuery(
     async () => {
       const { data, error } = await filterByClient(supabase.from('targets').select('metric_name, target_value'), currentClientId)

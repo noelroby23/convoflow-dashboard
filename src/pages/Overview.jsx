@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAllContacts, useContactDetails, useTargets } from '../hooks/useDashboardData'
 import { useDashboardOverview } from '../hooks/useDashboardOverview'
 import KPICard from '../components/ui/KPICard'
@@ -52,11 +52,16 @@ export default function Overview() {
   const { data: activePipeline, loading: pipelineLoading, error: pipelineError } = useContactDetails('active')
   const [showAllLeads, setShowAllLeads] = useState(false)
   const [activeLeadStageFilter, setActiveLeadStageFilter] = useState('all')
+  const reportDataRef = useRef({ overview: null, activePipeline: null })
 
   useEffect(() => {
-    setReportBuilder(() => homeReport(overview, activePipeline))
+    reportDataRef.current = { overview, activePipeline }
+  }, [overview, activePipeline])
+
+  useEffect(() => {
+    setReportBuilder(() => homeReport(reportDataRef.current.overview, reportDataRef.current.activePipeline))
     return () => setReportBuilder(null)
-  }, [overview, activePipeline, setReportBuilder])
+  }, [setReportBuilder])
 
   const totalLeads = overview?.total_leads ?? 0
   const meetingsBooked = overview?.meetings_booked ?? 0
