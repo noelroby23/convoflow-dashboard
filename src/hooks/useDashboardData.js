@@ -57,11 +57,10 @@ const mockFallbackDailyMetrics = USE_MOCK ? mockTrendsData.map(d => ({
   clicks: 0, leads: d.leads, meetings_booked: d.meetings, closes: 0,
 })) : null
 
-const mockFallbackSarahStages = USE_MOCK ? {
-  stages: [],
+const mockFallbackSarahPerformance = USE_MOCK ? {
+  byBucket: {},
   totalLeads: 0,
-  funnelMeetings: 0,
-  funnelConversations: 0,
+  rows: [],
 } : null
 
 const filterLeadTrackerByDubaiDate = (query, from, to) => query.gte('dubai_date', from).lte('dubai_date', to)
@@ -258,6 +257,24 @@ export function useContactDetails(bucket = null) {
   )
 }
 
+export function useDashboardContactsByBucket(bucket = null) {
+  const { currentClientId, dateRange, refreshKey } = useDashboardQueryState()
+  return useNormalizedContactQuery(
+    () => {
+      if (!bucket) return Promise.resolve({ data: [], error: null })
+
+      return supabase.rpc('dashboard_contacts_by_bucket', {
+        p_bucket: bucket,
+        p_start_date: dateRange.from,
+        p_end_date: dateRange.to,
+        p_client_id: currentClientId ?? null,
+      })
+    },
+    [currentClientId, dateRange.from, dateRange.to, bucket, refreshKey],
+    null
+  )
+}
+
 export function useAllContacts() {
   const { currentClientId, dateRange, refreshKey } = useDashboardQueryState()
   return useNormalizedContactQuery(
@@ -282,54 +299,37 @@ export function useLeadTrackerContacts() {
   )
 }
 
-export function useSarahStages() {
+export function useSarahPerformance() {
   const { currentClientId, dateRange, refreshKey } = useDashboardQueryState()
 
   const { data, loading, error } = useSupabaseQuery(
     async () => {
-      const [stageResult, contactsResult] = await Promise.all([
-        supabase.rpc('sarah_stage_summary', {
-          start_date: dateRange.from,
-          end_date: dateRange.to,
-          p_client_id: currentClientId,
-        }),
-        filterLeadTrackerByDubaiDate(
-          filterByClient(supabase.from('lead_tracker').select('contact_id'), currentClientId),
-          dateRange.from,
-          dateRange.to
-        ),
-      ])
+      const { data, error } = await supabase.rpc('sarah_performance_breakdown', {
+        p_start_date: dateRange.from,
+        p_end_date: dateRange.to,
+        p_client_id: currentClientId ?? null,
+      })
 
-      if (stageResult.error || contactsResult.error) {
-        return { data: null, error: stageResult.error || contactsResult.error }
-      }
+      if (error) return { data: null, error }
 
-      const allRows = stageResult.data ?? []
-      const stages = allRows.filter(row => !row.stage?.startsWith('_funnel_'))
-      const funnelMeetings = Number(allRows.find(row => row.stage === '_funnel_meetings_booked')?.count ?? 0)
-      const funnelConversations = Number(allRows.find(row => row.stage === '_funnel_conversations')?.count ?? 0)
-      const totalLeads = new Set((contactsResult.data ?? []).map(row => row.contact_id)).size
-
-
+      const rows = data ?? []
       return {
         data: {
-          stages,
-          totalLeads,
-          funnelMeetings,
-          funnelConversations,
+          byBucket: Object.fromEntries(rows.map(row => [row.bucket, row])),
+          totalLeads: Number(rows[0]?.total_leads ?? 0),
+          rows,
         },
         error: null,
       }
     },
     [currentClientId, dateRange.from, dateRange.to, refreshKey],
-    mockFallbackSarahStages
+    mockFallbackSarahPerformance
   )
 
   return {
-    stages: data?.stages ?? [],
+    byBucket: data?.byBucket ?? {},
     totalLeads: data?.totalLeads ?? 0,
-    funnelMeetings: data?.funnelMeetings ?? 0,
-    funnelConversations: data?.funnelConversations ?? 0,
+    rows: data?.rows ?? [],
     loading,
     error,
   }
