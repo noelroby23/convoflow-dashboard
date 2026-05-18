@@ -290,7 +290,7 @@ export default function Overview() {
                   <tr key={lead.contact_id} className="border-b border-[#F3F4F6] hover:bg-[#FAFAFA] cursor-pointer" onClick={() => openLeadTracker(lead.contact_id)}>
                     <td className="py-3 pr-4 font-medium text-[#0F0F1A]">{lead.full_name}</td>
                     <td className="py-3 pr-4 text-[#6B7280]">{lead.company || '—'}</td>
-                    <td className="py-3 pr-4"><StatusBadge stage={lead.current_stage} successTone="red" /></td>
+                    <td className="py-3 pr-4"><StatusBadge stage={lead.current_stage} label={lead.stage_name} successTone="red" /></td>
                     <td className="py-3 pr-4 text-[#6B7280]">{lead.ad_name || lead.source_ad || '—'}</td>
                     <td className="py-3 pr-4 text-[#6B7280]">{formatLeadDate(lead)}</td>
                     <td className="py-3 font-medium text-[#0F0F1A]">{lead.deal_value ? `AED ${Number(lead.deal_value).toLocaleString()}` : '—'}</td>

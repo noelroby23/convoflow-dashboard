@@ -17,7 +17,7 @@ const stageConfig = {
   upcoming: { label: 'Upcoming', classes: 'bg-blue-100 text-blue-700' },
 }
 
-export default function StatusBadge({ stage, successTone = 'green' }) {
+export default function StatusBadge({ stage, label = null, successTone = 'green' }) {
   const config = stageConfig[stage] || { label: stage, classes: 'bg-gray-100 text-gray-600' }
   const classes = successTone === 'red'
     ? config.classes.replace(/bg-green-100|text-green-700|text-green-800/g, (token) => {
@@ -29,7 +29,7 @@ export default function StatusBadge({ stage, successTone = 'green' }) {
 
   return (
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${classes}`}>
-      {config.label}
+      {label || config.label}
     </span>
   )
 }
