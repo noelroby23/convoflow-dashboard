@@ -4,6 +4,15 @@ import { subDays, subMonths, subQuarters, startOfMonth, endOfMonth, startOfQuart
 
 export const DEFAULT_DATE_PRESET = 'this_month'
 export const ALL_TIME_START = '2020-01-01'
+export const DEFAULT_CLIENT_ID = 'b7f3e2a1-5c8d-4e9f-a1b2-3c4d5e6f7a8b'
+export const DEFAULT_CLIENT_NAME = 'ConvoFlow UAE'
+
+const getInitialClientId = () => {
+  if (typeof window === 'undefined') return DEFAULT_CLIENT_ID
+  const clientParam = new URLSearchParams(window.location.search).get('client')
+  if (clientParam === 'all') return null
+  return clientParam || DEFAULT_CLIENT_ID
+}
 
 export const DATE_RANGE_PRESETS = [
   { id: 'last_7_days', label: 'Last 7 Days' },
@@ -73,8 +82,8 @@ export const getPresetRange = (preset) => {
 export const useDashboard = create(
   persist(
     (set) => ({
-      currentClientId: 'ca5a5257-9217-4d06-990e-b789cb233ac0',
-      currentClientName: 'ConvoFlow UK',
+      currentClientId: getInitialClientId(),
+      currentClientName: getInitialClientId() === DEFAULT_CLIENT_ID ? DEFAULT_CLIENT_NAME : 'Current Market',
       dateRange: { preset: DEFAULT_DATE_PRESET, ...getPresetRange(DEFAULT_DATE_PRESET) },
       refreshKey: 0,
       reportBuilder: null,
@@ -93,7 +102,15 @@ export const useDashboard = create(
     }),
     {
       name: 'convoflow-dashboard-store-v2',
-      partialize: (state) => ({ currentClientId: state.currentClientId, dateRange: state.dateRange }),
+      version: 3,
+      migrate: (state) => {
+        if (state) {
+          delete state.currentClientId
+          delete state.currentClientName
+        }
+        return state
+      },
+      partialize: (state) => ({ dateRange: state.dateRange }),
     }
   )
 )

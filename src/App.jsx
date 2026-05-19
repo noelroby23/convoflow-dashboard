@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { supabase } from './lib/supabase'
 import { useDashboard as useDashboardStore } from './store/dashboard'
 import Layout from './components/Layout/Layout'
@@ -20,8 +20,14 @@ import { DailyAISummaryProvider } from './context/DailyAISummaryContext'
 const WINDOW_FOCUS_STALE_MS = 30_000
 
 function ProtectedRoute({ session, children }) {
-  if (session === null) return <Navigate to="/login" replace />
+  const { search } = useLocation()
+  if (session === null) return <Navigate to={{ pathname: '/login', search }} replace />
   return children
+}
+
+function RedirectWithSearch({ to }) {
+  const { search } = useLocation()
+  return <Navigate to={{ pathname: to, search }} replace />
 }
 
 export default function App() {
@@ -31,16 +37,6 @@ export default function App() {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session))
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => setSession(session))
     return () => subscription.unsubscribe()
-  }, [])
-
-  // Auto-load first available client
-  useEffect(() => {
-    supabase.from('funnel_summary').select('client_id, client_name').limit(1).single()
-      .then(({ data }) => {
-        if (data) {
-          useDashboardStore.getState().setClient(data.client_id, data.client_name)
-        }
-      })
   }, [])
 
   useEffect(() => {
@@ -106,8 +102,8 @@ export default function App() {
         <Toaster richColors position="top-right" />
         <ReportModal />
         <Routes>
-          <Route path="/login" element={(DEV_MODE || session) ? <Navigate to="/overview" replace /> : <Login />} />
-          <Route path="/" element={<Navigate to="/overview" replace />} />
+          <Route path="/login" element={(DEV_MODE || session) ? <RedirectWithSearch to="/overview" /> : <Login />} />
+          <Route path="/" element={<RedirectWithSearch to="/overview" />} />
           {routes.map(({ path, component }) => (
             <Route
               key={path}
@@ -120,7 +116,7 @@ export default function App() {
             />
           ))}
           {/* Catch-all: prevents blank pages from any sidebar link mismatches */}
-          <Route path="*" element={<Navigate to="/overview" replace />} />
+          <Route path="*" element={<RedirectWithSearch to="/overview" />} />
         </Routes>
       </BrowserRouter>
     </DailyAISummaryProvider>

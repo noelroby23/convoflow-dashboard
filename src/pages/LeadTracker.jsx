@@ -549,13 +549,17 @@ export default function LeadTracker() {
 
   const handleStageFilterChange = (selectedStage) => {
     setStageFilter(selectedStage)
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.delete('expand')
 
     if (selectedStage === 'all') {
-      setSearchParams({})
+      nextParams.delete('stage')
+      setSearchParams(nextParams, { replace: true })
       return
     }
 
-    setSearchParams({ stage: selectedStage })
+    nextParams.set('stage', selectedStage)
+    setSearchParams(nextParams, { replace: true })
   }
 
   const uniqueAds = contacts ? [...new Set(contacts.map(c => c.ad_name || c.source_ad).filter(Boolean))] : []

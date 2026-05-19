@@ -1,9 +1,10 @@
-import { NavLink } from 'react-router-dom'
+import { useEffect } from 'react'
+import { NavLink, useSearchParams } from 'react-router-dom'
 import {
   LayoutDashboard, Megaphone, Bot, Users, DollarSign,
   TrendingUp, Target, Search, Settings, ChevronDown, LogOut
 } from 'lucide-react'
-import { useDashboard } from '../../store/dashboard'
+import { DEFAULT_CLIENT_ID, DEFAULT_CLIENT_NAME, useDashboard } from '../../store/dashboard'
 import { useClients } from '../../hooks/useDashboardData'
 
 const navItems = [
@@ -20,7 +21,12 @@ const navItems = [
 export default function Sidebar({ onLogout }) {
   const { currentClientId, currentClientName, setClient } = useDashboard()
   const { data: clients } = useClients()
+  const [searchParams, setSearchParams] = useSearchParams()
   const realClients = clients ?? []
+  const clientParam = searchParams.get('client')
+  const urlClientId = clientParam === 'all' ? null : (clientParam || DEFAULT_CLIENT_ID)
+  const urlClient = realClients.find(client => client.client_id === urlClientId)
+  const navSearch = searchParams.toString()
   const hasCurrentClient = currentClientId && realClients.some(client => client.client_id === currentClientId)
   const clientOptions = [
     { client_id: null, client_name: 'All Markets' },
@@ -28,10 +34,29 @@ export default function Sidebar({ onLogout }) {
     ...realClients,
   ]
 
+  useEffect(() => {
+    if (!clientParam) {
+      const nextParams = new URLSearchParams(searchParams)
+      nextParams.set('client', DEFAULT_CLIENT_ID)
+      setSearchParams(nextParams, { replace: true })
+    }
+
+    const urlClientName = urlClientId === null
+      ? 'All Markets'
+      : urlClient?.client_name || (urlClientId === DEFAULT_CLIENT_ID ? DEFAULT_CLIENT_NAME : 'Current Market')
+
+    if ((currentClientId ?? null) !== (urlClientId ?? null) || currentClientName !== urlClientName) {
+      setClient(urlClientId, urlClientName)
+    }
+  }, [clientParam, currentClientId, currentClientName, searchParams, setClient, setSearchParams, urlClient?.client_name, urlClientId])
+
   const handleClientChange = (event) => {
     const nextClientId = event.target.value || null
     const nextClient = clientOptions.find(client => (client.client_id ?? '') === (nextClientId ?? ''))
     setClient(nextClient?.client_id ?? null, nextClient?.client_name ?? 'All Markets')
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set('client', nextClientId || 'all')
+    setSearchParams(nextParams, { replace: true })
   }
 
   return (
@@ -64,7 +89,7 @@ export default function Sidebar({ onLogout }) {
         {navItems.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
-            to={to}
+            to={{ pathname: to, search: navSearch ? `?${navSearch}` : '' }}
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2 rounded-lg mb-0.5 text-sm font-medium transition-all ${
                 isActive
@@ -81,7 +106,7 @@ export default function Sidebar({ onLogout }) {
         {/* Settings (admin) */}
         <div className="mt-2 pt-2 border-t border-[#E5E7EB]">
           <NavLink
-            to="/settings"
+            to={{ pathname: '/settings', search: navSearch ? `?${navSearch}` : '' }}
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                 isActive

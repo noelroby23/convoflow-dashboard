@@ -8,7 +8,7 @@ import ErrorBoundary from '../components/ui/ErrorBoundary'
 import StatusBadge from '../components/ui/StatusBadge'
 import AISummary from '../components/ui/AISummary'
 import DailyAISummaryModal from '../components/ui/DailyAISummaryModal'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useDashboard } from '../store/dashboard'
 import { homeReport } from '../lib/reports/generators'
 
@@ -44,6 +44,7 @@ function matchesMappedStage(lead, stage) {
 
 export default function Overview() {
   const navigate = useNavigate()
+  const location = useLocation()
   const dateRange = useDashboard(s => s.dateRange)
   const setReportBuilder = useDashboard(s => s.setReportBuilder)
   const { data: overview, loading: overviewLoading, error: overviewError } = useDashboardOverview(dateRange.from, dateRange.to)
@@ -117,7 +118,9 @@ export default function Overview() {
     setShowAllLeads(false)
   }
   const openLeadTracker = (contactId) => {
-    navigate(contactId ? `/lead-tracker?expand=${encodeURIComponent(contactId)}` : '/lead-tracker')
+    const params = new URLSearchParams(location.search)
+    if (contactId) params.set('expand', contactId)
+    navigate({ pathname: '/lead-tracker', search: params.toString() ? `?${params.toString()}` : '' })
   }
 
   // Build insights dynamically

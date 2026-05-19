@@ -1,5 +1,5 @@
 import { AlertCircle, AlertTriangle, Info, X } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useState, useRef, useEffect } from 'react'
 
 const icons = {
@@ -24,6 +24,7 @@ const flashBg = 'bg-red-500'
 
 export default function InsightsFeed({ insights = [] }) {
   const navigate = useNavigate()
+  const location = useLocation()
   const [dismissed, setDismissed] = useState([])
   const [flashingIdx, setFlashingIdx] = useState(null)
   const flashCount = useRef(0)
@@ -62,7 +63,7 @@ export default function InsightsFeed({ insights = [] }) {
             className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium cursor-pointer transition-colors duration-100 ${colors[severity]} ${isFlashing ? `${flashBg} text-white border-red-500` : bgColors[severity]}`}
             onClick={() => {
               startFlash(i)
-              if (insight.href) setTimeout(() => navigate(insight.href), 600)
+              if (insight.href) setTimeout(() => navigate({ pathname: insight.href, search: location.search }), 600)
             }}
           >
             {icons[severity]}
