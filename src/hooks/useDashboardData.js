@@ -197,9 +197,9 @@ export function useAdPerformance() {
   const { currentClientId, dateRange, refreshKey } = useDashboardQueryState()
   return useSupabaseQuery(
     async () => {
-      const { data, error } = await supabase.rpc('ad_performance_by_date', {
-        start_date: dateRange.from,
-        end_date: dateRange.to,
+      const { data, error } = await supabase.rpc('dashboard_ad_performance', {
+        p_start_date: dateRange.from,
+        p_end_date: dateRange.to,
         p_client_id: currentClientId,
       })
 
