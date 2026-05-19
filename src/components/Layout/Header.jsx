@@ -37,26 +37,20 @@ export default function Header() {
         return
       }
 
-      if (refreshStatus === 'accepted') {
-        toast.success('Refreshing data from Meta and GHL...')
-        await new Promise(resolve => setTimeout(resolve, 3000))
-        refresh()
-        toast.success('Data updated')
-        return
-      }
-
-      if (refreshStatus === 'partial') {
-        toast.warning('Partial refresh — some sources failed')
-        refresh()
-        return
-      }
-
       if (refreshStatus === 'duplicate_recent_request') {
         toast.info('Just refreshed, please wait a minute before trying again')
         return
       }
 
+      toast.info('Syncing latest data from GHL and Meta...')
+      await new Promise(resolve => setTimeout(resolve, 3000))
       refresh()
+
+      if (refreshStatus === 'partial') {
+        toast.warning('Partial refresh — some sources failed')
+        return
+      }
+
       toast.success('Data updated')
     } finally {
       setRefreshing(false)
