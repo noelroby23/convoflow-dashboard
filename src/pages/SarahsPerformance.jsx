@@ -2,6 +2,8 @@ import { useState } from 'react'
 import KPICard from '../components/ui/KPICard'
 import ErrorBoundary from '../components/ui/ErrorBoundary'
 import { useDashboardContactsByBucket, useSarahPerformance, useTargets } from '../hooks/useDashboardData'
+import { useDashboardOverview } from '../hooks/useDashboardOverview'
+import { useDashboard } from '../store/dashboard'
 
 const SARAH_CARDS = [
   { key: 'follow_up', label: 'Follow Up Pending' },
@@ -67,17 +69,17 @@ function formatContactStage(contact) {
 
 export default function SarahsPerformance() {
   const { byBucket, totalLeads, loading, error } = useSarahPerformance()
+  const dateRange = useDashboard(s => s.dateRange)
+  const { data: kpis, loading: kpisLoading } = useDashboardOverview(dateRange.from, dateRange.to)
   const { data: targets } = useTargets()
   const [selectedBucket, setSelectedBucket] = useState(null)
   const { data: drilldownContacts, loading: drilldownLoading, error: drilldownError } = useDashboardContactsByBucket(selectedBucket)
 
   const selectedCard = SARAH_CARDS.find(card => card.key === selectedBucket)
-  const conversations = Math.max(totalLeads - Number(byBucket.new_lead?.contact_count ?? 0), 0)
-  const meetingsBooked = ['meeting_booked', 'no_show', 'active', 'showed', 'closed_won', 'closed_lost'].reduce(
-    (sum, bucket) => sum + Number(byBucket[bucket]?.contact_count ?? 0),
-    0
-  )
-  const bookingRate = totalLeads > 0 ? Number(((meetingsBooked / totalLeads) * 100).toFixed(1)) : 0
+  const kpiTotalLeads = kpis?.total_leads ?? totalLeads
+  const conversations = Math.max(kpiTotalLeads - Number(byBucket.new_lead?.contact_count ?? 0), 0)
+  const meetingsBooked = kpis?.meetings_booked ?? 0
+  const bookingRate = kpiTotalLeads > 0 ? Number(((meetingsBooked / kpiTotalLeads) * 100).toFixed(1)) : 0
   const meetingsTarget = targets?.monthly_meetings ? Math.round(targets.monthly_meetings / 2) : 15
 
   return (
@@ -86,20 +88,20 @@ export default function SarahsPerformance() {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 mb-6">
           <KPICard
             label="Total Leads"
-            value={totalLeads}
-            loading={loading}
+            value={kpiTotalLeads}
+            loading={loading || kpisLoading}
             description="All non-test leads assigned to Sarah's pipeline."
           />
           <KPICard
             label="Conversations"
             value={conversations}
-            loading={loading}
+            loading={loading || kpisLoading}
             description="Leads Sarah spoke with, including those who progressed further."
           />
           <KPICard
             label="Meetings Booked"
             value={meetingsBooked}
-            loading={loading}
+            loading={loading || kpisLoading}
             target={meetingsTarget}
             description="Total meetings booked by Sarah, including those who showed or closed."
           />
@@ -107,7 +109,7 @@ export default function SarahsPerformance() {
             label="Booking Rate"
             value={bookingRate}
             suffix="%"
-            loading={loading}
+            loading={loading || kpisLoading}
             description="Meetings booked as a share of total leads."
           />
         </div>
