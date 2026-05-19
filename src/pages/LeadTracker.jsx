@@ -678,7 +678,8 @@ export default function LeadTracker() {
       </div>
 
       <div className="bg-white rounded-xl border border-[#E5E7EB] shadow-sm overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
           <thead className="bg-[#F3F4F6]">
             <tr>
               {['Name', 'Company', 'Source Ad', 'Date', 'Stage', 'Priority', 'Quality'].map(h => (
@@ -865,7 +866,8 @@ export default function LeadTracker() {
               )
             })}
           </tbody>
-        </table>
+          </table>
+        </div>
       </div>
     </ErrorBoundary>
 
