@@ -339,30 +339,53 @@ export function useLeadTrackerContacts() {
   const { currentClientId, dateRange, refreshKey } = useDashboardQueryState()
   return useNormalizedContactQuery(
     async () => {
-      const [contactsResult, stagesResult] = await Promise.all([
-        filterLeadTrackerByDubaiDate(
-          filterByClient(supabase.from('lead_tracker').select('*'), currentClientId),
-          dateRange.from,
-          dateRange.to
-        ).order('ghl_created_at', { ascending: false, nullsFirst: false }),
-        supabase.rpc('dashboard_contacts_by_bucket', {
-          p_bucket: 'leads',
-          p_start_date: dateRange.from,
-          p_end_date: dateRange.to,
-          p_client_id: currentClientId ?? null,
-        }),
-      ])
+      const { data, error } = await supabase.rpc('dashboard_contacts_by_bucket', {
+        p_bucket: 'leads',
+        p_start_date: dateRange.from,
+        p_end_date: dateRange.to,
+        p_client_id: currentClientId ?? null,
+      })
 
-      if (contactsResult.error || stagesResult.error) {
-        return { data: null, error: contactsResult.error || stagesResult.error }
-      }
+      if (error) return { data: null, error }
 
-      return { data: mergeStageNames(contactsResult.data, stagesResult.data), error: null }
+      const sorted = [...(data ?? [])].sort((a, b) => {
+        const aDate = a.dubai_date || a.ghl_created_at || a.created_at || ''
+        const bDate = b.dubai_date || b.ghl_created_at || b.created_at || ''
+        return String(bDate).localeCompare(String(aDate))
+      })
+
+      return { data: sorted, error: null }
     },
     [currentClientId, dateRange.from, dateRange.to, refreshKey], mockFallbackLeadTracker
   )
 }
 
+export function useLeadTrackerBucketContacts(bucket = null) {
+  const { currentClientId, dateRange, refreshKey } = useDashboardQueryState()
+  return useNormalizedContactQuery(
+    async () => {
+      if (!bucket) return { data: [], error: null }
+
+      const { data, error } = await supabase.rpc('dashboard_contacts_by_bucket', {
+        p_bucket: bucket,
+        p_start_date: dateRange.from,
+        p_end_date: dateRange.to,
+        p_client_id: currentClientId ?? null,
+      })
+
+      if (error) return { data: null, error }
+
+      const sorted = [...(data ?? [])].sort((a, b) => {
+        const aDate = a.dubai_date || a.ghl_created_at || a.created_at || ''
+        const bDate = b.dubai_date || b.ghl_created_at || b.created_at || ''
+        return String(bDate).localeCompare(String(aDate))
+      })
+
+      return { data: sorted, error: null }
+    },
+    [currentClientId, dateRange.from, dateRange.to, bucket, refreshKey], null
+  )
+}
 export function useSarahPerformance() {
   const { currentClientId, dateRange, refreshKey } = useDashboardQueryState()
 

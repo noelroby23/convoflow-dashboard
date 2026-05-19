@@ -1,6 +1,6 @@
 import { Fragment, useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { useLeadTrackerContacts } from '../hooks/useDashboardData'
+import { useLeadTrackerBucketContacts, useLeadTrackerContacts } from '../hooks/useDashboardData'
 import { useDashboard } from '../store/dashboard'
 import { leadsReport } from '../lib/reports/generators'
 import ErrorBoundary from '../components/ui/ErrorBoundary'
@@ -53,7 +53,7 @@ const STAGE_FILTERS = [
   { id: 'interested_no_meeting', label: 'Interested no meeting' },
   { id: 'human_requested', label: 'Human-Requested' },
   { id: 'qualified_no_meeting', label: 'Qualified No Meeting' },
-  { id: 'meeting_booked', label: 'Meeting Booked' },
+  { id: 'meetings_booked', label: 'Meeting Booked' },
   { id: 'no_show', label: 'No Show' },
   { id: 'not_interested', label: 'Not Interested' },
   { id: 'disqualified', label: 'Disqualified' },
@@ -65,7 +65,7 @@ const STAGE_FILTERS = [
   { id: 'closed_lost', label: 'Closed Lost' },
 ]
 
-const KNOWN_STAGE_VALUES = new Set(STAGE_FILTERS.filter(stage => stage.id !== 'all').map(stage => stage.id))
+const KNOWN_STAGE_VALUES = new Set([...STAGE_FILTERS.filter(stage => stage.id !== 'all').map(stage => stage.id), 'meeting_booked'])
 
 const hasText = (value) => typeof value === 'string' && value.trim().length > 0
 
@@ -479,6 +479,10 @@ function countStage(data, stage) {
 }
 
 function hasStage(contact, stage) {
+  if (stage === 'meetings_booked') {
+    return Boolean(contact.funnel_meeting_booked) || ['meeting_booked', 'showed', 'no_show', 'active', 'closed_won', 'closed_lost'].some(value => hasStage(contact, value))
+  }
+
   return Array.isArray(contact.stage_filter_values)
     ? contact.stage_filter_values.includes(stage)
     : contact.current_stage === stage
@@ -497,7 +501,7 @@ function getStageCounts(data) {
     interested_no_meeting: countStage(data, 'interested_no_meeting'),
     human_requested: countStage(data, 'human_requested'),
     qualified_no_meeting: countStage(data, 'qualified_no_meeting'),
-    meeting_booked: countStage(data, 'meeting_booked'),
+    meetings_booked: countStage(data, 'meetings_booked'),
     no_show: countStage(data, 'no_show'),
     not_interested: countStage(data, 'not_interested'),
     disqualified: countStage(data, 'disqualified'),
@@ -522,6 +526,8 @@ export default function LeadTracker() {
   const [priorityFilter, setPriorityFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [sortByPriority, setSortByPriority] = useState(false)
+  const selectedBucket = stageFilter === 'meetings_booked' ? 'meetings_booked' : null
+  const { data: meetingsBookedContacts, loading: meetingsBookedLoading, error: meetingsBookedError } = useLeadTrackerBucketContacts('meetings_booked')
 
   useEffect(() => {
     setReportBuilder(() => leadsReport(contacts))
@@ -530,7 +536,7 @@ export default function LeadTracker() {
 
   useEffect(() => {
     if (stageFromUrl && KNOWN_STAGE_VALUES.has(stageFromUrl)) {
-      setStageFilter(stageFromUrl)
+      setStageFilter(stageFromUrl === 'meeting_booked' ? 'meetings_booked' : stageFromUrl)
       return
     }
 
@@ -562,10 +568,17 @@ export default function LeadTracker() {
     setSearchParams(nextParams, { replace: true })
   }
 
-  const uniqueAds = contacts ? [...new Set(contacts.map(c => c.ad_name || c.source_ad).filter(Boolean))] : []
-  const stageCounts = contacts ? getStageCounts(contacts) : {}
+  const visibleContacts = selectedBucket ? meetingsBookedContacts : contacts
+  const visibleLoading = loading || (selectedBucket ? meetingsBookedLoading : false)
+  const visibleError = error || (selectedBucket ? meetingsBookedError : null)
+  const uniqueAds = visibleContacts ? [...new Set(visibleContacts.map(c => c.ad_name || c.source_ad).filter(Boolean))] : []
+  const baseStageCounts = contacts ? getStageCounts(contacts) : {}
+  const stageCounts = contacts ? {
+    ...baseStageCounts,
+    meetings_booked: meetingsBookedContacts?.length ?? baseStageCounts.meetings_booked,
+  } : {}
 
-  let filtered = applyFunnelFilter(contacts ?? [], stageFilter).filter(c => {
+  let filtered = (selectedBucket ? (visibleContacts ?? []) : applyFunnelFilter(contacts ?? [], stageFilter)).filter(c => {
     const matchAd = adFilter === 'all' || (c.ad_name || c.source_ad) === adFilter
     const matchPriority = priorityFilter === 'all' || getPriority(c) === priorityFilter
     const matchSearch = !search || [c.full_name, c.email, c.company, c.phone].some(f => f?.toLowerCase().includes(search.toLowerCase()))
@@ -675,13 +688,13 @@ export default function LeadTracker() {
             </tr>
           </thead>
           <tbody>
-            {loading ? (
+            {visibleLoading ? (
               [...Array(6)].map((_, i) => (
                 <tr key={i} className="border-t border-[#F3F4F6]">
                   <td colSpan={8} className="px-4 py-3"><div className="skeleton h-6 w-full" /></td>
                 </tr>
               ))
-            ) : error ? (
+            ) : visibleError ? (
               <tr>
                 <td colSpan={8} className="px-4 py-8 text-center text-sm text-[#B91C1C]">
                   Failed to load leads. Try refreshing.
