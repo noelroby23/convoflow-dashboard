@@ -432,26 +432,32 @@ export function useSalesPerformance() {
   const { currentClientId, dateRange, refreshKey } = useDashboardQueryState()
   return useSupabaseQuery(
     async () => {
-      const { data, error } = await supabase.rpc('sales_performance_by_date', {
+      const { data: kpiData, error: kpiError } = await supabase.rpc('dashboard_kpis', {
         start_date: dateRange.from,
         end_date: dateRange.to,
         p_client_id: currentClientId,
       })
-      if (error) return { data: null, error }
+      if (kpiError) return { data: null, error: kpiError }
 
-      const totals = data?.totals ?? {}
-      const perRep = Array.isArray(data?.per_rep) ? data.per_rep : []
+      const { data: repsData, error: repsError } = await filterByClient(
+        supabase.from('sales_rep_performance').select('*'),
+        currentClientId
+      )
+      if (repsError) return { data: null, error: repsError }
+
+      const totals = Array.isArray(kpiData) ? (kpiData[0] ?? {}) : (kpiData ?? {})
+      const perRep = Array.isArray(repsData) ? repsData : []
 
       return {
         data: {
           totals: {
-            meetings_scheduled: Number(totals.meetings_scheduled ?? 0),
-            shows: Number(totals.shows ?? 0),
+            meetings_scheduled: Number(totals.meetings_booked ?? 0),
+            shows: Number(totals.showed_up ?? 0),
             no_shows: Number(totals.no_shows ?? 0),
-            closes: Number(totals.closes ?? 0),
+            closes: Number(totals.closed_won ?? 0),
             disqualified: Number(totals.disqualified ?? 0),
-            lost_not_interested: Number(totals.lost_not_interested ?? 0),
-            revenue_closed: Number(totals.revenue_closed ?? 0),
+            lost_not_interested: Number(totals.closed_lost ?? 0),
+            revenue_closed: Number(totals.deal_value ?? totals.closed_revenue ?? 0),
           },
           per_rep: perRep.map(rep => ({
             ...rep,

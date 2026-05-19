@@ -38,8 +38,8 @@ export default function SalesPerformance() {
   const showsTarget = 23
   const closeRateTarget = 20
 
-  const showRate = totalMeetings > 0 ? ((totalShows / totalMeetings) * 100).toFixed(0) : 0
-  const closeRate = totalShows > 0 ? ((totalCloses / totalShows) * 100).toFixed(0) : 0
+  const showRate = totalMeetings > 0 ? Number(((totalShows / totalMeetings) * 100).toFixed(1)) : 0
+  const closeRate = totalShows > 0 ? Number(((totalCloses / totalShows) * 100).toFixed(1)) : 0
 
   return (
     <div>
@@ -77,7 +77,7 @@ export default function SalesPerformance() {
           {/* Per-rep table */}
           <ErrorBoundary>
             <div className="bg-white rounded-xl border border-[#E5E7EB] p-6 shadow-sm mb-6">
-              <h2 className="text-sm font-bold text-[#0F0F1A] mb-4">Per-Salesperson Performance</h2>
+              <h2 className="text-sm font-bold text-[#0F0F1A] mb-4">Per-Salesperson Performance (all-time)</h2>
               {salesLoading ? (
                 <div className="space-y-3">{[...Array(3)].map((_, i) => <div key={i} className="skeleton h-10 w-full" />)}</div>
               ) : salesError ? (
