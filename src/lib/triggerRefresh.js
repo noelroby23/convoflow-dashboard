@@ -1,8 +1,8 @@
 import { supabase } from './supabase'
 
-export async function triggerRefresh(target = 'all') {
+export async function triggerRefresh(target = 'all', clientId = null) {
   const { data, error } = await supabase.functions.invoke('trigger-refresh', {
-    body: { target }
+    body: { target, client_id: clientId }
   })
 
   if (error) {

@@ -13,6 +13,7 @@ export default function DailyAISummaryModal() {
     setLastOpenedDate,
     hiddenForDate,
     setHiddenForDate,
+    refreshKey,
   } = useDailyAISummary()
 
   const today = format(new Date(), 'yyyy-MM-dd')
@@ -27,11 +28,11 @@ export default function DailyAISummaryModal() {
       return
     }
 
-    if (lastOpenedDate === today || hiddenForDate === today) return
+    if (refreshKey === 0 && (lastOpenedDate === today || hiddenForDate === today)) return
 
     setIsOpen(true)
     setLastOpenedDate(today)
-  }, [hiddenForDate, isEnabled, lastOpenedDate, setLastOpenedDate, today])
+  }, [hiddenForDate, isEnabled, lastOpenedDate, refreshKey, setLastOpenedDate, today])
 
   if (!isOpen || !isEnabled) return null
 

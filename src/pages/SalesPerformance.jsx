@@ -77,7 +77,7 @@ export default function SalesPerformance() {
           {/* Per-rep table */}
           <ErrorBoundary>
             <div className="bg-white rounded-xl border border-[#E5E7EB] p-6 shadow-sm mb-6">
-              <h2 className="text-sm font-bold text-[#0F0F1A] mb-4">Per-Salesperson Performance (all-time)</h2>
+              <h2 className="text-sm font-bold text-[#0F0F1A] mb-4">Per-Salesperson Performance</h2>
               {salesLoading ? (
                 <div className="space-y-3">{[...Array(3)].map((_, i) => <div key={i} className="skeleton h-10 w-full" />)}</div>
               ) : salesError ? (
@@ -88,27 +88,23 @@ export default function SalesPerformance() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-[#E5E7EB]">
-                      {['Name', 'Meetings', 'Shows', 'No-Shows', 'Show Rate', 'Closes', 'Close Rate', 'Revenue Closed'].map(h => (
+                      {['Sales Rep', 'Meetings', 'Shows', 'No Shows', 'Active', 'Won', 'Lost', 'Revenue'].map(h => (
                         <th key={h} className="text-left text-xs font-semibold text-[#6B7280] pb-2 pr-4">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {salesReps.map((rep) => {
-                      const showRate = rep.meetings_scheduled > 0
-                        ? ((rep.shows / rep.meetings_scheduled) * 100).toFixed(1) : '0.0'
-                      const closeRate = rep.shows > 0
-                        ? ((rep.closes / rep.shows) * 100).toFixed(1) : '0.0'
                       return (
                         <tr key={rep.sales_rep} className="border-b border-[#F3F4F6]">
                           <td className="py-3 pr-4 font-medium text-[#0F0F1A]">{rep.sales_rep}</td>
-                          <td className="py-3 pr-4">{rep.meetings_scheduled ?? '—'}</td>
-                          <td className="py-3 pr-4 text-[#16A34A] font-medium">{rep.shows ?? '—'}</td>
+                          <td className="py-3 pr-4">{rep.meetings_booked ?? rep.meetings_scheduled ?? '—'}</td>
+                          <td className="py-3 pr-4 text-[#16A34A] font-medium">{rep.showed_up ?? rep.shows ?? '—'}</td>
                           <td className="py-3 pr-4 text-[#DC2626] font-medium">{rep.no_shows ?? '—'}</td>
-                          <td className={`py-3 pr-4 font-medium ${parseFloat(showRate) < 50 ? 'text-[#DC2626]' : 'text-[#16A34A]'}`}>{showRate}%</td>
-                          <td className="py-3 pr-4">{rep.closes ?? '—'}</td>
-                          <td className={`py-3 pr-4 font-medium ${parseFloat(closeRate) === 0 ? 'text-[#DC2626]' : 'text-[#16A34A]'}`}>{closeRate}%</td>
-                          <td className="py-3 font-medium text-[#0F0F1A]">{rep.revenue_closed ? `AED ${Number(rep.revenue_closed).toLocaleString()}` : '—'}</td>
+                          <td className="py-3 pr-4">{rep.active ?? '—'}</td>
+                          <td className="py-3 pr-4">{rep.closed_won ?? rep.closes ?? '—'}</td>
+                          <td className="py-3 pr-4">{rep.closed_lost ?? '—'}</td>
+                          <td className="py-3 font-medium text-[#0F0F1A]">{rep.revenue ? `AED ${Number(rep.revenue).toLocaleString()}` : '—'}</td>
                         </tr>
                       )
                     })}

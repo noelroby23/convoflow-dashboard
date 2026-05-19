@@ -4,6 +4,7 @@ import { useDashboard } from '../../store/dashboard'
 import { FileDown, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { triggerRefresh } from '../../lib/triggerRefresh'
+import { useDailyAISummary } from '../../context/DailyAISummaryContext'
 import DateRangePicker from '../DateRangePicker'
 
 const pageTitles = {
@@ -20,7 +21,8 @@ const pageTitles = {
 
 export default function Header() {
   const location = useLocation()
-  const { refresh, openReport } = useDashboard()
+  const { currentClientId, refresh, openReport } = useDashboard()
+  const { regenerate } = useDailyAISummary()
   const title = pageTitles[location.pathname] || 'Dashboard'
   const isSettings = location.pathname === '/settings'
   const [refreshing, setRefreshing] = useState(false)
@@ -29,7 +31,7 @@ export default function Header() {
     setRefreshing(true)
 
     try {
-      const { ok, data } = await triggerRefresh('all')
+      const { ok, data } = await triggerRefresh('all', currentClientId)
       const refreshStatus = data?.status
 
       if (!ok) {
@@ -43,8 +45,9 @@ export default function Header() {
       }
 
       toast.info('Syncing latest data from GHL and Meta...')
-      await new Promise(resolve => setTimeout(resolve, 3000))
+      await new Promise(resolve => setTimeout(resolve, 10000))
       refresh()
+      regenerate()
 
       if (refreshStatus === 'partial') {
         toast.warning('Partial refresh — some sources failed')

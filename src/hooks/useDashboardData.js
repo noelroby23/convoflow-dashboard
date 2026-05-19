@@ -439,10 +439,11 @@ export function useSalesPerformance() {
       })
       if (kpiError) return { data: null, error: kpiError }
 
-      const { data: repsData, error: repsError } = await filterByClient(
-        supabase.from('sales_rep_performance').select('*'),
-        currentClientId
-      )
+      const { data: repsData, error: repsError } = await supabase.rpc('dashboard_sales_rep_performance', {
+        p_start_date: dateRange.from,
+        p_end_date: dateRange.to,
+        p_client_id: currentClientId,
+      })
       if (repsError) return { data: null, error: repsError }
 
       const totals = Array.isArray(kpiData) ? (kpiData[0] ?? {}) : (kpiData ?? {})
@@ -461,11 +462,18 @@ export function useSalesPerformance() {
           },
           per_rep: perRep.map(rep => ({
             ...rep,
-            meetings_scheduled: Number(rep.meetings_scheduled ?? 0),
-            shows: Number(rep.shows ?? 0),
+            meetings_scheduled: Number(rep.meetings_booked ?? rep.meetings_scheduled ?? 0),
+            meetings_booked: Number(rep.meetings_booked ?? rep.meetings_scheduled ?? 0),
+            shows: Number(rep.showed_up ?? rep.shows ?? 0),
+            showed_up: Number(rep.showed_up ?? rep.shows ?? 0),
             no_shows: Number(rep.no_shows ?? 0),
-            closes: Number(rep.closes ?? 0),
-            revenue_closed: Number(rep.revenue_closed ?? 0),
+            active: Number(rep.active ?? 0),
+            closes: Number(rep.closed_won ?? rep.closes ?? 0),
+            closed_won: Number(rep.closed_won ?? rep.closes ?? 0),
+            closed_lost: Number(rep.closed_lost ?? 0),
+            revenue_closed: Number(rep.revenue ?? rep.revenue_closed ?? 0),
+            revenue: Number(rep.revenue ?? rep.revenue_closed ?? 0),
+            pipeline_value: Number(rep.pipeline_value ?? 0),
           })),
         },
         error: null,

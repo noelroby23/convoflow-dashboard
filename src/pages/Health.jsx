@@ -15,10 +15,10 @@ export default function Health() {
   const closedRevenue = data?.closed_revenue ?? 0
   const leadsTarget = targets?.monthly_leads ?? 100
   const meetingsTarget = targets?.monthly_meetings ?? 30
-  const showRateTarget = targets?.show_rate ?? 75
+  const showedUpTarget = targets?.monthly_shows ?? 23
   const closesTarget = targets?.monthly_closes ?? 4
   const revenueTarget = targets?.monthly_revenue ?? (closesTarget * 10000)
-  const showedUpTarget = Math.round(meetingsTarget * (showRateTarget / 100))
+  const pct = (actual, target) => target > 0 ? (actual / target) * 100 : 0
 
   const metrics = useMemo(() => [
     { label: 'Total Leads',     actual: data?.total_leads ?? 0,     target: leadsTarget },
@@ -28,8 +28,11 @@ export default function Health() {
     { label: 'Revenue (AED)',   actual: closedRevenue,              target: revenueTarget, isCurrency: true },
   ], [closedRevenue, closesTarget, data?.closed_won, data?.meetings_booked, data?.showed_up, data?.total_leads, leadsTarget, meetingsTarget, revenueTarget, showedUpTarget])
 
-  const scores = metrics.filter(m => !m.isCurrency).map(m => Math.min((m.actual / m.target) * 100, 100))
-  const healthScore = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0
+  const healthScore = Math.round((
+    Math.min(pct(data?.total_leads ?? 0, leadsTarget), 100) +
+    Math.min(pct(data?.meetings_booked ?? 0, meetingsTarget), 100) +
+    Math.min(pct(data?.closed_won ?? 0, closesTarget), 100)
+  ) / 3)
 
   const healthStatus = useMemo(() => healthScore >= 80 ? { label: 'GREEN', color: '#16A34A', bg: 'bg-green-100 text-green-700' }
     : healthScore >= 60 ? { label: 'YELLOW', color: '#F59E0B', bg: 'bg-amber-100 text-amber-700' }
@@ -135,7 +138,7 @@ export default function Health() {
             </thead>
             <tbody>
               {metrics.map(({ label, actual, target, isCurrency }) => {
-                const pct = Math.round((actual / target) * 100)
+                const pctValue = Math.round(pct(actual, target))
                 const fmt = v => isCurrency ? `AED ${Number(v).toLocaleString()}` : v
                 return (
                   <tr key={label} className="border-b border-[#F3F4F6]">
@@ -145,12 +148,12 @@ export default function Health() {
                     <td className="py-3 pr-6">
                       <div className="flex items-center gap-2">
                         <div className="flex-1 bg-[#F3F4F6] rounded-full h-1.5 max-w-[80px]">
-                          <div className="h-1.5 rounded-full" style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: pct >= 80 ? '#16A34A' : pct >= 60 ? '#F59E0B' : '#DC2626' }} />
+                          <div className="h-1.5 rounded-full" style={{ width: `${Math.min(pctValue, 100)}%`, backgroundColor: pctValue >= 80 ? '#16A34A' : pctValue >= 60 ? '#F59E0B' : '#DC2626' }} />
                         </div>
-                        <span className="text-xs font-medium">{pct}%</span>
+                        <span className="text-xs font-medium">{pctValue}%</span>
                       </div>
                     </td>
-                    <td className="py-3">{getStatusBadge(pct)}</td>
+                    <td className="py-3">{getStatusBadge(pctValue)}</td>
                   </tr>
                 )
               })}
@@ -161,8 +164,8 @@ export default function Health() {
       <AISummary loading={loading} summary={
         `Overall health score is ${healthScore}% — ${healthStatus.label} status. ` +
         `${metrics.map(m => {
-          const pct = Math.round((m.actual / m.target) * 100)
-          return `${m.label}: ${m.actual} of ${m.target} target (${pct}%)`
+          const pctValue = Math.round(pct(m.actual, m.target))
+          return `${m.label}: ${m.actual} of ${m.target} target (${pctValue}%)`
         }).join(', ')}. ` +
         `Churn risk is ${churnRisk.label}. ` +
         `${healthScore >= 80 ? 'The campaign is performing well across all key metrics.' : healthScore >= 60 ? 'Performance is moderate — focus on the metrics showing yellow to avoid slipping into red.' : 'Performance is below target across multiple metrics — review ad spend allocation and sales follow-up urgently.'}`

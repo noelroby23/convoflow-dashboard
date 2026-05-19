@@ -11,8 +11,10 @@ const TARGET_CONFIG = [
   { key: 'monthly_spend',    label: 'Monthly Spend (AED)',     default: 33000 },
   { key: 'monthly_leads',    label: 'Monthly Leads',           default: 100 },
   { key: 'monthly_meetings', label: 'Monthly Meetings',        default: 30 },
+  { key: 'monthly_shows',    label: 'Monthly Shows',           default: 23 },
   { key: 'active_opportunities', label: 'Active Opportunities', default: 10 },
   { key: 'monthly_closes',   label: 'Monthly Closes',          default: 4 },
+  { key: 'monthly_revenue',  label: 'Monthly Revenue (AED)',   default: 40000 },
   { key: 'weekly_leads',     label: 'Weekly Leads',            default: 28 },
   { key: 'weekly_meetings',  label: 'Weekly Meetings',         default: 8 },
   { key: 'weekly_shows',     label: 'Weekly Shows',            default: 6 },
@@ -59,7 +61,7 @@ function Toggle({ defaultOn = true, checked, onChange }) {
 }
 
 export default function Settings() {
-  const { currentClientId } = useDashboard()
+  const { currentClientId, refresh } = useDashboard()
   const { isEnabled, setIsEnabled } = useDailyAISummary()
   const [targets, setTargets] = useState(defaultTargets)
   const [teamMembers, setTeamMembers] = useState([])
@@ -146,10 +148,13 @@ export default function Settings() {
 
     setSaving(true)
     setLoadError(null)
+    const { data: authData } = await supabase.auth.getUser()
     const rows = TARGET_CONFIG.map(t => ({
       client_id: currentClientId,
       metric_name: t.key,
       target_value: Number(targets[t.key] ?? t.default),
+      updated_by: authData?.user?.email ?? null,
+      updated_at: new Date().toISOString(),
     }))
     const { error } = await supabase
       .from('targets')
@@ -159,6 +164,7 @@ export default function Settings() {
       setLoadError(error.message)
       return
     }
+    refresh()
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
