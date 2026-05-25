@@ -1,5 +1,5 @@
 import { Fragment, useState, useEffect } from 'react'
-import { useAdPerformance } from '../hooks/useDashboardData'
+import { useAdDrilldown, useAdPerformance } from '../hooks/useDashboardData'
 import { useDashboard } from '../store/dashboard'
 import { creativeReport } from '../lib/reports/generators'
 import ErrorBoundary from '../components/ui/ErrorBoundary'
@@ -17,6 +17,14 @@ const FILTER_CHIPS = [
   { id: 'removal',    label: '🗑 Needs Removal',   color: 'text-[#6B7280] bg-gray-50 border-gray-200' },
   { id: 'revamp',     label: '🔄 Needs Revamp',    color: 'text-[#8B5CF6] bg-purple-50 border-purple-200' },
 ]
+
+const DRILLDOWN_METRICS = {
+  total_leads: { rpcMetric: 'leads', label: 'leads' },
+  meetings_booked: { rpcMetric: 'meetings_booked', label: 'meetings' },
+  showed_up: { rpcMetric: 'showed_up', label: 'showed' },
+  active_opportunities: { rpcMetric: 'active', label: 'active opportunities' },
+  closed_won: { rpcMetric: 'closed_won', label: 'closed won' },
+}
 
 function classifyAd(ad) {
   const cpl = Number(ad.cost_per_lead ?? 0)
@@ -86,6 +94,113 @@ function formatPercent(value, digits = 2) {
   const numeric = Number(value)
   if (value == null || !Number.isFinite(numeric)) return '—'
   return `${numeric.toFixed(digits)}%`
+}
+
+function formatContactDate(value) {
+  if (!value) return '—'
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+
+  return date.toLocaleDateString('en-GB', {
+    timeZone: 'Asia/Dubai',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
+function DrilldownMetricCell({ ad, metricKey, onOpen, className = '' }) {
+  const value = Number(ad[metricKey] ?? 0)
+  const metric = DRILLDOWN_METRICS[metricKey]
+  const canOpen = value > 0 && Boolean(ad.meta_ad_id)
+
+  if (!canOpen) {
+    return <td className={`px-4 py-3 ${className}`}>{value.toLocaleString()}</td>
+  }
+
+  return (
+    <td className={`px-4 py-3 ${className}`}>
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation()
+          onOpen({
+            adName: ad.ad_name || 'Ad',
+            metaAdId: ad.meta_ad_id,
+            metric: metric.rpcMetric,
+            metricLabel: metric.label,
+            count: value,
+          })
+        }}
+        className="font-semibold text-[#2563EB] underline-offset-2 hover:underline cursor-pointer"
+      >
+        {value.toLocaleString()}
+      </button>
+    </td>
+  )
+}
+
+function AdDrilldownModal({ drilldown, contacts, loading, error, onClose }) {
+  if (!drilldown) return null
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4"
+      onClick={(event) => { if (event.target === event.currentTarget) onClose() }}
+    >
+      <div className="w-full max-w-5xl rounded-2xl border border-[#E5E7EB] bg-white shadow-xl">
+        <div className="flex items-start justify-between gap-4 border-b border-[#E5E7EB] px-5 py-4">
+          <div>
+            <h3 className="text-sm font-bold text-[#0F0F1A]">
+              {drilldown.adName} — {drilldown.count.toLocaleString()} {drilldown.metricLabel}
+            </h3>
+            <p className="mt-1 text-xs text-[#6B7280]">Contacts attributed to this ad for the selected date range.</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg px-3 py-1.5 text-sm font-medium text-[#6B7280] hover:bg-[#F3F4F6]"
+          >
+            Close
+          </button>
+        </div>
+
+        <div className="max-h-[70vh] overflow-y-auto p-5">
+          {loading ? (
+            <div className="space-y-3">{[...Array(5)].map((_, index) => <div key={index} className="skeleton h-12 w-full" />)}</div>
+          ) : error ? (
+            <p className="text-sm text-[#B91C1C] text-center py-8">Failed to load contacts for this ad.</p>
+          ) : !contacts?.length ? (
+            <p className="text-sm text-[#9CA3AF] text-center py-8">No contacts found for this metric.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[#E5E7EB]">
+                    {['Name', 'Phone', 'Company', 'Stage', 'Date'].map(heading => (
+                      <th key={heading} className="pb-2 pr-4 text-left text-xs font-semibold text-[#6B7280]">{heading}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {contacts.map((contact, index) => (
+                    <tr key={contact.contact_id ?? contact.ghl_contact_id ?? index} className="border-b border-[#F3F4F6]">
+                      <td className="py-3 pr-4 font-medium text-[#0F0F1A]">{contact.full_name || 'Unknown'}</td>
+                      <td className="py-3 pr-4 text-[#6B7280]">{contact.phone || '—'}</td>
+                      <td className="py-3 pr-4 text-[#6B7280]">{contact.company || '—'}</td>
+                      <td className="py-3 pr-4 text-[#6B7280]">{contact.stage_name || contact.mapped_stage || '—'}</td>
+                      <td className="py-3 pr-4 text-[#6B7280] whitespace-nowrap">{formatContactDate(contact.ghl_created_at)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function getAdViewUrl(ad) {
@@ -242,6 +357,11 @@ export default function AdCreatives() {
   const setReportBuilder = useDashboard(s => s.setReportBuilder)
   const [expandedId, setExpandedId] = useState(null)
   const [activeFilter, setActiveFilter] = useState('all')
+  const [selectedDrilldown, setSelectedDrilldown] = useState(null)
+  const { data: drilldownContacts, loading: drilldownLoading, error: drilldownError } = useAdDrilldown(
+    selectedDrilldown?.metaAdId,
+    selectedDrilldown?.metric
+  )
 
   useEffect(() => {
     setReportBuilder(() => creativeReport(ads))
@@ -313,6 +433,7 @@ export default function AdCreatives() {
     { key: 'meetings_booked', label: 'Meetings' },
     { key: 'showed_up', label: 'Showed' },
     { key: 'active_opportunities', label: 'Active Opps' },
+    { key: 'closed_won', label: 'Closed Won' },
     { key: 'cost_per_active', label: 'Cost/Active' },
     { key: 'avg_frequency', label: 'Frequency' },
     { key: 'avg_ctr', label: 'CTR %' },
@@ -342,7 +463,7 @@ export default function AdCreatives() {
     exportCsv(filtered.map(ad => ({
       'Ad Name': ad.ad_name, 'Status': ad.status, 'Spend (AED)': ad.total_spend,
       'Leads': ad.total_leads, 'CPL (AED)': ad.cost_per_lead, 'Meetings': ad.meetings_booked,
-      'Showed': ad.showed_up, 'Active Opps': ad.active_opportunities, 'Cost/Active': ad.cost_per_active,
+      'Showed': ad.showed_up, 'Active Opps': ad.active_opportunities, 'Closed Won': ad.closed_won, 'Cost/Active': ad.cost_per_active,
       'Frequency': ad.avg_frequency, 'CTR %': ad.avg_ctr,
       'Hook Rate %': ad.hook_rate_pct, 'Watch-Through %': ad.watch_through_pct,
     })), 'ad-performance')
@@ -377,7 +498,7 @@ export default function AdCreatives() {
       ) : (
         <div className="bg-white rounded-xl border border-[#E5E7EB] shadow-sm overflow-hidden">
           <div style={{ overflowX: 'auto', width: '100%', WebkitOverflowScrolling: 'touch' }}>
-          <table className="w-full min-w-[1200px] text-sm">
+          <table className="w-full min-w-[1300px] text-sm">
             <thead className="bg-[#F3F4F6]">
               <tr>
                 {cols.map(({ key, label }) => (
@@ -411,7 +532,7 @@ export default function AdCreatives() {
                                   classification === 'best' ? 'border-l-2 border-l-green-400' :
                                   classification === 'revamp' ? 'border-l-2 border-l-purple-400' : ''
                 return (
-                  <>
+                  <Fragment key={ad.ad_id}>
                     <tr
                       key={ad.ad_id}
                       className={`border-t border-[#F3F4F6] hover:bg-[#FAFAFA] cursor-pointer transition-colors ${!statusDisplay.isActive ? 'opacity-60' : ''} ${rowAccent}`}
@@ -439,13 +560,12 @@ export default function AdCreatives() {
                         </span>
                       </td>
                       <td className="px-4 py-3">{ad.total_spend ? `AED ${Number(ad.total_spend).toLocaleString()}` : '—'}</td>
-                      <td className="px-4 py-3">{ad.total_leads ?? '—'}</td>
+                      <DrilldownMetricCell ad={ad} metricKey="total_leads" onOpen={setSelectedDrilldown} />
                       <td className={`px-4 py-3 ${getCPLColor(ad.cost_per_lead)}`}>{ad.cost_per_lead ? `AED ${Number(ad.cost_per_lead).toFixed(0)}` : '—'}</td>
-                      <td className="px-4 py-3">{ad.meetings_booked ?? '—'}</td>
-                      <td className="px-4 py-3">{ad.showed_up ?? '—'}</td>
-                      <td className={`px-4 py-3 font-medium ${(ad.active_opportunities ?? 0) > 0 ? 'text-[#16A34A]' : (ad.total_leads ?? 0) > 0 ? 'text-[#DC2626]' : ''}`}>
-                        {ad.active_opportunities ?? '—'}
-                      </td>
+                      <DrilldownMetricCell ad={ad} metricKey="meetings_booked" onOpen={setSelectedDrilldown} />
+                      <DrilldownMetricCell ad={ad} metricKey="showed_up" onOpen={setSelectedDrilldown} />
+                      <DrilldownMetricCell ad={ad} metricKey="active_opportunities" onOpen={setSelectedDrilldown} />
+                      <DrilldownMetricCell ad={ad} metricKey="closed_won" onOpen={setSelectedDrilldown} />
                       <td className="px-4 py-3">{ad.cost_per_active ? `AED ${Number(ad.cost_per_active).toFixed(0)}` : '∞'}</td>
                       <td className={`px-4 py-3 ${getFreqColor(ad.avg_frequency)}`}>{formatDecimal(ad.avg_frequency)}</td>
                       <td className="px-4 py-3">{ad.avg_ctr != null ? `${formatDecimal(ad.avg_ctr)}%` : '—'}</td>
@@ -457,7 +577,7 @@ export default function AdCreatives() {
                     </tr>
                     {expandedId === ad.ad_id && (
                       <tr key={`${ad.ad_id}-expanded`} className="border-t border-[#F3F4F6] bg-[#FAFAFA]">
-                        <td colSpan={14} className="px-6 pt-4 pb-3">
+                        <td colSpan={15} className="px-6 pt-4 pb-3">
                           <div className="mb-3 box-border grid w-full grid-cols-1 gap-4 overflow-hidden rounded-lg bg-[#F9FAFB] p-4 lg:grid-cols-[220px_minmax(0,1fr)]">
                             <div className="min-w-0">
                               <ExpandedCreativePreview ad={ad} />
@@ -522,7 +642,7 @@ export default function AdCreatives() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 )
               })}
             </tbody>
@@ -531,6 +651,14 @@ export default function AdCreatives() {
         </div>
       )}
     </ErrorBoundary>
+
+    <AdDrilldownModal
+      drilldown={selectedDrilldown}
+      contacts={drilldownContacts}
+      loading={drilldownLoading}
+      error={drilldownError}
+      onClose={() => setSelectedDrilldown(null)}
+    />
 
     <AdsSummary ads={ads} loading={loading} />
   </>

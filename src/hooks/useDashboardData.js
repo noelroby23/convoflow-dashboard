@@ -270,6 +270,36 @@ export function useAdPerformance() {
   )
 }
 
+export function useAdDrilldown(metaAdId = null, metric = null) {
+  const { currentClientId, dateRange, refreshKey } = useDashboardQueryState()
+  return useSupabaseQuery(
+    async () => {
+      if (!metaAdId || !metric) return { data: [], error: null }
+
+      const { data, error } = await supabase.rpc('dashboard_ad_drilldown', {
+        p_meta_ad_id: String(metaAdId),
+        p_metric: metric,
+        p_start_date: dateRange.from,
+        p_end_date: dateRange.to,
+        p_client_id: currentClientId ?? null,
+      })
+
+      if (error) return { data: null, error }
+
+      return {
+        data: (data ?? []).map(row => ({
+          ...row,
+          full_name: row.full_name || [row.first_name, row.last_name].filter(Boolean).join(' ') || null,
+          monetary_value: Number(row.monetary_value ?? 0),
+        })),
+        error: null,
+      }
+    },
+    [currentClientId, dateRange.from, dateRange.to, metaAdId, metric, refreshKey],
+    []
+  )
+}
+
 export function useContactDetails(bucket = null) {
   const { currentClientId, dateRange, refreshKey } = useDashboardQueryState()
   return useNormalizedContactQuery(
