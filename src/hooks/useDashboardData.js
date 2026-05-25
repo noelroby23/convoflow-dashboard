@@ -60,6 +60,7 @@ const mockFallbackDailyMetrics = USE_MOCK ? mockTrendsData.map(d => ({
 const mockFallbackSarahPerformance = USE_MOCK ? {
   byBucket: {},
   totalLeads: 0,
+  realConversations: 0,
   rows: [],
 } : null
 
@@ -508,19 +509,32 @@ export function useSarahPerformance() {
 
   const { data, loading, error } = useSupabaseQuery(
     async () => {
-      const { data, error } = await supabase.rpc('sarah_performance_breakdown', {
-        p_start_date: dateRange.from,
-        p_end_date: dateRange.to,
-        p_client_id: currentClientId ?? null,
-      })
+      const [breakdownResult, conversationCountResult] = await Promise.all([
+        supabase.rpc('sarah_performance_breakdown', {
+          p_start_date: dateRange.from,
+          p_end_date: dateRange.to,
+          p_client_id: currentClientId ?? null,
+        }),
+        supabase.rpc('real_conversation_count', {
+          p_start_date: dateRange.from,
+          p_end_date: dateRange.to,
+          p_client_id: currentClientId ?? null,
+        }),
+      ])
 
-      if (error) return { data: null, error }
+      if (breakdownResult.error) return { data: null, error: breakdownResult.error }
+      if (conversationCountResult.error) return { data: null, error: conversationCountResult.error }
 
-      const rows = data ?? []
+      const rows = breakdownResult.data ?? []
+      const conversationCount = Array.isArray(conversationCountResult.data)
+        ? (conversationCountResult.data[0] ?? null)
+        : conversationCountResult.data
+
       return {
         data: {
           byBucket: Object.fromEntries(rows.map(row => [row.bucket, row])),
           totalLeads: Number(rows[0]?.total_leads ?? 0),
+          realConversations: Number(conversationCount?.real_conversations ?? 0),
           rows,
         },
         error: null,
@@ -533,6 +547,7 @@ export function useSarahPerformance() {
   return {
     byBucket: data?.byBucket ?? {},
     totalLeads: data?.totalLeads ?? 0,
+    realConversations: data?.realConversations ?? 0,
     rows: data?.rows ?? [],
     loading,
     error,

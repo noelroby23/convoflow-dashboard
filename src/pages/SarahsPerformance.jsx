@@ -68,7 +68,7 @@ function formatContactStage(contact) {
 }
 
 export default function SarahsPerformance() {
-  const { byBucket, totalLeads, loading, error } = useSarahPerformance()
+  const { byBucket, totalLeads, realConversations, loading, error } = useSarahPerformance()
   const dateRange = useDashboard(s => s.dateRange)
   const { data: kpis, loading: kpisLoading } = useDashboardOverview(dateRange.from, dateRange.to)
   const { data: targets } = useTargets()
@@ -77,7 +77,6 @@ export default function SarahsPerformance() {
 
   const selectedCard = SARAH_CARDS.find(card => card.key === selectedBucket)
   const kpiTotalLeads = kpis?.total_leads ?? totalLeads
-  const conversations = Math.max(kpiTotalLeads - Number(byBucket.new_lead?.contact_count ?? 0), 0)
   const meetingsBooked = kpis?.meetings_booked ?? 0
   const bookingRate = kpiTotalLeads > 0 ? Number(((meetingsBooked / kpiTotalLeads) * 100).toFixed(1)) : 0
   const meetingsTarget = targets?.monthly_meetings ? Math.round(targets.monthly_meetings / 2) : 15
@@ -94,9 +93,9 @@ export default function SarahsPerformance() {
           />
           <KPICard
             label="Conversations"
-            value={conversations}
+            value={realConversations}
             loading={loading || kpisLoading}
-            description="Leads Sarah spoke with, including those who progressed further."
+            description="Leads who actually spoke with Sarah — voicemails and machines excluded."
           />
           <KPICard
             label="Meetings Booked"
