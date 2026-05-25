@@ -1,6 +1,6 @@
-import { Fragment, useState, useEffect } from 'react'
+import { Fragment, useMemo, useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { useLeadTrackerBucketContacts, useLeadTrackerContacts } from '../hooks/useDashboardData'
+import { useAdNamesByMetaIds, useLeadTrackerBucketContacts, useLeadTrackerContacts } from '../hooks/useDashboardData'
 import { useDashboard } from '../store/dashboard'
 import { leadsReport } from '../lib/reports/generators'
 import ErrorBoundary from '../components/ui/ErrorBoundary'
@@ -68,6 +68,20 @@ const STAGE_FILTERS = [
 const KNOWN_STAGE_VALUES = new Set([...STAGE_FILTERS.filter(stage => stage.id !== 'all').map(stage => stage.id), 'meeting_booked'])
 
 const hasText = (value) => typeof value === 'string' && value.trim().length > 0
+
+function getMetaAdId(contact) {
+  const id = contact?.meta_ad_id_raw ?? contact?.meta_ad_id ?? null
+  return id ? String(id) : ''
+}
+
+function getCreativeAdName(contact, adNameByMetaId = {}) {
+  const adNames = adNameByMetaId ?? {}
+  return contact?.ad_name || adNames[getMetaAdId(contact)] || ''
+}
+
+function getSourceAdLabel(contact, adNameByMetaId = {}) {
+  return getCreativeAdName(contact, adNameByMetaId) || contact?.source_ad || contact?.source || ''
+}
 
 function formatDubaiDate(value) {
   if (!value) return '—'
@@ -528,6 +542,8 @@ export default function LeadTracker() {
   const [sortByPriority, setSortByPriority] = useState(false)
   const selectedBucket = stageFilter === 'meetings_booked' ? 'meetings_booked' : null
   const { data: meetingsBookedContacts, loading: meetingsBookedLoading, error: meetingsBookedError } = useLeadTrackerBucketContacts('meetings_booked')
+  const metaAdIds = useMemo(() => [...new Set((contacts ?? []).map(getMetaAdId).filter(Boolean))], [contacts])
+  const { data: adNameByMetaId } = useAdNamesByMetaIds(metaAdIds)
 
   useEffect(() => {
     setReportBuilder(() => leadsReport(contacts))
@@ -571,7 +587,8 @@ export default function LeadTracker() {
   const visibleContacts = selectedBucket ? meetingsBookedContacts : contacts
   const visibleLoading = loading || (selectedBucket ? meetingsBookedLoading : false)
   const visibleError = error || (selectedBucket ? meetingsBookedError : null)
-  const uniqueAds = visibleContacts ? [...new Set(visibleContacts.map(c => c.ad_name || c.source_ad).filter(Boolean))] : []
+  const uniqueAds = contacts ? [...new Set(contacts.map(c => getCreativeAdName(c, adNameByMetaId)).filter(Boolean))].sort() : []
+  const hasNoAdAttribution = contacts ? contacts.some(c => !getMetaAdId(c)) : false
   const baseStageCounts = contacts ? getStageCounts(contacts) : {}
   const stageCounts = contacts ? {
     ...baseStageCounts,
@@ -579,7 +596,8 @@ export default function LeadTracker() {
   } : {}
 
   let filtered = (selectedBucket ? (visibleContacts ?? []) : applyFunnelFilter(contacts ?? [], stageFilter)).filter(c => {
-    const matchAd = adFilter === 'all' || (c.ad_name || c.source_ad) === adFilter
+    const matchAd = adFilter === 'all'
+      || (adFilter === 'none' ? !getMetaAdId(c) : getCreativeAdName(c, adNameByMetaId) === adFilter)
     const matchPriority = priorityFilter === 'all' || getPriority(c) === priorityFilter
     const matchSearch = !search || [c.full_name, c.email, c.company, c.phone].some(f => f?.toLowerCase().includes(search.toLowerCase()))
     return matchAd && matchPriority && matchSearch
@@ -660,13 +678,14 @@ export default function LeadTracker() {
             className={`appearance-none text-sm font-medium rounded-lg pl-9 pr-8 py-2 cursor-pointer transition-all focus:outline-none max-w-[200px] truncate ${adFilter !== 'all' ? 'border border-[#EC4899] bg-pink-50 text-[#EC4899]' : 'border border-[#E5E7EB] bg-white text-[#333333] hover:border-[#9CA3AF]'}`}>
             <option value="all">All Ads</option>
             {uniqueAds.map(a => <option key={a} value={a}>{a}</option>)}
+            {hasNoAdAttribution && <option value="none">No Ad Attribution</option>}
           </select>
         </div>
         <span className="text-xs text-[#6B7280]">{filtered.length} leads</span>
         <button
           onClick={() => exportCsv(filtered.map(c => ({
             'Name': c.full_name, 'Company': c.company, 'Email': c.email, 'Phone': c.phone,
-            'Stage': getDisplayStage(c), 'Priority': getPriority(c), 'Source Ad': c.ad_name || c.source_ad,
+            'Stage': getDisplayStage(c), 'Priority': getPriority(c), 'Source Ad': getSourceAdLabel(c, adNameByMetaId),
             'Date': c.dubai_date, 'Quality Score': c.lead_quality_score, 'Deal Value': c.deal_value,
             'Meeting Date': c.meeting_date, 'Follow-up Attempts': c.follow_up_attempts,
             'Assigned To': c.assigned_to, 'DQ Reason': c.dq_reason, 'Call Summary': c.call_summary,
@@ -726,7 +745,7 @@ export default function LeadTracker() {
                     >
                       <td className="px-4 py-3 font-medium text-[#0F0F1A]">{contact.full_name}</td>
                       <td className="px-4 py-3 text-[#6B7280]">{contact.company || '—'}</td>
-                      <td className="px-4 py-3 text-[#6B7280]">{contact.ad_name || contact.source_ad || '—'}</td>
+                      <td className="px-4 py-3 text-[#6B7280]">{getSourceAdLabel(contact, adNameByMetaId) || '—'}</td>
                       <td className="px-4 py-3 text-[#6B7280]">{formatDubaiDate(contact.dubai_date)}</td>
                       <td className="px-4 py-3">
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#F3F4F6] text-[#374151]">
@@ -853,7 +872,7 @@ export default function LeadTracker() {
                               <div className="space-y-2 text-sm">
                                 <div className="flex justify-between gap-3"><span className="text-[#6B7280]">Stage</span><span className="text-right">{getDisplayStage(contact) || '—'}</span></div>
                                 <div className="flex justify-between gap-3"><span className="text-[#6B7280]">Priority</span><span className="text-right">{priorityConfig.label}</span></div>
-                                <div className="flex justify-between gap-3"><span className="text-[#6B7280]">Source Ad</span><span className="text-right">{contact.ad_name || contact.source_ad || '—'}</span></div>
+                                <div className="flex justify-between gap-3"><span className="text-[#6B7280]">Source Ad</span><span className="text-right">{getSourceAdLabel(contact, adNameByMetaId) || '—'}</span></div>
                                 <div className="flex justify-between gap-3"><span className="text-[#6B7280]">Created</span><span className="text-right">{formatDubaiDate(contact.dubai_date)}</span></div>
                               </div>
                             </div>

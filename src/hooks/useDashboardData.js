@@ -386,6 +386,33 @@ export function useLeadTrackerBucketContacts(bucket = null) {
     [currentClientId, dateRange.from, dateRange.to, bucket, refreshKey], null
   )
 }
+
+export function useAdNamesByMetaIds(metaAdIds = []) {
+  const { currentClientId, refreshKey } = useDashboardQueryState({ includeDateRange: false })
+  const normalizedMetaAdIds = useMemo(() => [
+    ...new Set((metaAdIds ?? []).map(id => String(id).trim()).filter(Boolean)),
+  ].sort(), [metaAdIds])
+
+  return useSupabaseQuery(
+    async () => {
+      if (!normalizedMetaAdIds.length) return { data: {}, error: null }
+
+      const { data, error } = await filterByClient(
+        supabase.from('ads').select('meta_ad_id, ad_name'),
+        currentClientId
+      ).in('meta_ad_id', normalizedMetaAdIds)
+
+      if (error) return { data: null, error }
+
+      return {
+        data: Object.fromEntries((data ?? []).map(ad => [String(ad.meta_ad_id), ad.ad_name]).filter(([, name]) => Boolean(name))),
+        error: null,
+      }
+    },
+    [currentClientId, normalizedMetaAdIds.join('|'), refreshKey],
+    {}
+  )
+}
 export function useSarahPerformance() {
   const { currentClientId, dateRange, refreshKey } = useDashboardQueryState()
 
