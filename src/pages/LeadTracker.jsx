@@ -681,7 +681,7 @@ export default function LeadTracker() {
           onClick={() => exportCsv(filtered.map(c => ({
             'Name': c.full_name, 'Company': c.company, 'Email': c.email, 'Phone': c.phone,
             'Stage': getDisplayStage(c), 'Priority': getPriority(c), 'Source Ad': getSourceAdLabel(c, adOptionByMetaId),
-            'Date': c.dubai_date, 'Quality Score': c.lead_quality_score, 'Deal Value': c.deal_value,
+            'Date': c.dubai_date, 'Deal Value': c.deal_value,
             'Meeting Date': c.meeting_date, 'Follow-up Attempts': c.follow_up_attempts,
             'Assigned To': c.assigned_to, 'DQ Reason': c.dq_reason, 'Call Summary': c.call_summary,
           })), 'leads')}
@@ -696,7 +696,7 @@ export default function LeadTracker() {
           <table className="w-full text-sm">
           <thead className="bg-[#F3F4F6]">
             <tr>
-              {['Name', 'Company', 'Source Ad', 'Date', 'Stage', 'Priority', 'Quality'].map(h => (
+              {['Name', 'Company', 'Source Ad', 'Date', 'Stage', 'Priority'].map(h => (
                 <th key={h} className="text-left text-xs font-semibold text-[#6B7280] px-4 py-3">{h}</th>
               ))}
               <th className="px-4 py-3" />
@@ -706,18 +706,18 @@ export default function LeadTracker() {
             {visibleLoading ? (
               [...Array(6)].map((_, i) => (
                 <tr key={i} className="border-t border-[#F3F4F6]">
-                  <td colSpan={8} className="px-4 py-3"><div className="skeleton h-6 w-full" /></td>
+                  <td colSpan={7} className="px-4 py-3"><div className="skeleton h-6 w-full" /></td>
                 </tr>
               ))
             ) : visibleError ? (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-sm text-[#B91C1C]">
+                <td colSpan={7} className="px-4 py-8 text-center text-sm text-[#B91C1C]">
                   Failed to load leads. Try refreshing.
                 </td>
               </tr>
             ) : !filtered.length ? (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-sm text-[#9CA3AF]">
+                <td colSpan={7} className="px-4 py-8 text-center text-sm text-[#9CA3AF]">
                   No leads match this filter.
                 </td>
               </tr>
@@ -752,20 +752,13 @@ export default function LeadTracker() {
                           {priorityConfig.label}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
-                      {contact.lead_quality_score ? (
-                        <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold text-white ${contact.lead_quality_score >= 7 ? 'bg-[#16A34A]' : contact.lead_quality_score >= 4 ? 'bg-[#F59E0B]' : 'bg-[#DC2626]'}`}>
-                          {contact.lead_quality_score}
-                        </span>
-                      ) : '—'}
-                    </td>
                     <td className="px-4 py-3 text-[#6B7280]">
                       {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                     </td>
                   </tr>
                   {isExpanded && (
                     <tr key={`${contact.contact_id}-exp`} className="border-t border-[#F3F4F6] bg-[#FAFAFA]">
-                      <td colSpan={8} className="px-6 py-4">
+                      <td colSpan={7} className="px-6 py-4">
                         <div className="space-y-6">
                           {hasCallData && (
                             <div className="space-y-4">
