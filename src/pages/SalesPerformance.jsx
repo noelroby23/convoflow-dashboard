@@ -3,15 +3,123 @@ import KPICard from '../components/ui/KPICard'
 import Tabs from '../components/ui/Tabs'
 import ErrorBoundary from '../components/ui/ErrorBoundary'
 import AISummary from '../components/ui/AISummary'
-import { useSalesPerformance, useTargets } from '../hooks/useDashboardData'
+import { useRepDrilldown, useSalesPerformance, useTargets } from '../hooks/useDashboardData'
 import { useDashboard } from '../store/dashboard'
 import { salesReport } from '../lib/reports/generators'
+
+const REP_DRILLDOWN_METRICS = {
+  meetings_booked: { label: 'meetings' },
+  showed_up: { label: 'showed up' },
+  no_shows: { label: 'no-shows' },
+  active: { label: 'active opportunities' },
+  closed_won: { label: 'closed won' },
+  closed_lost: { label: 'closed lost' },
+}
+
+function getRepMetricValue(rep, metric) {
+  if (metric === 'meetings_booked') return rep.meetings_booked ?? rep.meetings_scheduled
+  if (metric === 'showed_up') return rep.showed_up ?? rep.shows
+  if (metric === 'closed_won') return rep.closed_won ?? rep.closes
+  return rep[metric]
+}
+
+function RepMetricCell({ rep, metric, onOpen, className = '' }) {
+  const rawValue = getRepMetricValue(rep, metric)
+  const value = Number(rawValue ?? 0)
+  const displayValue = rawValue == null ? '—' : value.toLocaleString()
+
+  if (!value) return <td className={`py-3 pr-4 ${className}`}>{displayValue}</td>
+
+  return (
+    <td className={`py-3 pr-4 ${className}`}>
+      <button
+        type="button"
+        onClick={() => onOpen({
+          repName: rep.sales_rep,
+          metric,
+          metricLabel: REP_DRILLDOWN_METRICS[metric].label,
+          count: value,
+        })}
+        className="font-semibold text-[#2563EB] underline-offset-2 hover:underline cursor-pointer"
+      >
+        {value.toLocaleString()}
+      </button>
+    </td>
+  )
+}
+
+function RepDrilldownModal({ drilldown, contacts, loading, error, onClose }) {
+  if (!drilldown) return null
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4"
+      onClick={(event) => { if (event.target === event.currentTarget) onClose() }}
+    >
+      <div className="w-full max-w-5xl rounded-2xl border border-[#E5E7EB] bg-white shadow-xl">
+        <div className="flex items-start justify-between gap-4 border-b border-[#E5E7EB] px-5 py-4">
+          <div>
+            <h3 className="text-sm font-bold text-[#0F0F1A]">
+              {drilldown.repName} — {drilldown.count.toLocaleString()} {drilldown.metricLabel}
+            </h3>
+            <p className="mt-1 text-xs text-[#6B7280]">Contacts attributed to this salesperson for the selected date range.</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg px-3 py-1.5 text-sm font-medium text-[#6B7280] hover:bg-[#F3F4F6]"
+          >
+            Close
+          </button>
+        </div>
+
+        <div className="max-h-[70vh] overflow-y-auto p-5">
+          {loading ? (
+            <div className="space-y-3">{[...Array(5)].map((_, index) => <div key={index} className="skeleton h-12 w-full" />)}</div>
+          ) : error ? (
+            <p className="text-sm text-[#B91C1C] text-center py-8">Failed to load contacts for this salesperson.</p>
+          ) : !contacts?.length ? (
+            <p className="text-sm text-[#9CA3AF] text-center py-8">No contacts found for this metric.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[#E5E7EB]">
+                    {['Name', 'Phone', 'Company', 'Stage', 'Ad'].map(heading => (
+                      <th key={heading} className="pb-2 pr-4 text-left text-xs font-semibold text-[#6B7280]">{heading}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {contacts.map((contact, index) => (
+                    <tr key={contact.contact_id ?? contact.ghl_contact_id ?? index} className="border-b border-[#F3F4F6]">
+                      <td className="py-3 pr-4 font-medium text-[#0F0F1A]">{contact.full_name || 'Unknown'}</td>
+                      <td className="py-3 pr-4 text-[#6B7280]">{contact.phone || '—'}</td>
+                      <td className="py-3 pr-4 text-[#6B7280]">{contact.company || '—'}</td>
+                      <td className="py-3 pr-4 text-[#6B7280]">{contact.stage_name || contact.mapped_stage || '—'}</td>
+                      <td className="py-3 pr-4 text-[#6B7280]">{contact.ad_name || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function SalesPerformance() {
   const [activeTab, setActiveTab] = useState('overview')
   const { data: salesPerformance, loading: salesLoading, error: salesError } = useSalesPerformance()
   const { data: targets } = useTargets()
   const setReportBuilder = useDashboard(s => s.setReportBuilder)
+  const [selectedDrilldown, setSelectedDrilldown] = useState(null)
+  const { data: drilldownContacts, loading: drilldownLoading, error: drilldownError } = useRepDrilldown(
+    selectedDrilldown?.repName,
+    selectedDrilldown?.metric
+  )
 
   const totals = salesPerformance?.totals ?? {}
   const salesReps = salesPerformance?.per_rep ?? []
@@ -100,12 +208,12 @@ export default function SalesPerformance() {
                       return (
                         <tr key={rep.sales_rep} className="border-b border-[#F3F4F6]">
                           <td className="py-3 pr-4 font-medium text-[#0F0F1A]">{rep.sales_rep}</td>
-                          <td className="py-3 pr-4">{rep.meetings_booked ?? rep.meetings_scheduled ?? '—'}</td>
-                          <td className="py-3 pr-4 text-[#16A34A] font-medium">{rep.showed_up ?? rep.shows ?? '—'}</td>
-                          <td className="py-3 pr-4 text-[#DC2626] font-medium">{rep.no_shows ?? '—'}</td>
-                          <td className="py-3 pr-4">{rep.active ?? '—'}</td>
-                          <td className="py-3 pr-4">{rep.closed_won ?? rep.closes ?? '—'}</td>
-                          <td className="py-3 pr-4">{rep.closed_lost ?? '—'}</td>
+                          <RepMetricCell rep={rep} metric="meetings_booked" onOpen={setSelectedDrilldown} />
+                          <RepMetricCell rep={rep} metric="showed_up" onOpen={setSelectedDrilldown} className="text-[#16A34A] font-medium" />
+                          <RepMetricCell rep={rep} metric="no_shows" onOpen={setSelectedDrilldown} className="text-[#DC2626] font-medium" />
+                          <RepMetricCell rep={rep} metric="active" onOpen={setSelectedDrilldown} />
+                          <RepMetricCell rep={rep} metric="closed_won" onOpen={setSelectedDrilldown} />
+                          <RepMetricCell rep={rep} metric="closed_lost" onOpen={setSelectedDrilldown} />
                           <td className="py-3 font-medium text-[#0F0F1A]">{rep.revenue ? `AED ${Number(rep.revenue).toLocaleString()}` : '—'}</td>
                         </tr>
                       )
@@ -138,6 +246,14 @@ export default function SalesPerformance() {
           <p className="text-xs text-[#9CA3AF]">AI Sales Coach will analyse Fathom call recordings and provide rep-by-rep feedback, objection patterns, and deal loss analysis. Coming in V2.</p>
         </div>
       )}
+
+      <RepDrilldownModal
+        drilldown={selectedDrilldown}
+        contacts={drilldownContacts}
+        loading={drilldownLoading}
+        error={drilldownError}
+        onClose={() => setSelectedDrilldown(null)}
+      />
     </div>
   )
 }
