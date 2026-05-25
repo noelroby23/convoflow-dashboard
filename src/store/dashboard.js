@@ -27,8 +27,10 @@ export const DATE_RANGE_PRESETS = [
   { id: 'custom', label: 'Custom' },
 ]
 
+const getDubaiNow = () => new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Dubai' }))
+
 export const getPresetRange = (preset) => {
-  const now = new Date()
+  const now = getDubaiNow()
   const today = format(now, 'yyyy-MM-dd')
 
   switch (preset) {

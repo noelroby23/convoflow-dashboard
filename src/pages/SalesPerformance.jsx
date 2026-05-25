@@ -35,8 +35,10 @@ export default function SalesPerformance() {
 
   const loading = salesLoading
   const meetingsTarget = targets?.monthly_meetings ?? 30
-  const showsTarget = 23
-  const closeRateTarget = 20
+  const showsTarget = targets?.monthly_shows ?? 23
+  const closesTarget = targets?.monthly_closes ?? 4
+  const showRateTarget = targets?.show_rate ?? 75
+  const closeRateTarget = showsTarget > 0 ? Number(((closesTarget / showsTarget) * 100).toFixed(1)) : 0
 
   const showRate = totalMeetings > 0 ? Number(((totalShows / totalMeetings) * 100).toFixed(1)) : 0
   const closeRate = totalShows > 0 ? Number(((totalCloses / totalShows) * 100).toFixed(1)) : 0
@@ -60,14 +62,14 @@ export default function SalesPerformance() {
               <KPICard label="Meetings Scheduled" value={totalMeetings} loading={salesLoading} description="Total meetings booked this period" target={meetingsTarget} />
               <KPICard label="Shows" value={totalShows} loading={salesLoading} description="People who attended their meeting" target={showsTarget} />
               <KPICard label="No-Shows" value={totalNoShows} loading={salesLoading} inverse={true} description="People who missed their meeting" />
-              <KPICard label="Closes" value={totalCloses} loading={salesLoading} description="New customers signed" target={2} />
+              <KPICard label="Closes" value={totalCloses} loading={salesLoading} description="New customers signed" target={closesTarget} />
             </div>
           </ErrorBoundary>
 
           {/* Row 2 — Lead outcomes */}
           <ErrorBoundary>
             <div className="grid grid-cols-4 gap-3 mb-6">
-              <KPICard label="Show Rate" value={showRate} suffix="%" loading={salesLoading} description="% of booked meetings that showed up" target={75} />
+              <KPICard label="Show Rate" value={showRate} suffix="%" loading={salesLoading} description="% of booked meetings that showed up" target={showRateTarget} />
               <KPICard label="Close Rate" value={closeRate} suffix="%" loading={salesLoading} description="% of showed meetings that closed" target={closeRateTarget} />
               <KPICard label="Disqualified" value={totalDisqualified} loading={salesLoading} inverse={true} description="Leads disqualified by AI or sales team" />
               <KPICard label="Lost / Not Interested" value={totalLostNotInterested} loading={salesLoading} inverse={true} description="Leads lost or marked not interested" />
@@ -122,7 +124,7 @@ export default function SalesPerformance() {
 
           <AISummary loading={loading} summary={
             `The sales team handled ${totalMeetings} meetings this period with ${totalShows} shows and ${totalNoShows} no-shows. ` +
-            `Show rate is ${showRate}% — ${showRate >= 75 ? 'on target.' : 'below the 75% target. Consider adding pre-meeting WhatsApp reminders.'} ` +
+            `Show rate is ${showRate}% — ${showRate >= showRateTarget ? 'on target.' : `below the ${showRateTarget}% target. Consider adding pre-meeting WhatsApp reminders.`} ` +
             `The team closed ${totalCloses} deal${totalCloses !== 1 ? 's' : ''} this period (${closeRate}% close rate). ` +
             `${totalDisqualified} leads were disqualified and ${totalLostNotInterested} were lost or not interested. ` +
             `${totalNoShows > 3 ? `No-shows are elevated at ${totalNoShows} — review follow-up sequences after booking.` : 'No-show volume is manageable.'}`

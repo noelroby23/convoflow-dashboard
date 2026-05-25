@@ -43,7 +43,7 @@ const PRIORITY_FILTERS = [
 
 const STAGE_FILTERS = [
   { id: 'all', label: 'All Stages' },
-  { id: 'new', label: 'New' },
+  { id: 'new_lead', label: 'New' },
   { id: 'follow_up', label: 'Follow Up' },
   { id: 'wa_chatbot', label: 'WA - Chatbot' },
   { id: 'contacted', label: 'Contacted' },
@@ -505,7 +505,7 @@ function hasStage(contact, stage) {
 function getStageCounts(data) {
   return {
     all: data.length,
-    new: countStage(data, 'new'),
+    new_lead: countStage(data, 'new_lead'),
     follow_up: countStage(data, 'follow_up'),
     wa_chatbot: countStage(data, 'wa_chatbot'),
     contacted: countStage(data, 'contacted'),
@@ -541,7 +541,7 @@ export default function LeadTracker() {
   const [search, setSearch] = useState('')
   const [sortByPriority, setSortByPriority] = useState(false)
   const selectedBucket = stageFilter === 'meetings_booked' ? 'meetings_booked' : null
-  const { data: meetingsBookedContacts, loading: meetingsBookedLoading, error: meetingsBookedError } = useLeadTrackerBucketContacts('meetings_booked')
+  const { data: bucketContacts, loading: bucketLoading, error: bucketError } = useLeadTrackerBucketContacts(selectedBucket)
   const { data: adOptions } = useDashboardAdOptions()
   const adOptionByMetaId = Object.fromEntries((adOptions ?? []).filter(ad => ad.meta_ad_id).map(ad => [ad.meta_ad_id, ad]))
 
@@ -584,14 +584,11 @@ export default function LeadTracker() {
     setSearchParams(nextParams, { replace: true })
   }
 
-  const visibleContacts = selectedBucket ? meetingsBookedContacts : contacts
-  const visibleLoading = loading || (selectedBucket ? meetingsBookedLoading : false)
-  const visibleError = error || (selectedBucket ? meetingsBookedError : null)
+  const visibleContacts = selectedBucket ? bucketContacts : contacts
+  const visibleLoading = loading || (selectedBucket ? bucketLoading : false)
+  const visibleError = error || (selectedBucket ? bucketError : null)
   const baseStageCounts = contacts ? getStageCounts(contacts) : {}
-  const stageCounts = contacts ? {
-    ...baseStageCounts,
-    meetings_booked: meetingsBookedContacts?.length ?? baseStageCounts.meetings_booked,
-  } : {}
+  const stageCounts = contacts ? baseStageCounts : {}
 
   let filtered = (selectedBucket ? (visibleContacts ?? []) : applyFunnelFilter(contacts ?? [], stageFilter)).filter(c => {
     const matchAd = adFilter === 'all'

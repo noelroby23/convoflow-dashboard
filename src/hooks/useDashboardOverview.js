@@ -28,7 +28,7 @@ const mockFallbackOverview = USE_MOCK ? {
   roas: 2.6,
 } : null
 
-export function useDashboardOverview(dateFrom, dateTo, paidOnly = true) {
+export function useDashboardOverview(dateFrom, dateTo) {
   const currentClientId = useDashboard(s => s.currentClientId)
   const refreshKey = useDashboard(s => s.refreshKey)
 
@@ -74,7 +74,7 @@ export function useDashboardOverview(dateFrom, dateTo, paidOnly = true) {
       }
 
     },
-    [currentClientId, dateFrom, dateTo, paidOnly, refreshKey],
+    [currentClientId, dateFrom, dateTo, refreshKey],
     mockFallbackOverview
   )
 }

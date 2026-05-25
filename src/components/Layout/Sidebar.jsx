@@ -26,7 +26,7 @@ export default function Sidebar({ onLogout }) {
   const clientParam = searchParams.get('client')
   const urlClientId = clientParam === 'all' ? null : (clientParam || DEFAULT_CLIENT_ID)
   const urlClient = realClients.find(client => client.client_id === urlClientId)
-  const navSearch = searchParams.toString()
+  const navSearch = clientParam ? `client=${encodeURIComponent(clientParam)}` : ''
   const hasCurrentClient = currentClientId && realClients.some(client => client.client_id === currentClientId)
   const clientOptions = [
     { client_id: null, client_name: 'All Markets' },
@@ -36,7 +36,7 @@ export default function Sidebar({ onLogout }) {
 
   useEffect(() => {
     if (!clientParam) {
-      const nextParams = new URLSearchParams(searchParams)
+      const nextParams = new URLSearchParams()
       nextParams.set('client', DEFAULT_CLIENT_ID)
       setSearchParams(nextParams, { replace: true })
     }
@@ -48,13 +48,13 @@ export default function Sidebar({ onLogout }) {
     if ((currentClientId ?? null) !== (urlClientId ?? null) || currentClientName !== urlClientName) {
       setClient(urlClientId, urlClientName)
     }
-  }, [clientParam, currentClientId, currentClientName, searchParams, setClient, setSearchParams, urlClient?.client_name, urlClientId])
+  }, [clientParam, currentClientId, currentClientName, setClient, setSearchParams, urlClient?.client_name, urlClientId])
 
   const handleClientChange = (event) => {
     const nextClientId = event.target.value || null
     const nextClient = clientOptions.find(client => (client.client_id ?? '') === (nextClientId ?? ''))
     setClient(nextClient?.client_id ?? null, nextClient?.client_name ?? 'All Markets')
-    const nextParams = new URLSearchParams(searchParams)
+    const nextParams = new URLSearchParams()
     nextParams.set('client', nextClientId || 'all')
     setSearchParams(nextParams, { replace: true })
   }

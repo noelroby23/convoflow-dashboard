@@ -258,6 +258,11 @@ export default function AdCreatives() {
 
   const sorted = ads ? [...ads].sort((a, b) => {
     const av = a[sortKey] ?? 0, bv = b[sortKey] ?? 0
+    if (typeof av === 'string' || typeof bv === 'string') {
+      return sortDir === 'asc'
+        ? String(av).localeCompare(String(bv))
+        : String(bv).localeCompare(String(av))
+    }
     return sortDir === 'asc' ? av - bv : bv - av
   }) : []
 

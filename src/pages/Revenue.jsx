@@ -4,14 +4,13 @@ import AISummary from '../components/ui/AISummary'
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { useDashboard } from '../store/dashboard'
 import { revenueReport } from '../lib/reports/generators'
-import { useAdPerformance, useDailyMetrics, useLeadTrackerContacts } from '../hooks/useDashboardData'
+import { useDailyMetrics, useLeadTrackerContacts } from '../hooks/useDashboardData'
 import { useDashboardOverview } from '../hooks/useDashboardOverview'
 
 export default function Revenue() {
   const dateRange = useDashboard(s => s.dateRange)
   const setReportBuilder = useDashboard(s => s.setReportBuilder)
   const { data: overview, loading: overviewLoading, error: overviewError } = useDashboardOverview(dateRange.from, dateRange.to)
-  const { data: ads, loading: adsLoading, error: adsError } = useAdPerformance()
   const { data: dailyMetrics, loading: metricsLoading, error: metricsError } = useDailyMetrics()
   const { data: leads, loading: leadsLoading, error: leadsError } = useLeadTrackerContacts()
 
@@ -51,12 +50,12 @@ export default function Revenue() {
     }
   })
 
-  const loading = overviewLoading || adsLoading || metricsLoading || leadsLoading
+  const loading = overviewLoading || metricsLoading || leadsLoading
 
   return (
     <div>
       {/* Big headline */}
-      {(overviewError || adsError || metricsError || leadsError) && !loading && (
+      {(overviewError || metricsError || leadsError) && !loading && (
         <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-[#B91C1C]">
           Failed to load revenue data. Try refreshing.
         </div>
@@ -101,9 +100,9 @@ export default function Revenue() {
       <ErrorBoundary>
         <div className="bg-white rounded-xl border border-[#E5E7EB] p-6 shadow-sm mb-6">
           <h2 className="text-sm font-bold text-[#0F0F1A] mb-4">Revenue by Source Ad</h2>
-          {adsLoading || leadsLoading ? (
+          {leadsLoading ? (
             <div className="skeleton h-48 w-full" />
-          ) : adsError || leadsError ? (
+          ) : leadsError ? (
             <p className="text-sm text-[#B91C1C] text-center py-12">Failed to load revenue by ad. Try refreshing.</p>
           ) : revenueByAd.length === 0 ? (
             <p className="text-sm text-[#9CA3AF] text-center py-12">No closed revenue recorded yet.</p>

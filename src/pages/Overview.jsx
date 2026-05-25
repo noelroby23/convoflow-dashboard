@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useAllContacts, useContactDetails, useTargets } from '../hooks/useDashboardData'
+import { useDashboardContactsByBucket, useTargets } from '../hooks/useDashboardData'
 import { useDashboardOverview } from '../hooks/useDashboardOverview'
 import KPICard from '../components/ui/KPICard'
 import InsightsFeed from '../components/ui/InsightsFeed'
@@ -49,8 +49,10 @@ export default function Overview() {
   const setReportBuilder = useDashboard(s => s.setReportBuilder)
   const { data: overview, loading: overviewLoading, error: overviewError } = useDashboardOverview(dateRange.from, dateRange.to)
   const { data: targets } = useTargets()
-  const { data: activeLeads, loading: activeLeadsLoading, error: activeLeadsError } = useAllContacts()
-  const { data: activePipeline, loading: pipelineLoading, error: pipelineError } = useContactDetails('active')
+  const { data: activePipeline, loading: pipelineLoading, error: pipelineError } = useDashboardContactsByBucket('active')
+  const activeLeads = activePipeline
+  const activeLeadsLoading = pipelineLoading
+  const activeLeadsError = pipelineError
   const [showAllLeads, setShowAllLeads] = useState(false)
   const [activeLeadStageFilter, setActiveLeadStageFilter] = useState('all')
   const reportDataRef = useRef({ overview: null, activePipeline: null })
