@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useDashboardContactsByBucket, useTargets } from '../hooks/useDashboardData'
+import { useDashboardAdOptions, useDashboardContactsByBucket, useTargets } from '../hooks/useDashboardData'
 import { useDashboardOverview } from '../hooks/useDashboardOverview'
 import KPICard from '../components/ui/KPICard'
 import InsightsFeed from '../components/ui/InsightsFeed'
@@ -42,6 +42,15 @@ function matchesMappedStage(lead, stage) {
     : lead?.current_stage === stage
 }
 
+function getMetaAdId(lead) {
+  const id = lead?.meta_ad_id_raw ?? lead?.meta_ad_id ?? null
+  return id ? String(id) : ''
+}
+
+function getCreativeAdName(lead, adOptionByMetaId = {}) {
+  return adOptionByMetaId[getMetaAdId(lead)]?.ad_name || ''
+}
+
 export default function Overview() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -50,6 +59,7 @@ export default function Overview() {
   const { data: overview, loading: overviewLoading, error: overviewError } = useDashboardOverview(dateRange.from, dateRange.to)
   const { data: targets } = useTargets()
   const { data: activePipeline, loading: pipelineLoading, error: pipelineError } = useDashboardContactsByBucket('active')
+  const { data: adOptions } = useDashboardAdOptions()
   const activeLeads = activePipeline
   const activeLeadsLoading = pipelineLoading
   const activeLeadsError = pipelineError
@@ -97,6 +107,10 @@ export default function Overview() {
   const formattedCostPerMeeting = Number(costPerMeeting).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   const formattedCostPerSale = Number(costPerSale).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   const formattedClosedRevenue = Number(closedRevenue).toLocaleString('en-US', { maximumFractionDigits: 0 })
+  const adOptionByMetaId = useMemo(
+    () => Object.fromEntries((adOptions ?? []).filter(ad => ad.meta_ad_id).map(ad => [ad.meta_ad_id, ad])),
+    [adOptions]
+  )
   const sortedActiveLeads = useMemo(() => {
     return [...(activeLeads ?? [])].sort((a, b) => {
       return getLeadDateValue(b).localeCompare(getLeadDateValue(a))
@@ -261,7 +275,7 @@ export default function Overview() {
                           </span>
                         </td>
                         <td className="py-3 pr-4 text-[#6B7280] hidden md:table-cell">{lead.company_name || lead.company || '—'}</td>
-                        <td className="py-3 pr-4 text-[#6B7280]">{lead.ad_name || lead.source_ad || '—'}</td>
+                        <td className="py-3 pr-4 text-[#6B7280]">{getCreativeAdName(lead, adOptionByMetaId) || '—'}</td>
                         <td className="py-3 pr-4"><StatusBadge stage={lead.current_stage} label={lead.stage_name || 'Unknown'} /></td>
                         <td className="py-3 pr-4 text-[#6B7280] whitespace-nowrap">{formatLeadDate(lead)}</td>
                         <td className="py-3 text-[#0F0F1A] font-medium hidden md:table-cell">{lead.deal_value ? `AED ${Number(lead.deal_value).toLocaleString()}` : '—'}</td>
@@ -300,7 +314,7 @@ export default function Overview() {
                     <td className="py-3 pr-4 font-medium text-[#0F0F1A]">{lead.full_name}</td>
                     <td className="py-3 pr-4 text-[#6B7280]">{lead.company || '—'}</td>
                     <td className="py-3 pr-4"><StatusBadge stage={lead.current_stage} label={lead.stage_name || 'Unknown'} successTone="red" /></td>
-                    <td className="py-3 pr-4 text-[#6B7280]">{lead.ad_name || lead.source_ad || '—'}</td>
+                    <td className="py-3 pr-4 text-[#6B7280]">{getCreativeAdName(lead, adOptionByMetaId) || '—'}</td>
                     <td className="py-3 pr-4 text-[#6B7280]">{formatLeadDate(lead)}</td>
                     <td className="py-3 font-medium text-[#0F0F1A]">{lead.deal_value ? `AED ${Number(lead.deal_value).toLocaleString()}` : '—'}</td>
                   </tr>

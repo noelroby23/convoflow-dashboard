@@ -313,15 +313,19 @@ export function useContactDetails(bucket = null) {
 export function useDashboardContactsByBucket(bucket = null) {
   const { currentClientId, dateRange, refreshKey } = useDashboardQueryState()
   return useNormalizedContactQuery(
-    () => {
+    async () => {
       if (!bucket) return Promise.resolve({ data: [], error: null })
 
-      return supabase.rpc('dashboard_contacts_by_bucket', {
+      const { data, error } = await supabase.rpc('dashboard_contacts_by_bucket', {
         p_bucket: bucket,
         p_start_date: dateRange.from,
         p_end_date: dateRange.to,
         p_client_id: currentClientId ?? null,
       })
+
+      if (error) return { data: null, error }
+
+      return mergeMetaAdIds(data ?? [], currentClientId)
     },
     [currentClientId, dateRange.from, dateRange.to, bucket, refreshKey],
     null
