@@ -139,6 +139,27 @@ const mergeStageNames = (rows, stageRows) => {
   })
 }
 
+async function mergeMetaAdIds(rows, clientId) {
+  const ghlContactIds = [...new Set((rows ?? []).map(row => row.ghl_contact_id).filter(Boolean))]
+  if (!ghlContactIds.length) return { data: rows ?? [], error: null }
+
+  const { data, error } = await filterByClient(
+    supabase.from('contacts').select('ghl_contact_id, meta_ad_id_raw'),
+    clientId
+  ).in('ghl_contact_id', ghlContactIds)
+
+  if (error) return { data: null, error }
+
+  const metaAdIdByGhlContactId = new Map((data ?? []).map(row => [row.ghl_contact_id, row.meta_ad_id_raw]))
+  return {
+    data: (rows ?? []).map(row => ({
+      ...row,
+      meta_ad_id_raw: row.meta_ad_id_raw ?? metaAdIdByGhlContactId.get(row.ghl_contact_id) ?? null,
+    })),
+    error: null,
+  }
+}
+
 function useDashboardQueryState({ includeDateRange = true } = {}) {
   const currentClientId = useDashboard(s => s.currentClientId)
   const dateRange = useDashboard(s => s.dateRange)
@@ -348,7 +369,10 @@ export function useLeadTrackerContacts() {
 
       if (error) return { data: null, error }
 
-      const sorted = [...(data ?? [])].sort((a, b) => {
+      const enriched = await mergeMetaAdIds(data ?? [], currentClientId)
+      if (enriched.error) return enriched
+
+      const sorted = [...(enriched.data ?? [])].sort((a, b) => {
         const aDate = a.dubai_date || a.ghl_created_at || a.created_at || ''
         const bDate = b.dubai_date || b.ghl_created_at || b.created_at || ''
         return String(bDate).localeCompare(String(aDate))
@@ -375,7 +399,10 @@ export function useLeadTrackerBucketContacts(bucket = null) {
 
       if (error) return { data: null, error }
 
-      const sorted = [...(data ?? [])].sort((a, b) => {
+      const enriched = await mergeMetaAdIds(data ?? [], currentClientId)
+      if (enriched.error) return enriched
+
+      const sorted = [...(enriched.data ?? [])].sort((a, b) => {
         const aDate = a.dubai_date || a.ghl_created_at || a.created_at || ''
         const bDate = b.dubai_date || b.ghl_created_at || b.created_at || ''
         return String(bDate).localeCompare(String(aDate))
@@ -387,30 +414,29 @@ export function useLeadTrackerBucketContacts(bucket = null) {
   )
 }
 
-export function useAdNamesByMetaIds(metaAdIds = []) {
-  const { currentClientId, refreshKey } = useDashboardQueryState({ includeDateRange: false })
-  const normalizedMetaAdIds = useMemo(() => [
-    ...new Set((metaAdIds ?? []).map(id => String(id).trim()).filter(Boolean)),
-  ].sort(), [metaAdIds])
-
+export function useDashboardAdOptions() {
+  const { currentClientId, dateRange, refreshKey } = useDashboardQueryState()
   return useSupabaseQuery(
     async () => {
-      if (!normalizedMetaAdIds.length) return { data: {}, error: null }
-
-      const { data, error } = await filterByClient(
-        supabase.from('ads').select('meta_ad_id, ad_name'),
-        currentClientId
-      ).in('meta_ad_id', normalizedMetaAdIds)
+      const { data, error } = await supabase.rpc('dashboard_ad_options', {
+        p_start_date: dateRange.from,
+        p_end_date: dateRange.to,
+        p_client_id: currentClientId ?? null,
+      })
 
       if (error) return { data: null, error }
 
       return {
-        data: Object.fromEntries((data ?? []).map(ad => [String(ad.meta_ad_id), ad.ad_name]).filter(([, name]) => Boolean(name))),
+        data: (data ?? []).map(ad => ({
+          ...ad,
+          meta_ad_id: ad.meta_ad_id == null ? null : String(ad.meta_ad_id),
+          contact_count: Number(ad.contact_count ?? 0),
+        })),
         error: null,
       }
     },
-    [currentClientId, normalizedMetaAdIds.join('|'), refreshKey],
-    {}
+    [currentClientId, dateRange.from, dateRange.to, refreshKey],
+    []
   )
 }
 export function useSarahPerformance() {
