@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { NavLink, useSearchParams } from 'react-router-dom'
 import {
   LayoutDashboard, Megaphone, Bot, Users, DollarSign,
-  TrendingUp, Target, Search, Settings, ChevronDown, LogOut
+  TrendingUp, Target, Search, MessageCircle, Settings, ChevronDown, LogOut
 } from 'lucide-react'
 import { DEFAULT_CLIENT_ID, DEFAULT_CLIENT_NAME, useDashboard } from '../../store/dashboard'
 import { useClients } from '../../hooks/useDashboardData'
@@ -16,6 +16,7 @@ const navItems = [
   { to: '/week-over-week', label: 'Week-over-Week', icon: TrendingUp },
   { to: '/target-progress', label: 'Target Progress', icon: Target },
   { to: '/lead-tracker', label: 'Lead Tracker', icon: Search },
+  { to: '/conversations', label: 'Conversations', icon: MessageCircle },
 ]
 
 export default function Sidebar({ onLogout }) {

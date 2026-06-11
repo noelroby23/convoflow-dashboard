@@ -37,9 +37,7 @@ const ACTIVE_LEAD_STAGE_FILTERS = [
 ]
 
 function matchesMappedStage(lead, stage) {
-  return Array.isArray(lead?.stage_filter_values)
-    ? lead.stage_filter_values.includes(stage)
-    : lead?.current_stage === stage
+  return (lead?.mapped_current_stage ?? lead?.current_stage) === stage
 }
 
 function getMetaAdId(lead) {
@@ -58,11 +56,9 @@ export default function Overview() {
   const setReportBuilder = useDashboard(s => s.setReportBuilder)
   const { data: overview, loading: overviewLoading, error: overviewError } = useDashboardOverview(dateRange.from, dateRange.to)
   const { data: targets } = useTargets()
+  const { data: activeLeads, loading: activeLeadsLoading, error: activeLeadsError } = useDashboardContactsByBucket('leads')
   const { data: activePipeline, loading: pipelineLoading, error: pipelineError } = useDashboardContactsByBucket('active')
   const { data: adOptions } = useDashboardAdOptions()
-  const activeLeads = activePipeline
-  const activeLeadsLoading = pipelineLoading
-  const activeLeadsError = pipelineError
   const [showAllLeads, setShowAllLeads] = useState(false)
   const [activeLeadStageFilter, setActiveLeadStageFilter] = useState('all')
   const reportDataRef = useRef({ overview: null, activePipeline: null })
@@ -276,7 +272,7 @@ export default function Overview() {
                         </td>
                         <td className="py-3 pr-4 text-[#6B7280] hidden md:table-cell">{lead.company_name || lead.company || '—'}</td>
                         <td className="py-3 pr-4 text-[#6B7280]">{getCreativeAdName(lead, adOptionByMetaId) || '—'}</td>
-                        <td className="py-3 pr-4"><StatusBadge stage={lead.current_stage} label={lead.stage_name || 'Unknown'} /></td>
+                        <td className="py-3 pr-4"><StatusBadge stage={lead.mapped_current_stage ?? lead.current_stage} label={lead.stage_name || lead.mapped_current_stage || 'Unknown'} /></td>
                         <td className="py-3 pr-4 text-[#6B7280] whitespace-nowrap">{formatLeadDate(lead)}</td>
                         <td className="py-3 text-[#0F0F1A] font-medium hidden md:table-cell">{lead.deal_value ? `AED ${Number(lead.deal_value).toLocaleString()}` : '—'}</td>
                       </tr>

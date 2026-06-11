@@ -7,6 +7,7 @@ import Login from './pages/Login'
 import Overview from './pages/Overview'
 import AdCreatives from './pages/AdCreatives'
 import LeadTracker from './pages/LeadTracker'
+import ConversationsPage from './pages/ConversationsPage'
 import Trends from './pages/Trends'
 import Health from './pages/Health'
 import Settings from './pages/Settings'
@@ -93,6 +94,7 @@ export default function App() {
     { path: '/health', component: <Health /> },
     { path: '/lead-tracker', component: <LeadTracker /> },
     { path: '/leads', component: <LeadTracker /> },
+    { path: '/conversations', component: <ConversationsPage /> },
     { path: '/settings', component: <Settings /> },
   ]
 

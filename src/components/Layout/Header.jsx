@@ -16,6 +16,7 @@ const pageTitles = {
   '/week-over-week': 'Week-over-Week',
   '/target-progress': 'Target Progress',
   '/lead-tracker': 'Lead Tracker',
+  '/conversations': 'Conversations',
   '/settings': 'Settings',
 }
 
