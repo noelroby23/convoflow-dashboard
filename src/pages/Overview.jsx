@@ -46,7 +46,22 @@ function getMetaAdId(lead) {
 }
 
 function getCreativeAdName(lead, adOptionByMetaId = {}) {
-  return adOptionByMetaId[getMetaAdId(lead)]?.ad_name || ''
+  return adOptionByMetaId[getMetaAdId(lead)]?.ad_name || lead?.ad_name || ''
+}
+
+function hasText(value) {
+  return value != null && String(value).trim() !== ''
+}
+
+function getActiveLeadSource(lead, adOptionByMetaId = {}) {
+  const sourceAd = [getCreativeAdName(lead, adOptionByMetaId), lead?.source_ad]
+    .find(value => hasText(value) && String(value).trim().toLowerCase() !== 'website')
+
+  if (sourceAd) {
+    return { value: String(sourceAd).trim(), label: String(sourceAd).trim(), isWebsite: false }
+  }
+
+  return { value: 'website', label: 'Website', isWebsite: true }
 }
 
 export default function Overview() {
@@ -61,6 +76,7 @@ export default function Overview() {
   const { data: adOptions } = useDashboardAdOptions()
   const [showAllLeads, setShowAllLeads] = useState(false)
   const [activeLeadStageFilter, setActiveLeadStageFilter] = useState('all')
+  const [activeLeadSourceFilter, setActiveLeadSourceFilter] = useState('all')
   const reportDataRef = useRef({ overview: null, activePipeline: null })
 
   useEffect(() => {
@@ -112,21 +128,49 @@ export default function Overview() {
       return getLeadDateValue(b).localeCompare(getLeadDateValue(a))
     })
   }, [activeLeads])
+  const activeLeadSourceOptions = useMemo(() => {
+    const adNames = new Set()
+
+    for (const lead of sortedActiveLeads) {
+      const source = getActiveLeadSource(lead, adOptionByMetaId)
+      if (!source.isWebsite) adNames.add(source.value)
+    }
+
+    return [
+      { value: 'all', label: 'All Sources' },
+      { value: 'website', label: 'Website' },
+      ...[...adNames].sort((a, b) => a.localeCompare(b)).map(name => ({ value: name, label: name })),
+    ]
+  }, [adOptionByMetaId, sortedActiveLeads])
+  const sourceFilteredActiveLeads = useMemo(() => {
+    if (activeLeadSourceFilter === 'all') return sortedActiveLeads
+
+    return sortedActiveLeads.filter(lead => {
+      const source = getActiveLeadSource(lead, adOptionByMetaId)
+      return activeLeadSourceFilter === 'website'
+        ? source.isWebsite
+        : source.value === activeLeadSourceFilter
+    })
+  }, [activeLeadSourceFilter, adOptionByMetaId, sortedActiveLeads])
   const activeLeadStageCounts = useMemo(() => {
     return ACTIVE_LEAD_STAGE_FILTERS.reduce((counts, filter) => {
       counts[filter.id] = filter.id === 'all'
-        ? sortedActiveLeads.length
-        : sortedActiveLeads.filter(lead => matchesMappedStage(lead, filter.id)).length
+        ? sourceFilteredActiveLeads.length
+        : sourceFilteredActiveLeads.filter(lead => matchesMappedStage(lead, filter.id)).length
       return counts
     }, {})
-  }, [sortedActiveLeads])
+  }, [sourceFilteredActiveLeads])
   const filteredActiveLeads = useMemo(() => {
-    if (activeLeadStageFilter === 'all') return sortedActiveLeads
-    return sortedActiveLeads.filter(lead => matchesMappedStage(lead, activeLeadStageFilter))
-  }, [activeLeadStageFilter, sortedActiveLeads])
+    if (activeLeadStageFilter === 'all') return sourceFilteredActiveLeads
+    return sourceFilteredActiveLeads.filter(lead => matchesMappedStage(lead, activeLeadStageFilter))
+  }, [activeLeadStageFilter, sourceFilteredActiveLeads])
   const visibleActiveLeads = showAllLeads ? filteredActiveLeads : filteredActiveLeads.slice(0, 10)
   const handleActiveLeadStageFilter = (stageId) => {
     setActiveLeadStageFilter(stageId)
+    setShowAllLeads(false)
+  }
+  const handleActiveLeadSourceFilter = (source) => {
+    setActiveLeadSourceFilter(source)
     setShowAllLeads(false)
   }
   const openLeadTracker = (contactId) => {
@@ -217,20 +261,35 @@ export default function Overview() {
           </div>
 
           {!activeLeadsLoading && !activeLeadsError && sortedActiveLeads.length > 0 && (
-            <div className="flex items-center gap-2 mb-4 flex-wrap">
-              {ACTIVE_LEAD_STAGE_FILTERS.map(filter => (
-                <button
-                  key={filter.id}
-                  type="button"
-                  onClick={() => handleActiveLeadStageFilter(filter.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${filter.color} ${activeLeadStageFilter === filter.id ? 'shadow-sm ring-2 ring-offset-1 ring-current opacity-100' : 'opacity-70 hover:opacity-100'}`}
+            <div className="mb-4 flex flex-col gap-3">
+              <label className="flex w-full flex-col gap-1 text-xs font-semibold text-[#6B7280] sm:w-72">
+                Source
+                <select
+                  value={activeLeadSourceFilter}
+                  onChange={event => handleActiveLeadSourceFilter(event.target.value)}
+                  className="w-full appearance-none rounded-lg border border-[#0F0F1A] bg-[#0F0F1A] px-3 py-2 text-sm font-semibold text-white outline-none transition-colors hover:bg-[#1F2937] focus:ring-2 focus:ring-pink-100"
                 >
-                  {filter.label}
-                  <span className="ml-0.5 bg-current bg-opacity-20 rounded-full px-1.5 py-0.5 text-[10px] font-bold">
-                    {activeLeadStageCounts[filter.id] ?? 0}
-                  </span>
-                </button>
-              ))}
+                  {activeLeadSourceOptions.map(option => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                {ACTIVE_LEAD_STAGE_FILTERS.map(filter => (
+                  <button
+                    key={filter.id}
+                    type="button"
+                    onClick={() => handleActiveLeadStageFilter(filter.id)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${filter.color} ${activeLeadStageFilter === filter.id ? 'shadow-sm ring-2 ring-offset-1 ring-current opacity-100' : 'opacity-70 hover:opacity-100'}`}
+                  >
+                    {filter.label}
+                    <span className="ml-0.5 bg-current bg-opacity-20 rounded-full px-1.5 py-0.5 text-[10px] font-bold">
+                      {activeLeadStageCounts[filter.id] ?? 0}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
@@ -241,7 +300,7 @@ export default function Overview() {
           ) : !sortedActiveLeads.length ? (
             <p className="text-sm text-[#9CA3AF] text-center py-8">No leads were created during this date range.</p>
           ) : !filteredActiveLeads.length ? (
-            <p className="text-sm text-[#9CA3AF] text-center py-8">No leads match this stage filter.</p>
+            <p className="text-sm text-[#9CA3AF] text-center py-8">No leads match these filters.</p>
           ) : (
             <div className="overflow-x-auto">
               <div className={showAllLeads ? 'max-h-[540px] overflow-y-auto' : 'max-h-[460px] overflow-y-auto'}>
@@ -259,24 +318,28 @@ export default function Overview() {
                     </tr>
                   </thead>
                   <tbody>
-                    {visibleActiveLeads.map((lead, index) => (
-                      <tr
-                        key={lead.contact_id}
-                        onClick={() => openLeadTracker(lead.contact_id)}
-                        className={`border-b border-[#F3F4F6] hover:bg-[#FAFAFA] cursor-pointer ${index % 2 === 1 ? 'bg-[#FCFCFD]' : ''}`}
-                      >
-                        <td className="py-3 pr-4 font-medium text-[#0F0F1A]">
-                          <span className="hover:text-[#EC4899] transition-colors">
-                            {lead.full_name || '—'}
-                          </span>
-                        </td>
-                        <td className="py-3 pr-4 text-[#6B7280] hidden md:table-cell">{lead.company_name || lead.company || '—'}</td>
-                        <td className="py-3 pr-4 text-[#6B7280]">{getCreativeAdName(lead, adOptionByMetaId) || '—'}</td>
-                        <td className="py-3 pr-4"><StatusBadge stage={lead.mapped_current_stage ?? lead.current_stage} label={lead.stage_name || lead.mapped_current_stage || 'Unknown'} /></td>
-                        <td className="py-3 pr-4 text-[#6B7280] whitespace-nowrap">{formatLeadDate(lead)}</td>
-                        <td className="py-3 text-[#0F0F1A] font-medium hidden md:table-cell">{lead.deal_value ? `AED ${Number(lead.deal_value).toLocaleString()}` : '—'}</td>
-                      </tr>
-                    ))}
+                    {visibleActiveLeads.map((lead, index) => {
+                      const source = getActiveLeadSource(lead, adOptionByMetaId)
+
+                      return (
+                        <tr
+                          key={lead.contact_id}
+                          onClick={() => openLeadTracker(lead.contact_id)}
+                          className={`border-b border-[#F3F4F6] hover:bg-[#FAFAFA] cursor-pointer ${index % 2 === 1 ? 'bg-[#FCFCFD]' : ''}`}
+                        >
+                          <td className="py-3 pr-4 font-medium text-[#0F0F1A]">
+                            <span className="hover:text-[#EC4899] transition-colors">
+                              {lead.full_name || '—'}
+                            </span>
+                          </td>
+                          <td className="py-3 pr-4 text-[#6B7280] hidden md:table-cell">{lead.company_name || lead.company || '—'}</td>
+                          <td className={`py-3 pr-4 ${source.isWebsite ? 'text-[#9CA3AF]' : 'text-[#0F0F1A] font-medium'}`}>{source.label}</td>
+                          <td className="py-3 pr-4"><StatusBadge stage={lead.mapped_current_stage ?? lead.current_stage} label={lead.stage_name || lead.mapped_current_stage || 'Unknown'} /></td>
+                          <td className="py-3 pr-4 text-[#6B7280] whitespace-nowrap">{formatLeadDate(lead)}</td>
+                          <td className="py-3 text-[#0F0F1A] font-medium hidden md:table-cell">{lead.deal_value ? `AED ${Number(lead.deal_value).toLocaleString()}` : '—'}</td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
