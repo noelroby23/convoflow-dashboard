@@ -9,6 +9,8 @@ import { useClients } from '../../hooks/useDashboardData'
 
 const navItems = [
   { to: '/home', label: 'Home', icon: LayoutDashboard },
+  { to: '/lead-desk', label: 'Lead Desk', icon: Headphones },
+  { to: '/lead-lookup', label: 'Lead Lookup', icon: ScanSearch },
   { to: '/creative-performance', label: 'Creative Performance', icon: Megaphone },
   { to: '/sarahs-performance', label: "Sarah's Performance", icon: Bot },
   { to: '/sales-performance', label: 'Sales Performance', icon: Users },

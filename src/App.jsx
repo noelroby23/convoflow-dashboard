@@ -14,6 +14,8 @@ import Settings from './pages/Settings'
 import SarahsPerformance from './pages/SarahsPerformance'
 import SalesPerformance from './pages/SalesPerformance'
 import Revenue from './pages/Revenue'
+import LeadDesk from './pages/LeadDesk'
+import LeadLookup from './pages/LeadLookup'
 import ReportModal from './components/ui/ReportModal'
 import { Toaster } from 'sonner'
 import { DailyAISummaryProvider } from './context/DailyAISummaryContext'
@@ -95,6 +97,10 @@ export default function App() {
     { path: '/lead-tracker', component: <LeadTracker /> },
     { path: '/leads', component: <LeadTracker /> },
     { path: '/conversations', component: <ConversationsPage /> },
+    { path: '/lead-desk', component: <LeadDesk /> },
+    { path: '/desk', component: <LeadDesk /> },
+    { path: '/lead-lookup', component: <LeadLookup /> },
+    { path: '/lookup', component: <LeadLookup /> },
     { path: '/settings', component: <Settings /> },
   ]
 
