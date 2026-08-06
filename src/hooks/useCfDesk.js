@@ -75,6 +75,15 @@ export const useCfQaDigest = (days = 7) =>
 export const useCfEod = (region = 'uae') =>
   useCfRpc('cf_eod_summary', { p: { region } }, { intervalMs: 300_000 })
 
+export const useCfTargets = (region = 'uae') =>
+  useCfRpc('cf_dash_targets', { p: { region } }, { intervalMs: 60_000 })
+
+export const useCfAttention = (region = 'uae') =>
+  useCfRpc('cf_dash_attention', { p: { region } }, { intervalMs: 30_000 })
+
+export const useCfCalls = (region = 'uae') =>
+  useCfRpc('cf_dash_calls', { p: { region } }, { intervalMs: 30_000 })
+
 export async function lookupLead(q) {
   return callRpc('cf_lead_lookup', { p: { q } })
 }

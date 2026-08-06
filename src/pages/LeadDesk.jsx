@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import {
   PhoneCall, Clock, CalendarDays, AlertTriangle, PauseCircle, Loader2,
+  Target, BellRing, FileText, ListChecks,
 } from 'lucide-react'
 import {
   useCfHeadline, useCfQueue, useCfPipeline, useCfMeetings, useCfSplit,
+  useCfTargets, useCfAttention, useCfCalls, useCfEod,
   setLeadState,
 } from '../hooks/useCfDesk'
 import { toast } from 'sonner'
@@ -55,6 +57,10 @@ export default function LeadDesk() {
   const { data: meetings, refresh: refreshMeetings } = useCfMeetings(region)
   const [view, setView] = useState('followup')
   const { data: split } = useCfSplit(view, region)
+  const { data: targets } = useCfTargets(region)
+  const { data: attention } = useCfAttention(region)
+  const { data: calls } = useCfCalls(region)
+  const { data: eod } = useCfEod(region)
   const [busyId, setBusyId] = useState(null)
 
   const paused = queue?.global_paused
@@ -94,6 +100,58 @@ export default function LeadDesk() {
         <Stat label="Show-up (30d)" value={head?.showup_rate_30d} suffix="%" />
         <Stat label="Close rate (30d)" value={head?.close_rate_30d} suffix="%" />
       </div>
+
+      {/* Targets & Progress — PDF 5.9 "KPIs with targets for Ads · Agent · Sales" */}
+      <Card title="Targets & progress" icon={Target}>
+        <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-x-8 gap-y-3">
+          {targets?.length ? targets.map((t) => {
+            const pct = Math.min(100, Number(t.pct) || 0)
+            const tone = pct >= 100 ? 'bg-emerald-500' : pct >= 60 ? 'bg-[#EC4899]' : 'bg-amber-400'
+            return (
+              <div key={`${t.metric}-${t.period}`}>
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="capitalize">
+                    {t.metric}
+                    <span className="text-[10px] uppercase ml-2 px-1.5 py-0.5 rounded bg-[#F3F4F6] text-[#6B7280]">{t.category}</span>
+                    <span className="text-xs text-[#9CA3AF] ml-1">/{t.period}</span>
+                  </span>
+                  <span className="tabular-nums">{t.actual} <span className="text-[#9CA3AF]">/ {t.target}</span></span>
+                </div>
+                <div className="h-2 bg-[#F3F4F6] rounded-full overflow-hidden">
+                  <div className={`h-full ${tone}`} style={{ width: `${pct}%` }} />
+                </div>
+              </div>
+            )
+          }) : <Empty>No targets set</Empty>}
+        </div>
+      </Card>
+
+      {/* Human Attention — PDF section 5: must be RELEVANT, no noise.
+          Deliberately only handovers, bookings with no link, and info requests.
+          The spec says to remove the old "Hot Lead" notification, so it is absent. */}
+      <Card
+        title="Human attention"
+        icon={BellRing}
+        right={<span className="text-xs text-[#6B7280]">{attention?.length ?? 0} need a person</span>}
+      >
+        <div className="space-y-2 max-h-72 overflow-y-auto">
+          {attention?.length ? attention.map((a, i) => (
+            <div key={i} className="flex items-start gap-3 border-b border-[#F3F4F6] pb-2 last:border-0">
+              <span className={`text-[10px] px-2 py-0.5 rounded-full shrink-0 mt-0.5 ${
+                a.kind === 'human_attention' ? 'bg-rose-100 text-rose-800'
+                : a.kind === 'booking_no_link' ? 'bg-amber-100 text-amber-800'
+                : 'bg-slate-100 text-slate-700'}`}>
+                {a.kind.replace(/_/g, ' ')}
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm">{a.title}</p>
+                <p className="text-xs text-[#6B7280] whitespace-pre-line">{a.body}</p>
+              </div>
+              <span className="text-xs text-[#9CA3AF] ml-auto shrink-0">{fmtTime(a.at)}</span>
+            </div>
+          )) : <Empty>Nothing needs a human right now</Empty>}
+        </div>
+      </Card>
 
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Lead Desk 1 — Calling queue */}
@@ -236,6 +294,53 @@ export default function LeadDesk() {
             </tbody>
           </table>
         </div>
+      </Card>
+
+      {/* Calls & logs */}
+      <Card
+        title="Calls & logs"
+        icon={ListChecks}
+        right={<span className="text-xs text-[#6B7280]">last 50</span>}
+      >
+        <div className="overflow-x-auto max-h-96 overflow-y-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs uppercase tracking-wide text-[#9CA3AF]">
+                <th className="py-2">When</th><th>Lead</th><th>Result</th><th>Secs</th><th>Summary</th><th></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#F3F4F6]">
+              {calls?.length ? calls.map((c, i) => (
+                <tr key={i}>
+                  <td className="py-2 whitespace-nowrap text-xs text-[#6B7280]">{fmtTime(c.at)}</td>
+                  <td className="whitespace-nowrap">{c.name}</td>
+                  <td className="whitespace-nowrap">
+                    <span className={`text-xs px-1.5 py-0.5 rounded ${
+                      c.connected ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}>
+                      {c.connected ? (c.outcome || 'connected') : 'no connect'}
+                    </span>
+                    {/* A SIP fault means the phone never rang — worth separating
+                        from a genuine no-answer when reading the log. */}
+                    {!c.connected && c.reason?.includes('sip') && (
+                      <span className="ml-1 text-[10px] text-amber-700">carrier</span>
+                    )}
+                  </td>
+                  <td className="tabular-nums text-xs">{c.secs ?? '—'}</td>
+                  <td className="text-xs text-[#374151] max-w-md truncate">{c.summary || '—'}</td>
+                  <td>{c.recording && <a href={c.recording} target="_blank" rel="noreferrer"
+                        className="text-xs text-[#EC4899]">play</a>}</td>
+                </tr>
+              )) : <tr><td colSpan={6}><Empty>No calls yet</Empty></td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {/* Reports */}
+      <Card title="Reports — end of day" icon={FileText}>
+        <pre className="text-xs whitespace-pre-wrap font-sans text-[#374151] max-h-96 overflow-y-auto">
+          {eod || 'No data yet.'}
+        </pre>
       </Card>
     </div>
   )
