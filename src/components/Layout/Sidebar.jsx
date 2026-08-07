@@ -2,7 +2,8 @@ import { useEffect } from 'react'
 import { NavLink, useSearchParams } from 'react-router-dom'
 import {
   LayoutDashboard, Megaphone, Bot, Users, DollarSign,
-  TrendingUp, Target, Search, MessageCircle, Settings, ChevronDown, LogOut
+  TrendingUp, Target, Search, MessageCircle, Settings, ChevronDown, LogOut,
+  Headphones, ScanSearch
 } from 'lucide-react'
 import { DEFAULT_CLIENT_ID, DEFAULT_CLIENT_NAME, useDashboard } from '../../store/dashboard'
 import { useClients } from '../../hooks/useDashboardData'

@@ -110,8 +110,8 @@ export default function App() {
         <Toaster richColors position="top-right" />
         <ReportModal />
         <Routes>
-          <Route path="/login" element={(DEV_MODE || session) ? <RedirectWithSearch to="/overview" /> : <Login />} />
-          <Route path="/" element={<RedirectWithSearch to="/overview" />} />
+          <Route path="/login" element={(DEV_MODE || session) ? <RedirectWithSearch to="/lead-desk" /> : <Login />} />
+          <Route path="/" element={<RedirectWithSearch to="/lead-desk" />} />
           {routes.map(({ path, component }) => (
             <Route
               key={path}
@@ -124,7 +124,7 @@ export default function App() {
             />
           ))}
           {/* Catch-all: prevents blank pages from any sidebar link mismatches */}
-          <Route path="*" element={<RedirectWithSearch to="/overview" />} />
+          <Route path="*" element={<RedirectWithSearch to="/lead-desk" />} />
         </Routes>
       </BrowserRouter>
     </DailyAISummaryProvider>
