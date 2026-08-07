@@ -34,10 +34,8 @@ export function useDashboardOverview(dateFrom, dateTo) {
 
   return useSupabaseQuery(
     async () => {
-      const { data, error } = await supabase.rpc('dashboard_kpis', {
-        start_date: dateFrom,
-        end_date: dateTo,
-        p_client_id: currentClientId,
+      const { data, error } = await supabase.rpc('cf_dash_kpis', {
+        p: { region: 'uae', from: dateFrom, to: dateTo },
       })
 
       if (error) return { data: null, error }
@@ -45,13 +43,19 @@ export function useDashboardOverview(dateFrom, dateTo) {
       const row = Array.isArray(data) ? (data[0] ?? null) : data
       if (!row) return { data: null, error: null }
 
-      const totalSpend = Number(row.total_spend ?? 0)
+      // Counts are real and default to 0. Money is NOT: cf has no ad spend and
+      // no deal value (phase 2), so those come back null and must STAY null.
+      // Coercing them to 0 would render "AED 0 spent" and a 0% ROAS, which
+      // reads as a measured result rather than an absent one.
+      const num = (v) => (v == null ? null : Number(v))
+      const totalSpend = num(row.total_spend)
+      const closedRevenue = num(row.deal_value ?? row.closed_revenue)
       const totalLeads = Number(row.total_leads ?? 0)
       const meetingsBooked = Number(row.meetings_booked ?? 0)
       const showedUp = Number(row.showed_up ?? 0)
       const activeOpps = Number(row.active_opportunities ?? 0)
-      const closedWon = Number(row.closed_won ?? 0)
-      const closedRevenue = Number(row.deal_value ?? row.closed_revenue ?? 0)
+
+      const perUnit = (n) => (totalSpend == null || !n ? null : totalSpend / n)
 
       return {
         data: {
@@ -61,14 +65,14 @@ export function useDashboardOverview(dateFrom, dateTo) {
           meetings_booked: meetingsBooked,
           showed_up: showedUp,
           active_opportunities: activeOpps,
-          closed_won: closedWon,
+          closed_won: num(row.closed_won),
           closed_revenue: closedRevenue,
-          cost_per_lead: totalLeads > 0 ? totalSpend / totalLeads : 0,
-          cost_per_meeting: meetingsBooked > 0 ? totalSpend / meetingsBooked : 0,
-          cost_per_active: activeOpps > 0 ? totalSpend / activeOpps : 0,
+          cost_per_lead: perUnit(totalLeads),
+          cost_per_meeting: perUnit(meetingsBooked),
+          cost_per_active: perUnit(activeOpps),
           show_rate: meetingsBooked > 0 ? (showedUp / meetingsBooked) * 100 : 0,
           meeting_rate: totalLeads > 0 ? (meetingsBooked / totalLeads) * 100 : 0,
-          roas: totalSpend > 0 ? closedRevenue / totalSpend : 0,
+          roas: totalSpend && closedRevenue != null ? closedRevenue / totalSpend : null,
         },
         error: null,
       }

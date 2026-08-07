@@ -8,14 +8,19 @@ import {
 import { DEFAULT_CLIENT_ID, DEFAULT_CLIENT_NAME, useDashboard } from '../../store/dashboard'
 import { useClients } from '../../hooks/useDashboardData'
 
+// Creative Performance, Sales Performance and Revenue & ROI are deliberately
+// absent (Abdus, 2026-08-07 — "leave these 3 pages for phase 2").
+//
+// They are not hidden because they are broken. They need data cf does not
+// hold and no rewiring can invent: Meta ad spend, per-deal value, and a
+// sales-rep model. Their routes still resolve, so a bookmark keeps working —
+// only the nav entries are gone, so nobody clicks into a page that can only
+// ever show zeros.
 const navItems = [
   { to: '/home', label: 'Home', icon: LayoutDashboard },
   { to: '/lead-desk', label: 'Lead Desk', icon: Headphones },
   { to: '/lead-lookup', label: 'Lead Lookup', icon: ScanSearch },
-  { to: '/creative-performance', label: 'Creative Performance', icon: Megaphone },
   { to: '/sarahs-performance', label: "Sarah's Performance", icon: Bot },
-  { to: '/sales-performance', label: 'Sales Performance', icon: Users },
-  { to: '/revenue', label: 'Revenue & ROI', icon: DollarSign },
   { to: '/week-over-week', label: 'Week-over-Week', icon: TrendingUp },
   { to: '/target-progress', label: 'Target Progress', icon: Target },
   { to: '/lead-tracker', label: 'Lead Tracker', icon: Search },

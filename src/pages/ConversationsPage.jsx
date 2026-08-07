@@ -93,12 +93,17 @@ export default function ConversationsPage() {
     setLoading(true)
     setError(null)
 
-    supabase.rpc('get_conversations', {
-      p_client_id: clientId,
-      p_limit: PAGE_SIZE,
-      p_offset: page * PAGE_SIZE,
-      p_temperature: temperatureFilter === 'all' ? null : temperatureFilter,
-      p_direction: directionFilter === 'all' ? null : directionFilter,
+    // cf.message is the source now — 45,919 real messages against the legacy
+    // ghl_conversations table's 100 thread summaries. Direction values are the
+    // canonical 'inbound'/'outbound' as of migration 029.
+    supabase.rpc('cf_conversations', {
+      p: {
+        region: 'uae',
+        limit: PAGE_SIZE,
+        offset: page * PAGE_SIZE,
+        temperature: temperatureFilter === 'all' ? null : temperatureFilter,
+        direction: directionFilter === 'all' ? null : directionFilter,
+      },
     }).then(({ data, error }) => {
       if (cancelled) return
 
@@ -126,8 +131,8 @@ export default function ConversationsPage() {
     setSummaryLoading(true)
     setSummaryError(null)
 
-    supabase.rpc('get_temperature_summary', {
-      p_client_id: clientId,
+    supabase.rpc('cf_temperature_summary', {
+      p: { region: 'uae' },
     }).then(({ data, error }) => {
       if (cancelled) return
 

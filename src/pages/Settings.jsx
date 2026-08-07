@@ -4,27 +4,23 @@ import { supabase } from '../lib/supabase'
 import { useDashboard } from '../store/dashboard'
 import { useDailyAISummary } from '../context/DailyAISummaryContext'
 
-// Maps UI labels to normalized target metric_name keys in Supabase.
-// These metric_names match what the backend (n8n alerts, reports) expects.
+// The editable targets are exactly the five cf.target measures — the same ones
+// the Lead Desk "Targets & progress" panel scores against, so a number changed
+// here moves that bar and nothing else.
+//
+// The previous list carried 18 keys, 13 of them spend / CPL / revenue / ROAS.
+// cf measures none of those (no ad spend, no deal value — phase 2), so those
+// rows let you set a target for a number that is always null. Removed rather
+// than left as editable decoration.
+//
+// `metric` and `period` are what cf.target actually stores; `key` is the
+// derived name cf_targets_map exposes to the rest of the UI.
 const TARGET_CONFIG = [
-  { key: 'daily_spend',      label: 'Daily Spend (AED)',       default: 420 },
-  { key: 'monthly_spend',    label: 'Monthly Spend (AED)',     default: 33000 },
-  { key: 'monthly_leads',    label: 'Monthly Leads',           default: 100 },
-  { key: 'monthly_meetings', label: 'Monthly Meetings',        default: 30 },
-  { key: 'monthly_shows',    label: 'Monthly Shows',           default: 23 },
-  { key: 'active_opportunities', label: 'Active Opportunities', default: 10 },
-  { key: 'monthly_closes',   label: 'Monthly Closes',          default: 4 },
-  { key: 'monthly_revenue',  label: 'Monthly Revenue (AED)',   default: 40000 },
-  { key: 'weekly_leads',     label: 'Weekly Leads',            default: 28 },
-  { key: 'weekly_meetings',  label: 'Weekly Meetings',         default: 8 },
-  { key: 'weekly_shows',     label: 'Weekly Shows',            default: 6 },
-  { key: 'weekly_closes',    label: 'Weekly Closes',           default: 1 },
-  { key: 'cpl_target',       label: 'CPL Target (AED)',        default: 85 },
-  { key: 'cost_per_meeting', label: 'Cost / Meeting (AED)',    default: 600 },
-  { key: 'cost_per_active',  label: 'Cost / Active Opp (AED)', default: 1200 },
-  { key: 'show_rate',        label: 'Show Rate (%)',           default: 75 },
-  { key: 'meeting_rate',     label: 'Meeting Rate (%)',        default: 18 },
-  { key: 'roas_target',      label: 'ROAS Target (x)',         default: 4 },
+  { key: 'daily_leads',     metric: 'leads',    period: 'day',  category: 'ads',   label: 'Leads / day',     default: 40 },
+  { key: 'daily_reached',   metric: 'reached',  period: 'day',  category: 'agent', label: 'Reached / day',   default: 25 },
+  { key: 'daily_bookings',  metric: 'bookings', period: 'day',  category: 'agent', label: 'Bookings / day',  default: 6 },
+  { key: 'weekly_showups',  metric: 'showups',  period: 'week', category: 'sales', label: 'Show-ups / week', default: 20 },
+  { key: 'weekly_closes',   metric: 'closes',   period: 'week', category: 'sales', label: 'Closes / week',   default: 5 },
 ]
 
 const defaultTargets = Object.fromEntries(TARGET_CONFIG.map(t => [t.key, t.default]))
@@ -79,29 +75,19 @@ export default function Settings() {
   useEffect(() => {
     setLoadError(null)
 
-    if (!currentClientId) {
-      setTargets(defaultTargets)
-      return
-    }
-
     setTargets(defaultTargets)
 
-    let query = supabase
-      .from('targets')
-      .select('metric_name, target_value')
-
-    query = query.eq('client_id', currentClientId)
-    query
+    supabase.rpc('cf_targets_map', { p: { region: 'uae' } })
       .then(({ data, error }) => {
         if (error) {
           setLoadError(error.message)
           return
         }
-        if (data && data.length) {
+        if (data && Object.keys(data).length) {
           setTargets(prev => {
             const next = { ...prev }
-            for (const row of data) {
-              next[row.metric_name] = Number(row.target_value)
+            for (const t of TARGET_CONFIG) {
+              if (data[t.key] != null) next[t.key] = Number(data[t.key])
             }
             return next
           })
@@ -110,22 +96,15 @@ export default function Settings() {
   }, [currentClientId])
 
   useEffect(() => {
-    if (!currentClientId) {
-      setTeamMembers([])
-      return
-    }
-
     setTeamMembers([])
 
-    let query = supabase
-      .from('team_members')
-      .select('name, email, role')
-
-    query = query.eq('client_id', currentClientId)
-    query
-      .order('invited_at', { ascending: false })
+    // cf has no team model — there is no user/rep table in the v2 schema, and
+    // the legacy one held a single row. cf_team_members returns an empty set so
+    // this renders its "unavailable" state rather than an error, until a team
+    // model is actually built (phase 2, alongside Sales Performance).
+    supabase.rpc('cf_team_members', { p: { region: 'uae' } })
       .then(({ data, error }) => {
-        if (error) {
+        if (error || !data?.length) {
           setTeamTableAvailable(false)
           return
         }
@@ -148,20 +127,23 @@ export default function Settings() {
 
     setSaving(true)
     setLoadError(null)
-    const { data: authData } = await supabase.auth.getUser()
-    const rows = TARGET_CONFIG.map(t => ({
-      client_id: currentClientId,
-      metric_name: t.key,
-      target_value: Number(targets[t.key] ?? t.default),
-      updated_by: authData?.user?.email ?? null,
-      updated_at: new Date().toISOString(),
-    }))
-    const { error } = await supabase
-      .from('targets')
-      .upsert(rows, { onConflict: 'client_id,metric_name' })
+    // One RPC per metric. cf_dash_set_target upserts on (region, metric,
+    // period), so saving twice is idempotent rather than duplicating rows.
+    const results = await Promise.all(TARGET_CONFIG.map(t =>
+      supabase.rpc('cf_dash_set_target', {
+        p: {
+          region: 'uae',
+          metric: t.metric,
+          period: t.period,
+          category: t.category,
+          target: Number(targets[t.key] ?? t.default),
+        },
+      })
+    ))
     setSaving(false)
-    if (error) {
-      setLoadError(error.message)
+    const failed = results.find(r => r.error)
+    if (failed) {
+      setLoadError(failed.error.message)
       return
     }
     refresh()

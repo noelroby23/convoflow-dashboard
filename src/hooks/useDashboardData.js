@@ -64,8 +64,6 @@ const mockFallbackSarahPerformance = USE_MOCK ? {
   rows: [],
 } : null
 
-const filterLeadTrackerByDubaiDate = (query, from, to) => query.gte('dubai_date', from).lte('dubai_date', to)
-
 const getDubaiToday = () => {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Dubai',
@@ -95,7 +93,27 @@ const mockFallbackSalesPerformance = USE_MOCK ? {
   per_rep: mockFallbackSalesReps,
 } : null
 
-const filterByClient = (query, clientId) => clientId ? query.eq('client_id', clientId) : query
+// ---------------------------------------------------------------------------
+// ConvoFlow v2 backend.
+//
+// These pages were written against the OLD project's multi-client `public`
+// schema. That schema does not exist on convoflow-v2, so every one of them
+// 404'd. The fix keeps the page UI untouched and swaps only the source: the
+// cf_* RPCs in migration 028 return the same column names and types as the
+// legacy functions they replace.
+//
+// Two consequences worth knowing when reading the pages:
+//   * cf is single-client, so client_id is not a filter any more. It is still
+//     passed through as null so the page components keep their shape.
+//   * spend, revenue, deal value and pipeline value come back NULL, not 0 —
+//     cf has no ad-spend or deal-value data (phase 2). Do not coerce them to
+//     0; a 0 renders as "we spent nothing", which is a lie. `??` on a number
+//     is fine, `?? 0` on these four is not.
+// ---------------------------------------------------------------------------
+const REGION = 'uae'
+const cfArgs = (dateRange, extra) => ({
+  p: { region: REGION, from: dateRange?.from, to: dateRange?.to, ...extra },
+})
 
 const normalizeContactRows = (rows) => (rows ?? []).map(row => {
   const currentStage = row.current_stage ?? row.mapped_current_stage ?? row.stage ?? null
@@ -122,45 +140,6 @@ const normalizeContactRows = (rows) => (rows ?? []).map(row => {
   }
 })
 
-const getContactLookupKeys = (row) => [row?.contact_id, row?.ghl_contact_id].filter(Boolean).map(String)
-
-const mergeStageNames = (rows, stageRows) => {
-  const stageNameByContactKey = new Map()
-
-  for (const stageRow of stageRows ?? []) {
-    if (!stageRow.stage_name) continue
-    for (const key of getContactLookupKeys(stageRow)) {
-      stageNameByContactKey.set(key, stageRow.stage_name)
-    }
-  }
-
-  return (rows ?? []).map(row => {
-    const stageName = getContactLookupKeys(row).map(key => stageNameByContactKey.get(key)).find(Boolean)
-    return stageName ? { ...row, stage_name: stageName } : row
-  })
-}
-
-async function mergeMetaAdIds(rows, clientId) {
-  const ghlContactIds = [...new Set((rows ?? []).map(row => row.ghl_contact_id).filter(Boolean))]
-  if (!ghlContactIds.length) return { data: rows ?? [], error: null }
-
-  const { data, error } = await filterByClient(
-    supabase.from('contacts').select('ghl_contact_id, meta_ad_id_raw'),
-    clientId
-  ).in('ghl_contact_id', ghlContactIds)
-
-  if (error) return { data: null, error }
-
-  const metaAdIdByGhlContactId = new Map((data ?? []).map(row => [row.ghl_contact_id, row.meta_ad_id_raw]))
-  return {
-    data: (rows ?? []).map(row => ({
-      ...row,
-      meta_ad_id_raw: row.meta_ad_id_raw ?? metaAdIdByGhlContactId.get(row.ghl_contact_id) ?? null,
-    })),
-    error: null,
-  }
-}
-
 function useDashboardQueryState({ includeDateRange = true } = {}) {
   const currentClientId = useDashboard(s => s.currentClientId)
   const dateRange = useDashboard(s => s.dateRange)
@@ -181,37 +160,36 @@ function useNormalizedContactQuery(queryFn, deps, fallback) {
   return { ...result, data }
 }
 
+// cf is single-client. The client switcher has nothing to switch between, so
+// this returns the one client rather than querying a table that no longer
+// exists.
 export function useClients() {
   return useSupabaseQuery(
-    () => supabase.from('funnel_summary').select('client_id, client_name'),
-    [], USE_MOCK ? [{ client_id: 'mock', client_name: 'ConvoFlow UK' }] : null
+    async () => ({ data: [{ client_id: null, client_name: 'ConvoFlow UAE' }], error: null }),
+    [], null
   )
 }
 
 export function useFunnelByDate() {
-  const { currentClientId, dateRange, refreshKey } = useDashboardQueryState()
+  const { dateRange, refreshKey } = useDashboardQueryState()
   return useSupabaseQuery(
     async () => {
-      const { data, error } = await supabase.rpc('funnel_summary_by_date', {
-        p_client_id: currentClientId, p_from: dateRange.from, p_to: dateRange.to, p_paid_only: true,
-      })
+      const { data, error } = await supabase.rpc('cf_funnel_summary', cfArgs(dateRange))
       return { data: Array.isArray(data) ? (data[0] ?? null) : data, error }
     },
-    [currentClientId, dateRange.from, dateRange.to, refreshKey], mockFallbackFunnel
+    [dateRange.from, dateRange.to, refreshKey], mockFallbackFunnel
   )
 }
 
 export function useFunnelSummary() {
-  const { currentClientId, refreshKey } = useDashboardQueryState({ includeDateRange: false })
+  const { refreshKey } = useDashboardQueryState({ includeDateRange: false })
   return useSupabaseQuery(
     async () => {
-      const { data, error } = await supabase.rpc('funnel_summary_by_date', {
-        p_client_id: currentClientId, p_from: '2020-01-01',
-        p_to: getDubaiToday(), p_paid_only: true,
-      })
+      const { data, error } = await supabase.rpc('cf_funnel_summary',
+        cfArgs({ from: '2020-01-01', to: getDubaiToday() }))
       return { data: Array.isArray(data) ? (data[0] ?? null) : data, error }
     },
-    [currentClientId, refreshKey], mockFallbackFunnel
+    [refreshKey], mockFallbackFunnel
   )
 }
 
@@ -331,152 +309,41 @@ export function useRepDrilldown(repName = null, metric = null) {
   )
 }
 
-export function useContactDetails(bucket = null) {
-  const { currentClientId, dateRange, refreshKey } = useDashboardQueryState()
+// One RPC now serves all five contact hooks. cf_contacts_by_bucket already
+// returns stage_name and meta_ad_id_raw, so the old mergeStageNames /
+// mergeMetaAdIds round-trips against `contacts` and `lead_tracker` are gone —
+// those tables do not exist here, and the extra queries were only ever
+// stitching back what one query can return.
+function useCfContacts(bucket, { emptyWhenNoBucket = false } = {}) {
+  const { dateRange, refreshKey } = useDashboardQueryState()
   return useNormalizedContactQuery(
     async () => {
-      if (bucket) {
-        return supabase.rpc('dashboard_contacts_by_bucket', {
-          p_bucket: bucket,
-          p_start_date: dateRange.from,
-          p_end_date: dateRange.to,
-          p_client_id: currentClientId ?? null,
-        })
-      }
-
-      const [contactsResult, stagesResult] = await Promise.all([
-        filterLeadTrackerByDubaiDate(
-          filterByClient(supabase.from('lead_tracker').select('*'), currentClientId),
-          dateRange.from,
-          dateRange.to
-        ).order('ghl_created_at', { ascending: false, nullsFirst: false }),
-        supabase.rpc('dashboard_contacts_by_bucket', {
-          p_bucket: 'leads',
-          p_start_date: dateRange.from,
-          p_end_date: dateRange.to,
-          p_client_id: currentClientId ?? null,
-        }),
-      ])
-
-      if (contactsResult.error || stagesResult.error) {
-        return { data: null, error: contactsResult.error || stagesResult.error }
-      }
-
-      return { data: mergeStageNames(contactsResult.data, stagesResult.data), error: null }
+      if (emptyWhenNoBucket && !bucket) return { data: [], error: null }
+      return supabase.rpc('cf_contacts_by_bucket', cfArgs(dateRange, { bucket: bucket ?? 'leads' }))
     },
-    [currentClientId, dateRange.from, dateRange.to, bucket, refreshKey],
-    USE_MOCK && mockFallbackContacts
-      ? (bucket ? mockFallbackContacts.filter(c => c.current_stage === bucket) : mockFallbackContacts)
-      : null
-  )
-}
-
-export function useDashboardContactsByBucket(bucket = null) {
-  const { currentClientId, dateRange, refreshKey } = useDashboardQueryState()
-  return useNormalizedContactQuery(
-    async () => {
-      if (!bucket) return Promise.resolve({ data: [], error: null })
-
-      const { data, error } = await supabase.rpc('dashboard_contacts_by_bucket', {
-        p_bucket: bucket,
-        p_start_date: dateRange.from,
-        p_end_date: dateRange.to,
-        p_client_id: currentClientId ?? null,
-      })
-
-      if (error) return { data: null, error }
-
-      return mergeMetaAdIds(data ?? [], currentClientId)
-    },
-    [currentClientId, dateRange.from, dateRange.to, bucket, refreshKey],
+    [dateRange.from, dateRange.to, bucket, refreshKey],
     null
   )
 }
 
+export function useContactDetails(bucket = null) {
+  return useCfContacts(bucket)
+}
+
+export function useDashboardContactsByBucket(bucket = null) {
+  return useCfContacts(bucket, { emptyWhenNoBucket: true })
+}
+
 export function useAllContacts() {
-  const { currentClientId, dateRange, refreshKey } = useDashboardQueryState()
-  return useNormalizedContactQuery(
-    async () => {
-      const [contactsResult, stagesResult] = await Promise.all([
-        filterLeadTrackerByDubaiDate(
-          filterByClient(supabase.from('lead_tracker').select('*'), currentClientId),
-          dateRange.from,
-          dateRange.to
-        ).order('ghl_created_at', { ascending: false, nullsFirst: false }),
-        supabase.rpc('dashboard_contacts_by_bucket', {
-          p_bucket: 'leads',
-          p_start_date: dateRange.from,
-          p_end_date: dateRange.to,
-          p_client_id: currentClientId ?? null,
-        }),
-      ])
-
-      if (contactsResult.error || stagesResult.error) {
-        return { data: null, error: contactsResult.error || stagesResult.error }
-      }
-
-      return { data: mergeStageNames(contactsResult.data, stagesResult.data), error: null }
-    },
-    [currentClientId, dateRange.from, dateRange.to, refreshKey], mockFallbackLeadTracker
-  )
+  return useCfContacts(null)
 }
 
 export function useLeadTrackerContacts() {
-  const { currentClientId, dateRange, refreshKey } = useDashboardQueryState()
-  return useNormalizedContactQuery(
-    async () => {
-      const { data, error } = await supabase.rpc('dashboard_contacts_by_bucket', {
-        p_bucket: 'leads',
-        p_start_date: dateRange.from,
-        p_end_date: dateRange.to,
-        p_client_id: currentClientId ?? null,
-      })
-
-      if (error) return { data: null, error }
-
-      const enriched = await mergeMetaAdIds(data ?? [], currentClientId)
-      if (enriched.error) return enriched
-
-      const sorted = [...(enriched.data ?? [])].sort((a, b) => {
-        const aDate = a.dubai_date || a.ghl_created_at || a.created_at || ''
-        const bDate = b.dubai_date || b.ghl_created_at || b.created_at || ''
-        return String(bDate).localeCompare(String(aDate))
-      })
-
-      return { data: sorted, error: null }
-    },
-    [currentClientId, dateRange.from, dateRange.to, refreshKey], mockFallbackLeadTracker
-  )
+  return useCfContacts(null)
 }
 
 export function useLeadTrackerBucketContacts(bucket = null) {
-  const { currentClientId, dateRange, refreshKey } = useDashboardQueryState()
-  return useNormalizedContactQuery(
-    async () => {
-      if (!bucket) return { data: [], error: null }
-
-      const { data, error } = await supabase.rpc('dashboard_contacts_by_bucket', {
-        p_bucket: bucket,
-        p_start_date: dateRange.from,
-        p_end_date: dateRange.to,
-        p_client_id: currentClientId ?? null,
-      })
-
-      if (error) return { data: null, error }
-
-      const enriched = await mergeMetaAdIds(data ?? [], currentClientId)
-      if (enriched.error) return enriched
-
-      const sorted = [...(enriched.data ?? [])].sort((a, b) => {
-        const aDate = a.dubai_date || a.ghl_created_at || a.created_at || ''
-        const bDate = b.dubai_date || b.ghl_created_at || b.created_at || ''
-        return String(bDate).localeCompare(String(aDate))
-      })
-
-      return { data: sorted, error: null }
-    },
-    [currentClientId, dateRange.from, dateRange.to, bucket, refreshKey], null
-  )
+  return useCfContacts(bucket, { emptyWhenNoBucket: true })
 }
 
 export function useDashboardAdOptions() {
@@ -510,16 +377,8 @@ export function useSarahPerformance() {
   const { data, loading, error } = useSupabaseQuery(
     async () => {
       const [breakdownResult, conversationCountResult] = await Promise.all([
-        supabase.rpc('sarah_performance_breakdown', {
-          p_start_date: dateRange.from,
-          p_end_date: dateRange.to,
-          p_client_id: currentClientId ?? null,
-        }),
-        supabase.rpc('real_conversation_count', {
-          p_start_date: dateRange.from,
-          p_end_date: dateRange.to,
-          p_client_id: currentClientId ?? null,
-        }),
+        supabase.rpc('cf_sarah_breakdown', cfArgs(dateRange)),
+        supabase.rpc('cf_real_conversations', cfArgs(dateRange)),
       ])
 
       if (breakdownResult.error) return { data: null, error: breakdownResult.error }
@@ -554,31 +413,26 @@ export function useSarahPerformance() {
   }
 }
 
+// The daily_metrics VIEW is replaced by cf_daily_metrics, which returns the
+// same columns plus dials / reached / messages. spend, impressions, clicks and
+// avg_frequency are NULL — that is the ad data, which is phase 2.
 export function useDailyMetrics() {
-  const { currentClientId, dateRange, refreshKey } = useDashboardQueryState()
+  const { dateRange, refreshKey } = useDashboardQueryState()
   return useSupabaseQuery(
-    () => filterByClient(supabase.from('daily_metrics').select('*'), currentClientId)
-      .gte('date', dateRange.from).lte('date', dateRange.to)
-      .order('date', { ascending: true }),
-    [currentClientId, dateRange.from, dateRange.to, refreshKey], mockFallbackDailyMetrics
+    () => supabase.rpc('cf_daily_metrics', cfArgs(dateRange)),
+    [dateRange.from, dateRange.to, refreshKey], mockFallbackDailyMetrics
   )
 }
 
 export function useTrendMetricsByDate() {
-  const { currentClientId, dateRange, refreshKey } = useDashboardQueryState()
+  const { dateRange, refreshKey } = useDashboardQueryState()
   return useSupabaseQuery(
     async () => {
-      if (!dateRange.from || !dateRange.to) {
-        return { data: [], error: null }
-      }
-
-      const { data, error } = await filterByClient(supabase.from('daily_metrics').select('*'), currentClientId)
-        .gte('date', dateRange.from).lte('date', dateRange.to)
-        .order('date', { ascending: true })
-
+      if (!dateRange.from || !dateRange.to) return { data: [], error: null }
+      const { data, error } = await supabase.rpc('cf_daily_metrics', cfArgs(dateRange))
       return { data: data ?? [], error }
     },
-    [currentClientId, dateRange.from, dateRange.to, refreshKey],
+    [dateRange.from, dateRange.to, refreshKey],
     mockFallbackDailyMetrics
   )
 }
@@ -638,19 +492,22 @@ export function useSalesPerformance() {
   )
 }
 
+// cf.target is the single source for targets (Section 5.9, "KPIs with targets
+// for Ads / Agent / Sales"). It stores one row per metric per period and
+// cf_targets_map derives the daily/weekly/monthly variants the UI asks for, so
+// the same number cannot be stored twice and drift.
+//
+// The old hard-coded fallback is gone deliberately. It quietly supplied
+// spend/CPL/ROAS targets that nothing measures any more, which made those cards
+// render a target line against a value that is always null.
 export function useTargets() {
-  const { currentClientId, refreshKey } = useDashboardQueryState({ includeDateRange: false })
+  const { refreshKey } = useDashboardQueryState({ includeDateRange: false })
   return useSupabaseQuery(
     async () => {
-      const { data, error } = await filterByClient(supabase.from('targets').select('metric_name, target_value'), currentClientId)
-      if (error) return { data: null, error }
-      const pivot = {}
-      for (const row of data || []) { pivot[row.metric_name] = Number(row.target_value) }
-      return { data: pivot, error: null }
+      const { data, error } = await supabase.rpc('cf_targets_map', { p: { region: REGION } })
+      return { data: data ?? {}, error }
     },
-    [currentClientId, refreshKey],
-    { monthly_spend: 33000, active_opportunities: 10, monthly_revenue: 40000, monthly_leads: 100, monthly_meetings: 30, monthly_shows: 23, monthly_closes: 4, weekly_leads: 28,
-      weekly_meetings: 8, weekly_shows: 6, weekly_closes: 1, daily_spend: 420, cpl_target: 85,
-      cost_per_meeting: 600, cost_per_active: 1200, show_rate: 75, meeting_rate: 18, roas_target: 4 }
+    [refreshKey],
+    null
   )
 }
