@@ -2,7 +2,18 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { subDays, subMonths, subQuarters, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfWeek, endOfWeek, format } from 'date-fns'
 
-export const DEFAULT_DATE_PRESET = 'this_month'
+// 'this_month' was the default while the old dashboard was fed daily by the
+// Meta and GHL syncs, so the current month always had data in it.
+//
+// It is the wrong default now. cf holds imported history spanning 2025-12 to
+// 2026-08 — 2,633 leads — and August has 13 of them, because v2 has not been
+// switched on yet and is generating nothing. Every page therefore opened on a
+// window containing 0.5% of the data and looked broken when it was merely
+// scoped.
+//
+// Revisit at cutover: once v2 is live and producing leads daily, a rolling
+// window ('last_30_days') becomes the sensible default again.
+export const DEFAULT_DATE_PRESET = 'all_time'
 export const ALL_TIME_START = '2020-01-01'
 export const DEFAULT_CLIENT_ID = 'b7f3e2a1-5c8d-4e9f-a1b2-3c4d5e6f7a8b'
 export const DEFAULT_CLIENT_NAME = 'ConvoFlow UAE'
@@ -104,11 +115,17 @@ export const useDashboard = create(
     }),
     {
       name: 'convoflow-dashboard-store-v2',
-      version: 3,
+      // v4 drops the persisted dateRange. Anyone who used the dashboard before
+      // today has 'this_month' saved in localStorage, and changing
+      // DEFAULT_DATE_PRESET alone would never reach them — the stored value
+      // wins. They would keep seeing a near-empty August and reasonably
+      // conclude the rebuild had not worked.
+      version: 4,
       migrate: (state) => {
         if (state) {
           delete state.currentClientId
           delete state.currentClientName
+          delete state.dateRange
         }
         return state
       },
