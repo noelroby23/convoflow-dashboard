@@ -53,8 +53,16 @@ export function useCfRpc(fn, args, { intervalMs = 0 } = {}) {
   return { data, error, loading, refresh: load }
 }
 
-export const useCfHeadline = (region = 'uae') =>
-  useCfRpc('cf_dash_headline', { p: { region } }, { intervalMs: 60_000 })
+// The three range-aware hooks. Until now they took no dates at all, so the
+// date-range control at the top of the page changed nothing and every card
+// read "today" — a permanent row of zeros above a pipeline rail full of leads.
+// `range` is the store's { from, to } (yyyy-MM-dd, Dubai); omit it and the
+// RPC still defaults to today.
+const withRange = (region, range) =>
+  range?.from && range?.to ? { region, from: range.from, to: range.to } : { region }
+
+export const useCfHeadline = (region = 'uae', range) =>
+  useCfRpc('cf_dash_headline', { p: withRange(region, range) }, { intervalMs: 60_000 })
 
 // The queue moves constantly, so it refreshes fastest.
 export const useCfQueue = () =>
@@ -75,14 +83,15 @@ export const useCfQaDigest = (days = 7) =>
 export const useCfEod = (region = 'uae') =>
   useCfRpc('cf_eod_summary', { p: { region } }, { intervalMs: 300_000 })
 
-export const useCfTargets = (region = 'uae') =>
-  useCfRpc('cf_dash_targets', { p: { region } }, { intervalMs: 60_000 })
+export const useCfTargets = (region = 'uae', range) =>
+  useCfRpc('cf_dash_targets', { p: withRange(region, range) }, { intervalMs: 60_000 })
 
 export const useCfAttention = (region = 'uae') =>
   useCfRpc('cf_dash_attention', { p: { region } }, { intervalMs: 30_000 })
 
-export const useCfCalls = (region = 'uae') =>
-  useCfRpc('cf_dash_calls', { p: { region } }, { intervalMs: 30_000 })
+export const useCfCalls = (region = 'uae', range) =>
+  useCfRpc('cf_dash_calls', { p: { ...withRange(region, range), limit: 100 } },
+           { intervalMs: 30_000 })
 
 export async function lookupLead(q) {
   return callRpc('cf_lead_lookup', { p: { q } })

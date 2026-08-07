@@ -8,6 +8,7 @@ import {
   useCfTargets, useCfAttention, useCfCalls, useCfEod,
   setLeadState,
 } from '../hooks/useCfDesk'
+import { useDashboard } from '../store/dashboard'
 import { toast } from 'sonner'
 
 const DUBAI = 'Asia/Dubai'
@@ -51,15 +52,19 @@ function Empty({ children }) {
 
 export default function LeadDesk() {
   const region = 'uae'
-  const { data: head } = useCfHeadline(region)
+  // The header's date-range control drives the counted panels. The live
+  // panels below it — queue, pipeline, meetings, attention — are deliberately
+  // "right now" and ignore it; a queue filtered to last month is meaningless.
+  const range = useDashboard(s => s.dateRange)
+  const { data: head } = useCfHeadline(region, range)
   const { data: queue, loading: qLoading } = useCfQueue()
   const { data: pipeline } = useCfPipeline(region)
   const { data: meetings, refresh: refreshMeetings } = useCfMeetings(region)
   const [view, setView] = useState('followup')
   const { data: split } = useCfSplit(view, region)
-  const { data: targets } = useCfTargets(region)
+  const { data: targets } = useCfTargets(region, range)
   const { data: attention } = useCfAttention(region)
-  const { data: calls } = useCfCalls(region)
+  const { data: calls } = useCfCalls(region, range)
   const { data: eod } = useCfEod(region)
   const [busyId, setBusyId] = useState(null)
 
@@ -91,8 +96,11 @@ export default function LeadDesk() {
       )}
 
       {/* "Should simply tell me" — PDF section 10 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
-        <Stat label="Leads today" value={head?.leads_today} />
+      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
+        <Stat label={range?.from === range?.to ? 'Leads today' : 'Leads'} value={head?.leads_today} />
+        {/* Dials and reached are separate on purpose: 59% of dials never
+            connect (CLAUDE.md 7.7), so one number cannot carry both. */}
+        <Stat label="Dials" value={head?.dials} />
         <Stat label="Actually reached" value={head?.reached} />
         <Stat label="Connect rate" value={head?.connect_rate} suffix="%" />
         <Stat label="Bookings" value={head?.bookings} />
