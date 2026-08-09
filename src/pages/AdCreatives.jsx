@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AlertTriangle, Megaphone } from 'lucide-react'
+import { AlertTriangle, Megaphone, Play, ExternalLink } from 'lucide-react'
 import { useCfRpc } from '../hooks/useCfDesk'
 import { useDashboard } from '../store/dashboard'
 import { exportCsv } from '../lib/exportCsv'
@@ -123,7 +123,7 @@ export default function AdCreatives() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-xs uppercase tracking-wide text-[#9CA3AF] border-b border-[#F3F4F6]">
-                    <th className="py-2 pr-3">{group === 'ad' ? 'Ad' : group === 'adset' ? 'Ad set' : 'Campaign'}</th>
+                    <th className="py-2 pr-3 min-w-[16rem]">{group === 'ad' ? 'Ad' : group === 'adset' ? 'Ad set' : 'Campaign'}</th>
                     <th className="py-2 px-2 text-right">Spend</th>
                     <th className="py-2 px-2 text-right">Impr.</th>
                     <th className="py-2 px-2 text-right">Clicks</th>
@@ -145,7 +145,32 @@ export default function AdCreatives() {
                     return (
                       <tr key={r.key} className="border-b border-[#F9FAFB] last:border-0">
                         <td className="py-2 pr-3">
-                          <span className="text-[#111]">{r.name}</span>
+                          <div className="flex items-center gap-2.5">
+                            {/* Click the creative to open the ad on Facebook
+                                exactly as it ran. Meta's thumbnail URLs are
+                                signed and rotate, so they are refreshed on
+                                every sync rather than cached by us. */}
+                            {r.creative_url ? (
+                              <a href={r.fb_post_url || r.video_url || r.creative_url}
+                                 target="_blank" rel="noopener noreferrer"
+                                 title="Open this ad on Facebook"
+                                 className="relative shrink-0 block w-12 h-12 rounded-lg overflow-hidden
+                                            border border-[#E9E9E7] group">
+                                <img src={r.creative_url} alt={r.name}
+                                     className="w-full h-full object-cover" loading="lazy" />
+                                {r.creative_type === 'VIDEO' && (
+                                  <span className="absolute inset-0 grid place-items-center bg-black/30
+                                                   group-hover:bg-black/45 transition-colors">
+                                    <Play size={14} className="text-white" fill="white" />
+                                  </span>
+                                )}
+                              </a>
+                            ) : (
+                              <span className="shrink-0 w-12 h-12 rounded-lg bg-[#F3F4F6]
+                                               border border-[#E9E9E7]" />
+                            )}
+                            <div className="min-w-0">
+                              <span className="text-[#111]">{r.name}</span>
                           {r.status && (
                             <span className="ml-2 text-[10px] uppercase text-[#9CA3AF]">{r.status}</span>
                           )}
@@ -155,6 +180,19 @@ export default function AdCreatives() {
                               not attributed
                             </span>
                           )}
+                              {(r.adset_name || r.campaign_name) && (
+                                <p className="text-[11px] text-[#9CA3AF] truncate">
+                                  {[r.campaign_name, r.adset_name].filter(Boolean).join(' · ')}
+                                </p>
+                              )}
+                              {r.fb_post_url && (
+                                <a href={r.fb_post_url} target="_blank" rel="noopener noreferrer"
+                                   className="inline-flex items-center gap-1 text-[11px] text-[#2E62E0] hover:underline">
+                                  View ad <ExternalLink size={10} />
+                                </a>
+                              )}
+                            </div>
+                          </div>
                         </td>
                         <td className="py-2 px-2 text-right tabular-nums">{money(r.spend)}</td>
                         <td className="py-2 px-2 text-right tabular-nums">{num(r.impressions)}</td>
