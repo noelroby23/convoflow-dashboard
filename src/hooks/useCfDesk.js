@@ -104,8 +104,16 @@ export const useCfCalls = (region = 'uae', range) =>
 
 // The board moves as calls happen, so it refreshes with the queue, not with
 // the slower panels.
-export const useCfBoard = (region = 'uae', filter = 'all') =>
-  useCfRpc('cf_dash_board', { p: { region, filter, per_column: 50 } }, { intervalMs: 15_000 })
+// `range` scopes by when the lead arrived and `q` searches name or phone.
+// Both optional: with neither, this is the live "in play" board.
+export const useCfBoard = (region = 'uae', filter = 'all', range, q) =>
+  useCfRpc('cf_dash_board', {
+    p: {
+      region, filter, per_column: 50,
+      ...(range?.from && range?.to ? { from: range.from, to: range.to } : {}),
+      ...(q ? { q } : {}),
+    },
+  }, { intervalMs: 15_000 })
 
 // `date` is a yyyy-MM-dd in Dubai; omit for today. Drives the Today/Yesterday
 // toggle without touching the page's main date range, which scopes history.

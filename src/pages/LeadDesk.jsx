@@ -85,10 +85,15 @@ export default function LeadDesk() {
   // date range: the range scopes history, this scopes "what happened today".
   const [day, setDay] = useState('today')
   const [boardFilter, setBoardFilter] = useState('all')
+  const [boardQ, setBoardQ] = useState('')
+  // The board is a live work surface by default. "Use date range" makes it
+  // follow the picker in the header instead, scoped by when the lead arrived.
+  const [boardByDate, setBoardByDate] = useState(false)
   const dayParam = day === 'today' ? undefined : yesterdayDubai()
   const { data: today } = useCfToday(region, dayParam)
   const { data: activity } = useCfActivity(region, dayParam)
-  const { data: board } = useCfBoard(region, boardFilter)
+  const { data: board } = useCfBoard(
+    region, boardFilter, boardByDate ? range : undefined, boardQ.trim() || undefined)
 
   const paused = queue?.global_paused
   const breaker = queue?.breaker_active
@@ -173,6 +178,25 @@ export default function LeadDesk() {
                   >{lbl}</button>
                 ))}
             </div>
+            <input
+              value={boardQ}
+              onChange={e => setBoardQ(e.target.value)}
+              placeholder="Search name or phone…"
+              className="text-xs px-2.5 py-1 rounded-lg border border-[#E9E9E7] w-44
+                         text-[#22211D] placeholder:text-[#9CA3AF] outline-none focus:border-[#C9C8C4]"
+            />
+            <button
+              onClick={() => setBoardByDate(v => !v)}
+              title={boardByDate
+                ? `Showing leads that arrived ${range?.from} to ${range?.to}`
+                : 'Showing everything currently in play'}
+              className={`text-xs px-2.5 py-1 rounded-lg border ${
+                boardByDate
+                  ? 'bg-[#22211D] text-white border-[#22211D]'
+                  : 'border-[#E9E9E7] text-[#6D6B63] hover:bg-[#F7F7F6]'}`}
+            >
+              {boardByDate ? 'Date range on' : 'Use date range'}
+            </button>
             <button onClick={exportBoard}
                     className="text-xs px-2.5 py-1 rounded-lg border border-[#E9E9E7] text-[#6D6B63] hover:bg-[#F7F7F6]">
               Export CSV
@@ -180,6 +204,12 @@ export default function LeadDesk() {
           </div>
         }
       >
+        <p className="text-xs text-[#9CA3AF] mb-3">
+          {boardByDate
+            ? `Leads that arrived ${range?.from} → ${range?.to}`
+            : 'Everything currently in play — queued, scheduled, in a cadence, or moved in the last 14 days'}
+          {boardQ.trim() ? ` · matching “${boardQ.trim()}”` : ''}
+        </p>
         <Board board={board} dialing={queue?.dialing_now} />
       </Card>
 

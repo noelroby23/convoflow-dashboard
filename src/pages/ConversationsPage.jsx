@@ -53,17 +53,17 @@ function normalizeTags(tags) {
 
 function ConversationSkeleton() {
   return (
-    <div className="rounded-2xl border border-white/10 bg-[#0d1320] p-4">
+    <div className="rounded-2xl border border-[#E9E9E7] bg-white p-4">
       <div className="mb-4 flex items-center gap-3">
-        <div className="h-3 w-3 animate-pulse rounded-full bg-white/10" />
-        <div className="h-4 w-40 animate-pulse rounded bg-white/10" />
-        <div className="ml-auto h-5 w-16 animate-pulse rounded-full bg-white/10" />
+        <div className="h-3 w-3 animate-pulse rounded-full bg-[#F3F4F6]" />
+        <div className="h-4 w-40 animate-pulse rounded bg-[#F3F4F6]" />
+        <div className="ml-auto h-5 w-16 animate-pulse rounded-full bg-[#F3F4F6]" />
       </div>
       <div className="grid grid-cols-5 gap-4">
-        <div className="h-4 animate-pulse rounded bg-white/10" />
-        <div className="h-4 animate-pulse rounded bg-white/10" />
-        <div className="h-4 animate-pulse rounded bg-white/10 col-span-2" />
-        <div className="h-4 animate-pulse rounded bg-white/10" />
+        <div className="h-4 animate-pulse rounded bg-[#F3F4F6]" />
+        <div className="h-4 animate-pulse rounded bg-[#F3F4F6]" />
+        <div className="h-4 animate-pulse rounded bg-[#F3F4F6] col-span-2" />
+        <div className="h-4 animate-pulse rounded bg-[#F3F4F6]" />
       </div>
     </div>
   )
@@ -179,14 +179,14 @@ export default function ConversationsPage() {
   const hasPreviousPage = page > 0
 
   return (
-    <div className="-m-6 min-h-[calc(100vh-64px)] bg-[#070a12] p-4 text-slate-100 sm:p-6" style={{ fontFamily: 'DM Sans, Outfit, sans-serif' }}>
+    <div className="-m-6 min-h-[calc(100vh-64px)] bg-[#F8F8F7] p-4 text-[#22211D] sm:p-6" style={{ fontFamily: 'DM Sans, Outfit, sans-serif' }}>
       <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#D85A30]">GHL Conversations</p>
-          <h2 className="mt-2 text-2xl font-bold text-white">Conversation temperature</h2>
-          <p className="mt-1 text-sm text-slate-400">Read-only view of synced conversations linked to contacts.</p>
+          <h2 className="mt-2 text-2xl font-bold text-[#22211D]">Conversation temperature</h2>
+          <p className="mt-1 text-sm text-[#6B7280]">Read-only view of synced conversations linked to contacts.</p>
         </div>
-        <div className="rounded-full border border-[#D85A30]/30 bg-[#D85A30]/10 px-3 py-1 text-xs font-semibold text-[#F9B196]">
+        <div className="rounded-full border border-[#D85A30]/30 bg-[#D85A30]/10 px-3 py-1 text-xs font-semibold text-[#B4451F]">
           Syncs every 30 minutes
         </div>
       </div>
@@ -199,7 +199,7 @@ export default function ConversationsPage() {
               key={temperature.id}
               type="button"
               onClick={() => setTemperatureFilter(temperature.id)}
-              className="rounded-2xl border p-4 text-left transition-all hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[0.06]"
+              className="rounded-2xl border p-4 text-left transition-all hover:-translate-y-0.5 hover:border-[#E5E5E3] hover:bg-white/[0.06]"
               style={{
                 borderColor: isActive ? temperature.color : 'rgba(255,255,255,0.1)',
                 background: isActive ? `${temperature.color}18` : 'rgba(13,19,32,0.92)',
@@ -212,7 +212,7 @@ export default function ConversationsPage() {
                   {formatTemperature(temperature.id)}
                 </span>
               </div>
-              <p className="mt-5 text-3xl font-bold text-white" style={{ fontFamily: 'DM Mono, monospace' }}>
+              <p className="mt-5 text-3xl font-bold text-[#22211D]" style={{ fontFamily: 'DM Mono, monospace' }}>
                 {summaryLoading ? '-' : summaryCounts[temperature.id].toLocaleString()}
               </p>
             </button>
@@ -226,25 +226,25 @@ export default function ConversationsPage() {
         </div>
       )}
 
-      <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-white/10 bg-[#0d1320] p-3 lg:flex-row lg:items-center">
-        <label className="flex flex-col gap-1 text-xs font-semibold text-slate-400">
+      <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-[#E9E9E7] bg-white p-3 lg:flex-row lg:items-center">
+        <label className="flex flex-col gap-1 text-xs font-semibold text-[#6B7280]">
           Temperature
           <select
             value={temperatureFilter}
             onChange={event => setTemperatureFilter(event.target.value)}
-            className="min-w-[180px] rounded-xl border border-white/10 bg-[#070a12] px-3 py-2 text-sm font-semibold text-white outline-none focus:border-[#D85A30]"
+            className="min-w-[180px] rounded-xl border border-[#E9E9E7] bg-[#F8F8F7] px-3 py-2 text-sm font-semibold text-[#22211D] outline-none focus:border-[#D85A30]"
           >
             <option value="all">All</option>
             {TEMPERATURES.map(temperature => <option key={temperature.id} value={temperature.id}>{temperature.label}</option>)}
           </select>
         </label>
 
-        <label className="flex flex-col gap-1 text-xs font-semibold text-slate-400">
+        <label className="flex flex-col gap-1 text-xs font-semibold text-[#6B7280]">
           Direction
           <select
             value={directionFilter}
             onChange={event => setDirectionFilter(event.target.value)}
-            className="min-w-[160px] rounded-xl border border-white/10 bg-[#070a12] px-3 py-2 text-sm font-semibold text-white outline-none focus:border-[#D85A30]"
+            className="min-w-[160px] rounded-xl border border-[#E9E9E7] bg-[#F8F8F7] px-3 py-2 text-sm font-semibold text-[#22211D] outline-none focus:border-[#D85A30]"
           >
             <option value="all">All</option>
             <option value="inbound">Inbound</option>
@@ -252,37 +252,37 @@ export default function ConversationsPage() {
           </select>
         </label>
 
-        <label className="relative flex flex-1 flex-col gap-1 text-xs font-semibold text-slate-400">
+        <label className="relative flex flex-1 flex-col gap-1 text-xs font-semibold text-[#6B7280]">
           Search
-          <Search size={15} className="absolute bottom-2.5 left-3 text-slate-500" />
+          <Search size={15} className="absolute bottom-2.5 left-3 text-[#6B7280]" />
           <input
             value={search}
             onChange={event => setSearch(event.target.value)}
             placeholder="Search contact or phone..."
-            className="w-full rounded-xl border border-white/10 bg-[#070a12] py-2 pl-9 pr-3 text-sm font-semibold text-white outline-none placeholder:text-slate-600 focus:border-[#D85A30]"
+            className="w-full rounded-xl border border-[#E9E9E7] bg-[#F8F8F7] py-2 pl-9 pr-3 text-sm font-semibold text-[#22211D] outline-none placeholder:text-[#9CA3AF] focus:border-[#D85A30]"
           />
         </label>
 
         <button
           type="button"
           onClick={() => setTemperatureFilter('all')}
-          className="self-end rounded-xl border border-white/10 px-3 py-2 text-sm font-semibold text-slate-300 transition-colors hover:bg-white/5"
+          className="self-end rounded-xl border border-[#E9E9E7] px-3 py-2 text-sm font-semibold text-[#374151] transition-colors hover:bg-[#F8F8F7]"
         >
           Clear temp
         </button>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#0d1320] shadow-2xl shadow-black/20">
+      <div className="overflow-hidden rounded-2xl border border-[#E9E9E7] bg-white shadow-sm">
         <div className="hidden overflow-x-auto xl:block">
           <table className="w-full min-w-[1060px] text-left text-sm">
-            <thead className="border-b border-white/10 bg-white/[0.03] text-xs uppercase tracking-wide text-slate-500">
+            <thead className="border-b border-[#E9E9E7] bg-white/[0.03] text-xs uppercase tracking-wide text-[#6B7280]">
               <tr>
                 {['Contact Name', 'Phone', 'Pipeline Stage', 'Last Message', 'Last Reply', 'Unread Count', 'Tags'].map(heading => (
                   <th key={heading} className="px-4 py-3 font-bold">{heading}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/10">
+            <tbody className="divide-y divide-[#F3F4F6]">
               {loading ? (
                 [...Array(6)].map((_, index) => (
                   <tr key={index}>
@@ -315,7 +315,7 @@ export default function ConversationsPage() {
         </div>
       </div>
 
-      <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-white/10 bg-[#0d1320] px-4 py-3 text-sm text-slate-400 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-[#E9E9E7] bg-white px-4 py-3 text-sm text-[#6B7280] sm:flex-row sm:items-center sm:justify-between">
         <span>
           {loading ? 'Loading conversations...' : `Showing ${startCount.toLocaleString()}-${endCount.toLocaleString()} of ${totalCount.toLocaleString()}`}
         </span>
@@ -324,16 +324,16 @@ export default function ConversationsPage() {
             type="button"
             onClick={() => setPage(currentPage => Math.max(0, currentPage - 1))}
             disabled={!hasPreviousPage || loading}
-            className="inline-flex items-center gap-1 rounded-xl border border-white/10 px-3 py-2 font-semibold text-slate-200 transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center gap-1 rounded-xl border border-[#E9E9E7] px-3 py-2 font-semibold text-[#374151] transition-colors hover:bg-[#F8F8F7] disabled:cursor-not-allowed disabled:opacity-40"
           >
             <ChevronLeft size={15} /> Prev
           </button>
-          <span className="rounded-xl bg-white/5 px-3 py-2 font-mono text-xs text-slate-300">Page {page + 1}</span>
+          <span className="rounded-xl bg-[#F8F8F7] px-3 py-2 font-mono text-xs text-[#374151]">Page {page + 1}</span>
           <button
             type="button"
             onClick={() => setPage(currentPage => currentPage + 1)}
             disabled={!hasNextPage || loading}
-            className="inline-flex items-center gap-1 rounded-xl border border-white/10 px-3 py-2 font-semibold text-slate-200 transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center gap-1 rounded-xl border border-[#E9E9E7] px-3 py-2 font-semibold text-[#374151] transition-colors hover:bg-[#F8F8F7] disabled:cursor-not-allowed disabled:opacity-40"
           >
             Next <ChevronRight size={15} />
           </button>
@@ -356,19 +356,19 @@ function ConversationRow({ conversation }) {
         <div className="flex items-center gap-3">
           <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: temperature.color }} />
           <div>
-            <p className="font-bold text-white">{conversation.contact_name || 'Unknown Contact'}</p>
-            <p className="text-xs text-slate-500">{formatTemperature(conversation.temperature)}</p>
+            <p className="font-bold text-[#22211D]">{conversation.contact_name || 'Unknown Contact'}</p>
+            <p className="text-xs text-[#6B7280]">{formatTemperature(conversation.temperature)}</p>
           </div>
         </div>
       </td>
-      <td className="px-4 py-4 text-slate-300" style={{ fontFamily: 'DM Mono, monospace' }}>{conversation.phone || '-'}</td>
+      <td className="px-4 py-4 text-[#374151]" style={{ fontFamily: 'DM Mono, monospace' }}>{conversation.phone || '-'}</td>
       <td className="px-4 py-4"><StagePill stage={conversation.mapped_current_stage} /></td>
-      <td className="max-w-[340px] px-4 py-4 text-slate-300">
+      <td className="max-w-[340px] px-4 py-4 text-[#374151]">
         <span className="mr-2 font-mono text-[#D85A30]">{getDirectionArrow(conversation.last_message_direction)}</span>
         {truncate(conversation.last_message_body)}
       </td>
-      <td className="px-4 py-4 text-slate-300" style={{ fontFamily: 'DM Mono, monospace' }}>{formatRelativeHours(conversation.hours_since_last_inbound)}</td>
-      <td className="px-4 py-4">{unreadCount > 0 ? <UnreadBadge count={unreadCount} /> : <span className="text-slate-600">-</span>}</td>
+      <td className="px-4 py-4 text-[#374151]" style={{ fontFamily: 'DM Mono, monospace' }}>{formatRelativeHours(conversation.hours_since_last_inbound)}</td>
+      <td className="px-4 py-4">{unreadCount > 0 ? <UnreadBadge count={unreadCount} /> : <span className="text-[#9CA3AF]">-</span>}</td>
       <td className="px-4 py-4"><TagList tags={visibleTags} extraTags={extraTags} /></td>
     </tr>
   )
@@ -382,13 +382,13 @@ function ConversationCard({ conversation }) {
   const unreadCount = Number(conversation.unread_count ?? 0)
 
   return (
-    <article className="rounded-2xl border border-white/10 bg-[#070a12] p-4">
+    <article className="rounded-2xl border border-[#E9E9E7] bg-[#F8F8F7] p-4">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className="mt-1 h-2.5 w-2.5 rounded-full" style={{ backgroundColor: temperature.color }} />
           <div>
-            <p className="font-bold text-white">{conversation.contact_name || 'Unknown Contact'}</p>
-            <p className="text-xs text-slate-500" style={{ fontFamily: 'DM Mono, monospace' }}>{conversation.phone || '-'}</p>
+            <p className="font-bold text-[#22211D]">{conversation.contact_name || 'Unknown Contact'}</p>
+            <p className="text-xs text-[#6B7280]" style={{ fontFamily: 'DM Mono, monospace' }}>{conversation.phone || '-'}</p>
           </div>
         </div>
         {unreadCount > 0 && <UnreadBadge count={unreadCount} />}
@@ -399,12 +399,12 @@ function ConversationCard({ conversation }) {
         </span>
         <StagePill stage={conversation.mapped_current_stage} />
       </div>
-      <p className="text-sm text-slate-300">
+      <p className="text-sm text-[#374151]">
         <span className="mr-2 font-mono text-[#D85A30]">{getDirectionArrow(conversation.last_message_direction)}</span>
         {truncate(conversation.last_message_body)}
       </p>
-      <div className="mt-4 flex flex-col gap-3 border-t border-white/10 pt-3 sm:flex-row sm:items-center sm:justify-between">
-        <span className="text-xs text-slate-500" style={{ fontFamily: 'DM Mono, monospace' }}>{formatRelativeHours(conversation.hours_since_last_inbound)}</span>
+      <div className="mt-4 flex flex-col gap-3 border-t border-[#E9E9E7] pt-3 sm:flex-row sm:items-center sm:justify-between">
+        <span className="text-xs text-[#6B7280]" style={{ fontFamily: 'DM Mono, monospace' }}>{formatRelativeHours(conversation.hours_since_last_inbound)}</span>
         <TagList tags={visibleTags} extraTags={extraTags} />
       </div>
     </article>
@@ -413,7 +413,7 @@ function ConversationCard({ conversation }) {
 
 function StagePill({ stage }) {
   return (
-    <span className="inline-flex max-w-[220px] items-center rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1 text-xs font-semibold text-slate-300">
+    <span className="inline-flex max-w-[220px] items-center rounded-full border border-[#E9E9E7] bg-white/[0.06] px-2.5 py-1 text-xs font-semibold text-[#374151]">
       <span className="truncate">{stage || 'No stage'}</span>
     </span>
   )
@@ -424,17 +424,17 @@ function UnreadBadge({ count }) {
 }
 
 function TagList({ tags, extraTags }) {
-  if (!tags.length && extraTags <= 0) return <span className="text-slate-600">-</span>
+  if (!tags.length && extraTags <= 0) return <span className="text-[#9CA3AF]">-</span>
 
   return (
     <div className="flex flex-wrap gap-1.5">
       {tags.map(tag => (
-        <span key={tag} className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[11px] font-semibold text-slate-400">
+        <span key={tag} className="rounded-full border border-[#E9E9E7] bg-white/[0.04] px-2 py-0.5 text-[11px] font-semibold text-[#6B7280]">
           {tag}
         </span>
       ))}
       {extraTags > 0 && (
-        <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[11px] font-semibold text-slate-500">
+        <span className="rounded-full border border-[#E9E9E7] bg-white/[0.04] px-2 py-0.5 text-[11px] font-semibold text-[#6B7280]">
           +{extraTags}
         </span>
       )}
@@ -445,10 +445,10 @@ function TagList({ tags, extraTags }) {
 function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center text-center">
-      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-slate-500">
+      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-[#E9E9E7] bg-white/[0.04] text-[#6B7280]">
         <MessageCircle size={22} />
       </div>
-      <p className="text-sm font-semibold text-slate-300">No conversations synced yet. Data syncs every 30 minutes.</p>
+      <p className="text-sm font-semibold text-[#374151]">No conversations synced yet. Data syncs every 30 minutes.</p>
     </div>
   )
 }
