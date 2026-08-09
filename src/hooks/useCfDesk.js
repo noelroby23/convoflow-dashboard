@@ -93,6 +93,29 @@ export const useCfCalls = (region = 'uae', range) =>
   useCfRpc('cf_dash_calls', { p: { ...withRange(region, range), limit: 100 } },
            { intervalMs: 30_000 })
 
+// --------------------------------------------------------------------------
+// Command Center parity (CLAUDE.md §7 item 52).
+//
+// These back the board, the "today so far" strip and the activity feed that
+// the n8n page at /webhook/cf-queue-view-8842 shows. That page reads the
+// LEGACY stack — call_queue_cf on the agency project, GHL directly, n8n
+// dataTables — so it goes blank at cutover. These read cf instead.
+// --------------------------------------------------------------------------
+
+// The board moves as calls happen, so it refreshes with the queue, not with
+// the slower panels.
+export const useCfBoard = (region = 'uae', filter = 'all') =>
+  useCfRpc('cf_dash_board', { p: { region, filter, per_column: 50 } }, { intervalMs: 15_000 })
+
+// `date` is a yyyy-MM-dd in Dubai; omit for today. Drives the Today/Yesterday
+// toggle without touching the page's main date range, which scopes history.
+export const useCfToday = (region = 'uae', date) =>
+  useCfRpc('cf_dash_today', { p: date ? { region, date } : { region } }, { intervalMs: 30_000 })
+
+export const useCfActivity = (region = 'uae', date) =>
+  useCfRpc('cf_dash_activity', { p: date ? { region, date, limit: 40 } : { region, limit: 40 } },
+           { intervalMs: 20_000 })
+
 export async function lookupLead(q) {
   return callRpc('cf_lead_lookup', { p: { q } })
 }

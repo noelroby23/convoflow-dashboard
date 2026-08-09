@@ -6,12 +6,25 @@ import {
 import {
   useCfHeadline, useCfQueue, useCfPipeline, useCfMeetings, useCfSplit,
   useCfTargets, useCfAttention, useCfCalls, useCfEod,
+  useCfBoard, useCfToday, useCfActivity,
   setLeadState,
 } from '../hooks/useCfDesk'
+import { Board, TodaySoFar, ActivityFeed, BOARD_COLUMNS } from '../components/ui/CommandCenter'
+import LiveListen from '../components/ui/LiveListen'
+import { exportCsv } from '../lib/exportCsv'
 import { useDashboard } from '../store/dashboard'
 import { toast } from 'sonner'
 
 const DUBAI = 'Asia/Dubai'
+// Yesterday in Dubai, as yyyy-MM-dd. Computed in the region's timezone rather
+// than the viewer's, or someone in London gets a different "yesterday".
+const yesterdayDubai = () => {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: DUBAI, year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date(Date.now() - 86_400_000))
+  const v = Object.fromEntries(parts.map(p => [p.type, p.value]))
+  return `${v.year}-${v.month}-${v.day}`
+}
 const fmtTime = (iso) =>
   iso ? new Date(iso).toLocaleTimeString('en-GB', { timeZone: DUBAI, hour: '2-digit', minute: '2-digit' }) : '—'
 const fmtDay = (iso) =>
@@ -68,8 +81,29 @@ export default function LeadDesk() {
   const { data: eod } = useCfEod(region)
   const [busyId, setBusyId] = useState(null)
 
+  // Command Center parity. `day` is its own control, separate from the page's
+  // date range: the range scopes history, this scopes "what happened today".
+  const [day, setDay] = useState('today')
+  const [boardFilter, setBoardFilter] = useState('all')
+  const dayParam = day === 'today' ? undefined : yesterdayDubai()
+  const { data: today } = useCfToday(region, dayParam)
+  const { data: activity } = useCfActivity(region, dayParam)
+  const { data: board } = useCfBoard(region, boardFilter)
+
   const paused = queue?.global_paused
   const breaker = queue?.breaker_active
+
+  // Flatten whatever the board is currently showing. Exporting what is on
+  // screen — filter included — beats exporting a different set silently.
+  const exportBoard = () => {
+    const rows = BOARD_COLUMNS.flatMap(c =>
+      (board?.[c.key]?.leads ?? []).map(l => ({
+        column: c.label, name: l.name, phone: l.phone,
+        status: l.status, state: l.state, age_days: l.age_days,
+      })))
+    if (!rows.length) { toast.error('Nothing on the board to export'); return }
+    exportCsv(rows, `convoflow-board-${day}`)
+  }
 
   const markAttendance = async (leadId, state) => {
     setBusyId(leadId)
@@ -94,6 +128,60 @@ export default function LeadDesk() {
             : 'Circuit breaker tripped — dialling paused after repeated carrier failures.'}
         </div>
       )}
+
+      {/* Today so far — the Command Center's opening strip. Reactivation and
+          reminders are here because they answer questions the headline KPIs
+          cannot: how hard is the agent working the old list, and is the
+          meeting machinery actually firing. */}
+      <section className="space-y-3">
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-semibold text-[#111]">
+            {day === 'today' ? 'Today so far' : 'Yesterday'}
+          </h2>
+          <div className="inline-flex rounded-lg border border-[#E9E9E7] overflow-hidden">
+            {['today', 'yesterday'].map(d => (
+              <button
+                key={d}
+                onClick={() => setDay(d)}
+                className={`px-2.5 py-1 text-xs capitalize ${
+                  day === d ? 'bg-[#22211D] text-white' : 'bg-white text-[#6D6B63] hover:bg-[#F7F7F6]'
+                }`}
+              >{d}</button>
+            ))}
+          </div>
+          <span className="ml-auto text-xs text-[#9CA3AF]">all times Dubai</span>
+        </div>
+        <TodaySoFar today={today} />
+      </section>
+
+      {/* The board. Cards move on their own as calls happen, and the one that
+          is actually on a call carries a live-listen button. */}
+      <Card
+        title="Where every lead is"
+        icon={ListChecks}
+        right={
+          <div className="flex items-center gap-2">
+            <div className="inline-flex rounded-lg border border-[#E9E9E7] overflow-hidden">
+              {[['all', 'All'], ['new', 'New'], ['booked', 'Booked'], ['old', 'Old / reactivation']]
+                .map(([k, lbl]) => (
+                  <button
+                    key={k}
+                    onClick={() => setBoardFilter(k)}
+                    className={`px-2.5 py-1 text-xs ${
+                      boardFilter === k ? 'bg-[#22211D] text-white' : 'bg-white text-[#6D6B63] hover:bg-[#F7F7F6]'
+                    }`}
+                  >{lbl}</button>
+                ))}
+            </div>
+            <button onClick={exportBoard}
+                    className="text-xs px-2.5 py-1 rounded-lg border border-[#E9E9E7] text-[#6D6B63] hover:bg-[#F7F7F6]">
+              Export CSV
+            </button>
+          </div>
+        }
+      >
+        <Board board={board} dialing={queue?.dialing_now} />
+      </Card>
 
       {/* "Should simply tell me" — PDF section 10 */}
       <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
@@ -176,9 +264,12 @@ export default function LeadDesk() {
                 <p className="text-xs uppercase tracking-wide text-[#9CA3AF] mb-2">On the line now</p>
                 {queue?.dialing_now?.length ? (
                   queue.dialing_now.map((c, i) => (
-                    <div key={i} className="flex items-center justify-between bg-[#FDF2F8] rounded-lg px-3 py-2">
+                    <div key={i} className="flex items-center gap-2 bg-[#FDF2F8] rounded-lg px-3 py-2">
                       <span className="text-sm font-medium">{c.name}</span>
                       <span className="text-xs text-[#6B7280]">since {fmtTime(c.since)}</span>
+                      {/* VAPI streams the live audio of this call over
+                          monitor.listenUrl. Captured by migration 030. */}
+                      <span className="ml-auto"><LiveListen listenUrl={c.listen_url} name={c.name} /></span>
                     </div>
                   ))
                 ) : (
@@ -204,7 +295,7 @@ export default function LeadDesk() {
         </Card>
 
         {/* Lead Desk 2 — Where every lead is */}
-        <Card title="Where every lead is" icon={Clock}>
+        <Card title="Pipeline totals" icon={Clock}>
           <div className="space-y-1.5 max-h-[26rem] overflow-y-auto">
             {pipeline?.length ? pipeline.map((row) => (
               <div key={row.state} className="flex items-center gap-3">
@@ -345,6 +436,13 @@ export default function LeadDesk() {
       </Card>
 
       {/* Reports */}
+      {/* What just happened — one merged stream of state changes, calls and
+          messages, so the desk shows motion rather than only totals. */}
+      <Card title="What just happened" icon={BellRing}
+            right={<span className="text-xs text-[#9CA3AF]">live · {day}</span>}>
+        <ActivityFeed items={activity} />
+      </Card>
+
       <Card title="Reports — end of day" icon={FileText}>
         <pre className="text-xs whitespace-pre-wrap font-sans text-[#374151] max-h-96 overflow-y-auto">
           {eod || 'No data yet.'}

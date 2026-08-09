@@ -1,0 +1,176 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Headphones, Square, AlertTriangle } from 'lucide-react'
+
+/**
+ * Listen to a VAPI call while it is happening.
+ *
+ * Every call VAPI places returns `monitor.listenUrl` — a wss:// endpoint that
+ * streams the live audio of that one call. v2 used to throw it away;
+ * migration 030 stores it on cf.call_queue and cf_dash_queue returns it for
+ * the row that is dialling right now.
+ *
+ * The stream is raw PCM, not a container format, so there is nothing an
+ * <audio> tag can do with it. We decode frames ourselves and push them into
+ * the Web Audio clock.
+ *
+ * SAMPLE RATE. VAPI streams at the sample rate of the call: 8 kHz for a plain
+ * phone leg, 16 kHz for wideband. If it sends a JSON control frame naming the
+ * rate we use that; otherwise we default to 16 kHz and leave a switch in the
+ * UI, because guessing wrong is instantly audible (too fast or too slow) and a
+ * human can fix it in one click. This is deliberately not silent magic.
+ *
+ * SECURITY. The listen URL is a capability — whoever holds it can hear the
+ * call. It reaches the browser only through cf_dash_queue, which is granted to
+ * `authenticated` alone, and it is never written to cf.call, so it stops
+ * existing when the call ends.
+ */
+
+const DEFAULT_RATE = 16000
+
+export default function LiveListen({ listenUrl, name }) {
+  const [state, setState] = useState('idle')   // idle | connecting | live | error
+  const [error, setError] = useState(null)
+  const [rate, setRate] = useState(DEFAULT_RATE)
+
+  const wsRef = useRef(null)
+  const ctxRef = useRef(null)
+  // When the next chunk should start. Scheduling against this rather than
+  // "now" is what stops the audio clicking between frames.
+  const playHeadRef = useRef(0)
+
+  const stop = useCallback(() => {
+    try { wsRef.current?.close() } catch { /* already gone */ }
+    try { ctxRef.current?.close() } catch { /* already gone */ }
+    wsRef.current = null
+    ctxRef.current = null
+    playHeadRef.current = 0
+    setState('idle')
+  }, [])
+
+  // Never leave a socket or an audio context behind on unmount.
+  useEffect(() => stop, [stop])
+
+  const start = useCallback(() => {
+    if (!listenUrl) return
+    setError(null)
+    setState('connecting')
+
+    let ctx
+    try {
+      ctx = new (window.AudioContext || window.webkitAudioContext)()
+    } catch {
+      setError('This browser has no Web Audio support.')
+      setState('error')
+      return
+    }
+    ctxRef.current = ctx
+
+    let ws
+    try {
+      ws = new WebSocket(listenUrl)
+    } catch {
+      setError('Could not open the audio stream.')
+      setState('error')
+      return
+    }
+    ws.binaryType = 'arraybuffer'
+    wsRef.current = ws
+
+    let activeRate = rate
+
+    ws.onopen = () => {
+      setState('live')
+      playHeadRef.current = ctx.currentTime + 0.15   // small jitter buffer
+    }
+
+    ws.onmessage = (ev) => {
+      // VAPI may send a JSON frame describing the stream before any audio.
+      if (typeof ev.data === 'string') {
+        try {
+          const meta = JSON.parse(ev.data)
+          const r = Number(meta.sampleRate ?? meta.sample_rate)
+          if (r > 0) { activeRate = r; setRate(r) }
+        } catch { /* not JSON — ignore, it is not audio either */ }
+        return
+      }
+
+      const pcm = new Int16Array(ev.data)
+      if (!pcm.length) return
+
+      const buf = ctx.createBuffer(1, pcm.length, activeRate)
+      const ch = buf.getChannelData(0)
+      for (let i = 0; i < pcm.length; i++) ch[i] = pcm[i] / 32768  // s16 -> float
+
+      const src = ctx.createBufferSource()
+      src.buffer = buf
+      src.connect(ctx.destination)
+
+      // If we fell behind (tab throttled, network stall), jump back to now
+      // rather than queueing an ever-growing delay.
+      const now = ctx.currentTime
+      if (playHeadRef.current < now) playHeadRef.current = now + 0.05
+      src.start(playHeadRef.current)
+      playHeadRef.current += buf.duration
+    }
+
+    ws.onerror = () => {
+      setError('The audio stream dropped. The call may have ended.')
+      setState('error')
+    }
+    ws.onclose = () => {
+      // A close after a healthy stream just means the call finished.
+      setState(s => (s === 'live' ? 'idle' : s))
+    }
+  }, [listenUrl, rate])
+
+  if (!listenUrl) {
+    return <span className="text-xs text-[#9CA3AF]">no live audio</span>
+  }
+
+  return (
+    <span className="inline-flex items-center gap-2">
+      {state === 'live' || state === 'connecting' ? (
+        <button
+          onClick={stop}
+          className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded
+                     bg-[#FEE2E2] text-[#B91C1C] hover:bg-[#FECACA]"
+        >
+          <Square size={12} /> {state === 'connecting' ? 'Connecting…' : 'Stop'}
+        </button>
+      ) : (
+        <button
+          onClick={start}
+          title={`Listen to the live call with ${name || 'this lead'}`}
+          className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded
+                     bg-[#E9EFFD] text-[#2E62E0] hover:bg-[#DBE5FC]"
+        >
+          <Headphones size={12} /> Listen live
+        </button>
+      )}
+
+      {state === 'live' && (
+        <>
+          <span className="relative flex h-2 w-2" aria-label="streaming">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#16A34A] opacity-70" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-[#16A34A]" />
+          </span>
+          {/* Audible-and-obvious escape hatch: if VAPI did not announce the
+              rate and 16k is wrong, the voice sounds fast or slow. One click. */}
+          <button
+            onClick={() => { const r = rate === 16000 ? 8000 : 16000; setRate(r); stop() }}
+            className="text-[10px] text-[#6D6B63] underline"
+            title="If the voice sounds too fast or too slow, switch the sample rate and press Listen again"
+          >
+            {rate / 1000}kHz
+          </button>
+        </>
+      )}
+
+      {state === 'error' && (
+        <span className="inline-flex items-center gap-1 text-xs text-[#B91C1C]">
+          <AlertTriangle size={12} /> {error}
+        </span>
+      )}
+    </span>
+  )
+}
