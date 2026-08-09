@@ -20,6 +20,9 @@ const navItems = [
   { to: '/home', label: 'Home', icon: LayoutDashboard },
   { to: '/lead-desk', label: 'Lead Desk', icon: Headphones },
   { to: '/lead-lookup', label: 'Lead Lookup', icon: ScanSearch },
+  // Back from phase 2: cf now holds Meta spend and per-lead ad attribution
+  // (migrations 033/034), so this page has real data behind it again.
+  { to: '/creative-performance', label: 'Creative Performance', icon: Megaphone },
   { to: '/sarahs-performance', label: "Sarah's Performance", icon: Bot },
   { to: '/week-over-week', label: 'Week-over-Week', icon: TrendingUp },
   { to: '/target-progress', label: 'Target Progress', icon: Target },
