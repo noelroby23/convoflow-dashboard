@@ -13,6 +13,13 @@ import { Headphones, Square, AlertTriangle } from 'lucide-react'
  * <audio> tag can do with it. We decode frames ourselves and push them into
  * the Web Audio clock.
  *
+ * CHANNELS. VAPI puts the two speakers on two channels, interleaved L,R,L,R
+ * — the customer on one, the assistant on the other. Decoding that as mono
+ * plays alternating samples from two different people: garbled at ANY sample
+ * rate. That was the real fault behind "I still can't understand it"; raising
+ * the rate to 32kHz corrected the pace (mono sees twice the samples) and left
+ * the interleaving untouched. Stereo is the default now.
+ *
  * SAMPLE RATE. VAPI does not reliably announce it, and the wrong value is
  * instantly audible — too slow and deep, or too fast and chipmunked. 16 kHz
  * was the first guess and it was wrong: Abdus could not make out the words.
@@ -46,6 +53,10 @@ export default function LiveListen({ listenUrl, name }) {
   // The announced value is what we started from and it was not intelligible,
   // so the ear in the room outranks the control frame.
   const userPickedRef = useRef(false)
+  // Stereo by default: VAPI puts the two speakers on two channels. Read per
+  // frame like the rate, so switching applies without a reconnect.
+  const [channels, setChannels] = useState(2)
+  const channelsRef = useRef(2)
   // When the next chunk should start. Scheduling against this rather than
   // "now" is what stops the audio clicking between frames.
   const playHeadRef = useRef(0)
@@ -108,9 +119,28 @@ export default function LiveListen({ listenUrl, name }) {
       const pcm = new Int16Array(ev.data)
       if (!pcm.length) return
 
-      const buf = ctx.createBuffer(1, pcm.length, rateRef.current)
-      const ch = buf.getChannelData(0)
-      for (let i = 0; i < pcm.length; i++) ch[i] = pcm[i] / 32768  // s16 -> float
+      // VAPI separates the two speakers onto two channels — the customer on
+      // one, the assistant on the other — interleaved L,R,L,R. Decoding that
+      // as mono plays alternating samples from two different people, which is
+      // garbled however the sample rate is set: raising the rate fixes the
+      // SPEED (mono sees twice the samples) and leaves the interleaving, which
+      // is why 32kHz sounded correctly paced but still unintelligible.
+      const chans = channelsRef.current
+      let buf
+      if (chans === 2) {
+        const frames = pcm.length >> 1
+        buf = ctx.createBuffer(2, frames, rateRef.current)
+        const l = buf.getChannelData(0)
+        const r = buf.getChannelData(1)
+        for (let i = 0, j = 0; i < frames; i++, j += 2) {
+          l[i] = pcm[j] / 32768          // s16 -> float
+          r[i] = pcm[j + 1] / 32768
+        }
+      } else {
+        buf = ctx.createBuffer(1, pcm.length, rateRef.current)
+        const ch = buf.getChannelData(0)
+        for (let i = 0; i < pcm.length; i++) ch[i] = pcm[i] / 32768
+      }
 
       const src = ctx.createBufferSource()
       src.buffer = buf
@@ -182,6 +212,22 @@ export default function LiveListen({ listenUrl, name }) {
             {RATES.map(r => (
               <option key={r} value={r}>{r / 1000}kHz</option>
             ))}
+          </select>
+          {/* The two settings interact: mono sees twice as many samples as
+              stereo, so it needs twice the rate to play at the same speed. */}
+          <select
+            value={channels}
+            onChange={(e) => {
+              const c = Number(e.target.value)
+              channelsRef.current = c
+              setChannels(c)
+            }}
+            title="VAPI sends the customer and the agent on separate channels. Stereo separates them; mono merges them and needs double the rate."
+            className="text-[10px] text-[#6D6B63] bg-transparent border border-[#E9E9E7]
+                       rounded px-1 py-0.5 outline-none cursor-pointer"
+          >
+            <option value={2}>stereo</option>
+            <option value={1}>mono</option>
           </select>
         </>
       )}
