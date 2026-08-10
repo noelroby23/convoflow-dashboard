@@ -13,11 +13,16 @@ import { Headphones, Square, AlertTriangle } from 'lucide-react'
  * <audio> tag can do with it. We decode frames ourselves and push them into
  * the Web Audio clock.
  *
- * SAMPLE RATE. VAPI streams at the sample rate of the call: 8 kHz for a plain
- * phone leg, 16 kHz for wideband. If it sends a JSON control frame naming the
- * rate we use that; otherwise we default to 16 kHz and leave a switch in the
- * UI, because guessing wrong is instantly audible (too fast or too slow) and a
- * human can fix it in one click. This is deliberately not silent magic.
+ * SAMPLE RATE. VAPI does not reliably announce it, and the wrong value is
+ * instantly audible — too slow and deep, or too fast and chipmunked. 16 kHz
+ * was the first guess and it was wrong: Abdus could not make out the words.
+ * 32 kHz is what actually plays back intelligibly, so that is the default.
+ *
+ * The selector stays, because "whatever plays back correctly" is an empirical
+ * question and the next VAPI change could move it. Changing it now takes
+ * effect on the NEXT AUDIO FRAME — the rate lives in a ref, not in state, so
+ * you can hunt for the right one mid-call instead of stopping and
+ * reconnecting each time.
  *
  * SECURITY. The listen URL is a capability — whoever holds it can hear the
  * call. It reaches the browser only through cf_dash_queue, which is granted to
@@ -25,7 +30,8 @@ import { Headphones, Square, AlertTriangle } from 'lucide-react'
  * existing when the call ends.
  */
 
-const DEFAULT_RATE = 16000
+const DEFAULT_RATE = 32000
+const RATES = [8000, 16000, 22050, 24000, 32000, 44100, 48000]
 
 export default function LiveListen({ listenUrl, name }) {
   const [state, setState] = useState('idle')   // idle | connecting | live | error
@@ -34,6 +40,12 @@ export default function LiveListen({ listenUrl, name }) {
 
   const wsRef = useRef(null)
   const ctxRef = useRef(null)
+  // Read on every frame, so a change applies immediately without a reconnect.
+  const rateRef = useRef(DEFAULT_RATE)
+  // Once a human has picked a rate, VAPI's own announcement must not undo it.
+  // The announced value is what we started from and it was not intelligible,
+  // so the ear in the room outranks the control frame.
+  const userPickedRef = useRef(false)
   // When the next chunk should start. Scheduling against this rather than
   // "now" is what stops the audio clicking between frames.
   const playHeadRef = useRef(0)
@@ -76,7 +88,6 @@ export default function LiveListen({ listenUrl, name }) {
     ws.binaryType = 'arraybuffer'
     wsRef.current = ws
 
-    let activeRate = rate
 
     ws.onopen = () => {
       setState('live')
@@ -89,7 +100,7 @@ export default function LiveListen({ listenUrl, name }) {
         try {
           const meta = JSON.parse(ev.data)
           const r = Number(meta.sampleRate ?? meta.sample_rate)
-          if (r > 0) { activeRate = r; setRate(r) }
+          if (r > 0 && !userPickedRef.current) { rateRef.current = r; setRate(r) }
         } catch { /* not JSON — ignore, it is not audio either */ }
         return
       }
@@ -97,7 +108,7 @@ export default function LiveListen({ listenUrl, name }) {
       const pcm = new Int16Array(ev.data)
       if (!pcm.length) return
 
-      const buf = ctx.createBuffer(1, pcm.length, activeRate)
+      const buf = ctx.createBuffer(1, pcm.length, rateRef.current)
       const ch = buf.getChannelData(0)
       for (let i = 0; i < pcm.length; i++) ch[i] = pcm[i] / 32768  // s16 -> float
 
@@ -121,7 +132,7 @@ export default function LiveListen({ listenUrl, name }) {
       // A close after a healthy stream just means the call finished.
       setState(s => (s === 'live' ? 'idle' : s))
     }
-  }, [listenUrl, rate])
+  }, [listenUrl])
 
   if (!listenUrl) {
     return <span className="text-xs text-[#9CA3AF]">no live audio</span>
@@ -154,15 +165,24 @@ export default function LiveListen({ listenUrl, name }) {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#16A34A] opacity-70" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-[#16A34A]" />
           </span>
-          {/* Audible-and-obvious escape hatch: if VAPI did not announce the
-              rate and 16k is wrong, the voice sounds fast or slow. One click. */}
-          <button
-            onClick={() => { const r = rate === 16000 ? 8000 : 16000; setRate(r); stop() }}
-            className="text-[10px] text-[#6D6B63] underline"
-            title="If the voice sounds too fast or too slow, switch the sample rate and press Listen again"
+          {/* Applies to the next frame — no reconnect, so you can find the
+              right rate while the call is still running. */}
+          <select
+            value={rate}
+            onChange={(e) => {
+              const r = Number(e.target.value)
+              userPickedRef.current = true
+              rateRef.current = r
+              setRate(r)
+            }}
+            title="If the voice sounds too slow and deep, go up. Too fast and squeaky, go down."
+            className="text-[10px] text-[#6D6B63] bg-transparent border border-[#E9E9E7]
+                       rounded px-1 py-0.5 outline-none cursor-pointer"
           >
-            {rate / 1000}kHz
-          </button>
+            {RATES.map(r => (
+              <option key={r} value={r}>{r / 1000}kHz</option>
+            ))}
+          </select>
         </>
       )}
 
