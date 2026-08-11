@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   X, PhoneCall, MessageSquare, GitBranch, FileText, ExternalLink,
   Loader2, ChevronDown, ChevronRight, Bug, CalendarCheck, Clock, Megaphone,
@@ -139,9 +139,20 @@ export default function LeadDetail({ leadId, onClose }) {
 
   useEffect(() => { setTab('calls') }, [leadId])
 
+  // Deliberately depends on leadId ALONE, with onClose held in a ref.
+  //
+  // The desk re-renders every few seconds (the queue polls at 10s, the board
+  // at 15s), so an inline `onClose` prop is a new function on every one of
+  // those renders. With onClose in the dependency array this effect re-ran
+  // each time, and the second run captured `prev = 'hidden'` from its own
+  // previous run — so closing the drawer restored `hidden` and left the page
+  // behind permanently unscrollable.
+  const closeRef = useRef(onClose)
+  closeRef.current = onClose
+
   useEffect(() => {
     if (!leadId) return
-    const onKey = (e) => { if (e.key === 'Escape') onClose?.() }
+    const onKey = (e) => { if (e.key === 'Escape') closeRef.current?.() }
     window.addEventListener('keydown', onKey)
     // Stop the page behind scrolling while the drawer is open.
     const prev = document.body.style.overflow
@@ -150,7 +161,7 @@ export default function LeadDetail({ leadId, onClose }) {
       window.removeEventListener('keydown', onKey)
       document.body.style.overflow = prev
     }
-  }, [leadId, onClose])
+  }, [leadId])
 
   if (!leadId) return null
 
