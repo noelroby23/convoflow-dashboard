@@ -20,4 +20,12 @@ import { createClient } from '@supabase/supabase-js'
 const SUPABASE_URL = 'https://lddzzuuovuqzqyujlbrb.supabase.co'
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_D8lfDUGwYVmv18QSCrjrAA_1KxFg-30'
 
+// Exported for the one thing supabase-js cannot express well: calling an edge
+// function and reading the STATUS CODE. functions.invoke() collapses every
+// non-2xx into a generic FunctionsHttpError, and cf-recording distinguishes
+// 410 (the audio aged out of VAPI's 14-day window) from 502 (something is
+// actually broken). Those need different words on screen, so that call is a
+// plain fetch — see getRecordingUrl in hooks/useCfDesk.js.
+export { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY }
+
 export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY)

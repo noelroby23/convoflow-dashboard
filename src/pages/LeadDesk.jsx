@@ -11,6 +11,7 @@ import {
 } from '../hooks/useCfDesk'
 import { Board, TodaySoFar, ActivityFeed, BOARD_COLUMNS } from '../components/ui/CommandCenter'
 import LiveListen from '../components/ui/LiveListen'
+import LeadDetail from '../components/ui/LeadDetail'
 import { exportCsv } from '../lib/exportCsv'
 import { useDashboard } from '../store/dashboard'
 import { toast } from 'sonner'
@@ -32,6 +33,26 @@ const fmtDay = (iso) =>
 
 // Tier is what actually decides dial order, so show it rather than a raw number.
 const TIER = { 10: 'form', 50: 'callback', 500: 'reactivation' }
+
+// A due time is only useful if you can tell today from tomorrow. Up next now
+// reaches days ahead, so a bare HH:MM would read as "in a few minutes" for a
+// call that is not happening until Thursday.
+const isToday = (iso) => {
+  if (!iso) return false
+  const day = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: DUBAI }).format(d)
+  return day(new Date(iso)) === day(new Date())
+}
+const fmtDue = (iso) => !iso ? '—' : isToday(iso) ? fmtTime(iso) : `${fmtDay(iso)} ${fmtTime(iso)}`
+
+// queued = a real cf.call_queue row, this WILL be dialled.
+// scheduled/callback = real but not yet committed; a reply or a kill can still
+// cancel it. Saying which is which is the point — §5.1's whole failure mode is
+// the system implying a commitment it has not made.
+const UP_NEXT_KIND = {
+  queued:    { label: 'queued',    tone: 'bg-sky-100 text-sky-800' },
+  scheduled: { label: 'scheduled', tone: 'bg-[#F3F4F6] text-[#6D6B63]' },
+  callback:  { label: 'callback',  tone: 'bg-amber-100 text-amber-900' },
+}
 
 function Card({ title, icon: Icon, right, children }) {
   return (
@@ -80,6 +101,10 @@ export default function LeadDesk() {
   const { data: calls } = useCfCalls(region, range)
   const { data: eod } = useCfEod(region)
   const [busyId, setBusyId] = useState(null)
+  // Which lead the drawer is showing. Every list on this page that knows a
+  // lead_id opens the same drawer, so "click the person" means one thing
+  // wherever you are on the desk.
+  const [openLeadId, setOpenLeadId] = useState(null)
 
   // Command Center parity. `day` is its own control, separate from the page's
   // date range: the range scopes history, this scopes "what happened today".
@@ -210,7 +235,13 @@ export default function LeadDesk() {
             : 'Everything currently in play — queued, scheduled, in a cadence, or moved in the last 14 days'}
           {boardQ.trim() ? ` · matching “${boardQ.trim()}”` : ''}
         </p>
-        <Board board={board} dialing={queue?.dialing_now} />
+        {/* Board has always accepted onOpen and LeadCard has always been a
+            button — nothing was ever passed, so every card was a click that
+            did nothing. Same shape as the no-caller bugs in §7 (items
+            47/48/87/104): a prop with no provider looks exactly like a
+            working one. */}
+        <Board board={board} dialing={queue?.dialing_now}
+               onOpen={(lead) => setOpenLeadId(lead.lead_id)} />
       </Card>
 
       {/* "Should simply tell me" — PDF section 10 */}
@@ -284,7 +315,14 @@ export default function LeadDesk() {
         <Card
           title="Calling queue"
           icon={PhoneCall}
-          right={<span className="text-xs text-[#6B7280]">{queue?.pending_total ?? 0} waiting</span>}
+          right={
+            <span className="text-xs text-[#6B7280]">
+              {queue?.upcoming_total ?? 0} coming up
+              {queue?.scheduled_total > 0 && (
+                <span className="text-[#9CA3AF]"> · {queue.pending_total} queued</span>
+              )}
+            </span>
+          }
         >
           {qLoading ? (
             <Empty>Loading…</Empty>
@@ -295,7 +333,8 @@ export default function LeadDesk() {
                 {queue?.dialing_now?.length ? (
                   queue.dialing_now.map((c, i) => (
                     <div key={i} className="flex items-center gap-2 bg-[#FDF2F8] rounded-lg px-3 py-2">
-                      <span className="text-sm font-medium">{c.name}</span>
+                      <button onClick={() => setOpenLeadId(c.lead_id)}
+                              className="text-sm font-medium hover:underline text-left">{c.name}</button>
                       <span className="text-xs text-[#6B7280]">since {fmtTime(c.since)}</span>
                       {/* VAPI streams the live audio of this call over
                           monitor.listenUrl. Captured by migration 030. */}
@@ -308,17 +347,28 @@ export default function LeadDesk() {
               </div>
               <p className="text-xs uppercase tracking-wide text-[#9CA3AF] mb-2">Up next</p>
               <div className="max-h-72 overflow-y-auto divide-y divide-[#F3F4F6]">
-                {queue?.up_next?.length ? queue.up_next.map((c, i) => (
-                  <div key={i} className="flex items-center justify-between py-2">
-                    <div className="min-w-0">
-                      <p className="text-sm truncate">{c.name}</p>
-                      <p className="text-xs text-[#9CA3AF]">
-                        {TIER[c.priority] || c.source}{c.dials > 0 ? ` · retry ${c.dials}` : ' · first call'}
-                      </p>
-                    </div>
-                    <span className="text-xs text-[#6B7280] shrink-0">{fmtTime(c.due)}</span>
-                  </div>
-                )) : <Empty>Nothing queued</Empty>}
+                {queue?.up_next?.length ? queue.up_next.map((c, i) => {
+                  const kind = UP_NEXT_KIND[c.kind] || UP_NEXT_KIND.scheduled
+                  return (
+                    <button key={i} onClick={() => setOpenLeadId(c.lead_id)}
+                      className="w-full text-left flex items-center justify-between gap-2 py-2 hover:bg-[#FAFAF9]">
+                      <div className="min-w-0">
+                        <p className="text-sm truncate">{c.name}</p>
+                        <p className="text-xs text-[#9CA3AF] truncate">
+                          {TIER[c.priority] || c.source}
+                          {c.cadence ? ` · ${c.cadence} step ${c.step}` : ''}
+                          {c.dials > 0 ? ` · retry ${c.dials}` : ' · first call'}
+                        </p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <span className="text-xs text-[#6B7280] tabular-nums">{fmtDue(c.due)}</span>
+                        <span className={`block text-[10px] px-1.5 rounded-full mt-0.5 ${kind.tone}`}>
+                          {kind.label}
+                        </span>
+                      </div>
+                    </button>
+                  )
+                }) : <Empty>Nobody is due to be called</Empty>}
               </div>
             </>
           )}
@@ -359,7 +409,10 @@ export default function LeadDesk() {
                     {fmtDay(m.start_at)} <span className="text-[#6B7280]">{fmtTime(m.start_at)}</span>
                     {m.same_day && <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">same-day</span>}
                   </td>
-                  <td>{m.name}</td>
+                  <td>
+                    <button onClick={() => setOpenLeadId(m.lead_id)}
+                            className="hover:underline text-left">{m.name}</button>
+                  </td>
                   <td><span className="text-xs px-2 py-0.5 rounded-full bg-[#F3F4F6]">{m.status}</span></td>
                   <td>{m.link ? <a className="text-[#EC4899] text-xs" href={m.link} target="_blank" rel="noreferrer">open</a>
                               : <span className="text-xs text-amber-600">no link</span>}</td>
@@ -411,7 +464,8 @@ export default function LeadDesk() {
             </thead>
             <tbody className="divide-y divide-[#F3F4F6]">
               {split?.length ? split.map((l) => (
-                <tr key={l.lead_id}>
+                <tr key={l.lead_id} onClick={() => setOpenLeadId(l.lead_id)}
+                    className="cursor-pointer hover:bg-[#FAFAF9]">
                   <td className="py-2">{l.name}<span className="block text-xs text-[#9CA3AF]">{l.phone}</span></td>
                   <td className="text-xs">{l.state}</td>
                   <td className="tabular-nums">{l.step}</td>
@@ -440,7 +494,8 @@ export default function LeadDesk() {
             </thead>
             <tbody className="divide-y divide-[#F3F4F6]">
               {calls?.length ? calls.map((c, i) => (
-                <tr key={i}>
+                <tr key={i} onClick={() => setOpenLeadId(c.lead_id)}
+                    className="cursor-pointer hover:bg-[#FAFAF9]">
                   <td className="py-2 whitespace-nowrap text-xs text-[#6B7280]">{fmtTime(c.at)}</td>
                   <td className="whitespace-nowrap">{c.name}</td>
                   <td className="whitespace-nowrap">
@@ -456,8 +511,13 @@ export default function LeadDesk() {
                   </td>
                   <td className="tabular-nums text-xs">{c.secs ?? '—'}</td>
                   <td className="text-xs text-[#374151] max-w-md truncate">{c.summary || '—'}</td>
-                  <td>{c.recording && <a href={c.recording} target="_blank" rel="noreferrer"
-                        className="text-xs text-[#EC4899]">play</a>}</td>
+                  {/* This used to be <a href={c.recording}>play</a>. That URL is
+                      VAPI's unsigned R2 object path and returns 400 in a
+                      browser — it has never played anything, and a dead link
+                      looks exactly like a working one. The audio needs a
+                      presigned URL, which is minted server-side; the player
+                      that does it lives in the drawer. */}
+                  <td>{c.recording && <span className="text-xs text-[#EC4899]">listen</span>}</td>
                 </tr>
               )) : <tr><td colSpan={6}><Empty>No calls yet</Empty></td></tr>}
             </tbody>
@@ -478,6 +538,11 @@ export default function LeadDesk() {
           {eod || 'No data yet.'}
         </pre>
       </Card>
+
+      {/* One drawer for the whole desk. Keyed on the lead so switching from
+          one lead to another remounts rather than showing the previous lead's
+          calls under a new name. */}
+      <LeadDetail key={openLeadId} leadId={openLeadId} onClose={() => setOpenLeadId(null)} />
     </div>
   )
 }

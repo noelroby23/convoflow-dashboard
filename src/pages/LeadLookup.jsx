@@ -151,10 +151,16 @@ export default function LeadLookup() {
 
             <Panel title="WhatsApp" icon={MessageSquare}>
               <div className="space-y-2 max-h-80 overflow-y-auto">
+                {/* cf.message.direction is 'inbound'/'outbound'. It used to be
+                    compared against 'in', which matches nothing — so every
+                    message the LEAD sent rendered as one of ours. That is §7
+                    item 47's two-vocabularies bug surviving in the UI after
+                    migration 029 normalised the column. Verified live: 8,644
+                    'inbound' and 31,560 'outbound', zero 'in'/'out'. */}
                 {res.messages?.length ? res.messages.map((m, i) => (
-                  <div key={i} className={`text-sm ${m.dir === 'in' ? '' : 'text-right'}`}>
+                  <div key={i} className={`text-sm ${m.dir === 'inbound' ? '' : 'text-right'}`}>
                     <span className={`inline-block px-3 py-1.5 rounded-2xl ${
-                      m.dir === 'in' ? 'bg-[#F3F4F6]' : 'bg-[#FDF2F8]'}`}>
+                      m.dir === 'inbound' ? 'bg-[#F3F4F6]' : 'bg-[#FDF2F8]'}`}>
                       {m.text}
                     </span>
                     <span className="block text-[11px] text-[#9CA3AF]">{fmt(m.at)}</span>

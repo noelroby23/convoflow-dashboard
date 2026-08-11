@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { supabase, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from '../lib/supabase'
 
 // All ConvoFlow v2 desk data comes from SECURITY DEFINER RPCs in `public`.
 // The cf.* tables are not exposed through PostgREST, so this is the only
@@ -14,7 +14,7 @@ async function callRpc(fn, args) {
  * Poll an RPC on an interval. Pauses while the tab is hidden so a backgrounded
  * dashboard doesn't hammer the database all night.
  */
-export function useCfRpc(fn, args, { intervalMs = 0 } = {}) {
+export function useCfRpc(fn, args, { intervalMs = 0, enabled = true } = {}) {
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -37,6 +37,17 @@ export function useCfRpc(fn, args, { intervalMs = 0 } = {}) {
     let cancelled = false
     const tick = () => { if (!cancelled && !document.hidden) load() }
 
+    // `enabled` exists for the lead drawer, which has no lead until one is
+    // clicked. Defaults to true, so every existing caller is unchanged.
+    // Stale data is cleared rather than left on screen: reopening the drawer
+    // on a different lead must not show the previous lead's calls for a frame.
+    if (!enabled) {
+      setData(null)
+      setError(null)
+      setLoading(false)
+      return () => { cancelled = true }
+    }
+
     load()
     if (intervalMs > 0) timer.current = setInterval(tick, intervalMs)
 
@@ -48,7 +59,7 @@ export function useCfRpc(fn, args, { intervalMs = 0 } = {}) {
       if (timer.current) clearInterval(timer.current)
       document.removeEventListener('visibilitychange', onVisible)
     }
-  }, [load, intervalMs])
+  }, [load, intervalMs, enabled])
 
   return { data, error, loading, refresh: load }
 }
@@ -126,6 +137,75 @@ export const useCfActivity = (region = 'uae', date) =>
 
 export async function lookupLead(q) {
   return callRpc('cf_lead_lookup', { p: { q } })
+}
+
+// --------------------------------------------------------------------------
+// One lead, everything about it — the drawer behind a board card.
+// --------------------------------------------------------------------------
+
+/**
+ * Keyed on lead_id, never on name or phone.
+ *
+ * cf_lead_lookup resolves free text and takes `order by updated_at desc limit
+ * 1`, which is the wrong thing to hang a click on: GHL makes a fresh contact
+ * per form fill, so one person is routinely several cf.lead rows on the same
+ * number (CLAUDE.md §7 items 89 and 119 — eight rows on one number in one
+ * evening). Resolving a clicked card by phone can open a different row than
+ * the card, with different calls, and nothing on screen would say so.
+ * The card carries lead_id, so use it.
+ *
+ * Polls while open because a lead can be mid-call: the status phrase, the
+ * queue and the call list all move underneath the drawer.
+ */
+export const useCfLeadDetail = (leadId) =>
+  useCfRpc('cf_lead_detail', { p: { lead_id: leadId } },
+           { intervalMs: 20_000, enabled: Boolean(leadId) })
+
+/**
+ * Ask for a playable URL for one call recording.
+ *
+ * cf.call.recording_url is VAPI's raw R2 object path and returns 400 in a
+ * browser — the "play" link this dashboard used to show has never played
+ * anything. The URL that works is presigned by VAPI on demand and needs the
+ * private VAPI key, so it is minted by the cf-recording edge function.
+ *
+ * A plain fetch rather than supabase.functions.invoke() because the STATUS
+ * CODE carries the meaning: 410 = the audio aged out of VAPI's 14-day window
+ * (the transcript is still there and the UI should say so), 404 = not one of
+ * our calls, 502 = actually broken. invoke() flattens all three into one
+ * error, and "expired" and "broken" need different words on screen.
+ *
+ * The URL it returns is signed for 30 minutes. Nothing caches it.
+ */
+export async function getRecordingUrl(callId) {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) {
+    const e = new Error('Your session has expired — sign in again')
+    e.reason = 'no_session'
+    throw e
+  }
+
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/cf-recording`, {
+    method: 'POST',
+    headers: {
+      apikey: SUPABASE_PUBLISHABLE_KEY,
+      Authorization: `Bearer ${session.access_token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ call_id: callId }),
+  })
+
+  let body = {}
+  try { body = await res.json() } catch { /* keep the status, drop the body */ }
+
+  if (!res.ok) {
+    const e = new Error(body.error || `Could not load the recording (${res.status})`)
+    e.reason = body.reason || String(res.status)
+    e.ageDays = body.age_days
+    e.detail = body.detail
+    throw e
+  }
+  return body
 }
 
 /**
