@@ -88,6 +88,13 @@ export default function Overview() {
     return () => setReportBuilder(null)
   }, [setReportBuilder])
 
+  const attributedLeads = overview?.attributed_leads ?? null
+  const pct = (n, d) => (!d || n == null ? null : `${((n / d) * 100).toFixed(n / d < 0.1 ? 1 : 0)}%`)
+  const step = (n, d, label) => {
+    const v = pct(n, d)
+    return v ? { value: v, label } : null
+  }
+
   const totalLeads = overview?.total_leads ?? 0
   const meetingsBooked = overview?.meetings_booked ?? 0
   const showedUp = overview?.showed_up ?? 0
@@ -207,12 +214,12 @@ export default function Overview() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">
-            <KPICard label="Total Spend" value={totalSpend} prefix="AED " inverse={true} loading={overviewLoading} description="What you spent on ads this period" target={spendTarget} />
-            <KPICard label="Total Leads" value={totalLeads} loading={overviewLoading} description="People who raised their hand interested in you" target={leadsTarget} />
-            <KPICard label="Meetings Booked" value={meetingsBooked} loading={overviewLoading} description="Sales conversations Sarah booked" target={meetingsTarget} />
-            <KPICard label="Showed Up" value={showedUp} loading={overviewLoading} description="People who actually attended their meeting" target={showsTarget} />
-            <KPICard label="Active Opportunities" value={activeOpps} loading={overviewLoading} description="Leads your sales team is currently working" target={activeOppsTarget} />
-            <KPICard label="Closed Won" value={closedWon} loading={overviewLoading} description="New customers who signed and paid" target={closesTarget} />
+            <KPICard label="Total Spend" value={totalSpend} prefix="AED " inverse={true} loading={overviewLoading} description="What you spent on ads this period" target={spendTarget} missingNote="No ad spend recorded for these dates" fromPrevious={attributedLeads ? { value: attributedLeads, label: "leads came from these ads" } : null} />
+            <KPICard label="Total Leads" value={totalLeads} loading={overviewLoading} description="People who raised their hand interested in you" target={leadsTarget} fromPrevious={step(attributedLeads, totalLeads, "of them came from ads")} />
+            <KPICard label="Meetings Booked" value={meetingsBooked} loading={overviewLoading} description="Sales conversations Sarah booked" target={meetingsTarget} fromPrevious={step(meetingsBooked, totalLeads, "of leads booked")} />
+            <KPICard label="Showed Up" value={showedUp} loading={overviewLoading} description="People who actually attended their meeting" target={showsTarget} fromPrevious={step(showedUp, meetingsBooked, "of booked meetings")} />
+            <KPICard label="Active Opportunities" value={activeOpps} loading={overviewLoading} description="Open deals in the sales pipeline right now" target={activeOppsTarget} fromPrevious={{ value: "live", label: "count, not this date range" }} />
+            <KPICard label="Closed Won" value={closedWon} loading={overviewLoading} description="New customers who signed and paid" target={closesTarget} missingNote="No deals recorded yet" fromPrevious={step(closedWon, showedUp, "of people who showed up")} />
           </div>
         )}
       </ErrorBoundary>
@@ -221,12 +228,12 @@ export default function Overview() {
       <ErrorBoundary>
         {overviewError && !overviewLoading ? null : (
           <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">
-            <KPICard label="Cost per Lead" value={cpl} prefix="AED " decimals={2} inverse={true} loading={overviewLoading} description="What each interested person costs you" target={cplTarget} recommendation="If CPL is above target, pause underperforming ads." />
-            <KPICard label="Cost per Meeting" value={costPerMeeting} prefix="AED " decimals={2} inverse={true} loading={overviewLoading} description="What each booked sales conversation costs you" target={costPerMeetingTarget} />
-            <KPICard label="Cost per Active Opp" value={costPerActive} prefix="AED " inverse={true} loading={overviewLoading} description="What it costs to get each real engaged buyer" target={costPerActiveTarget} />
+            <KPICard label="Cost per Lead" value={cpl} prefix="AED " decimals={2} inverse={true} loading={overviewLoading} description="Ad spend divided by the leads those ads produced" target={cplTarget} missingNote="No ad spend, or no leads from ads, in this range" recommendation="If CPL is above target, pause underperforming ads." />
+            <KPICard label="Cost per Meeting" value={costPerMeeting} prefix="AED " decimals={2} inverse={true} loading={overviewLoading} description="What each booked sales conversation costs you" target={costPerMeetingTarget} missingNote="No ad spend, or no meetings, in this range" />
+            <KPICard label="Cost per Active Opp" value={costPerActive} prefix="AED " inverse={true} loading={overviewLoading} description="What it costs to open a new deal" target={costPerActiveTarget} missingNote="No new deals were opened in this range" />
             <KPICard label="Show Rate" value={showRate} suffix="%" loading={overviewLoading} description="Out of 10 booked meetings, how many show up" target={showRateTarget} recommendation="Add WhatsApp reminders 24h and 1h before meetings." />
             <KPICard label="Meeting Rate" value={meetingRate} suffix="%" decimals={2} loading={overviewLoading} description="Out of 100 interested people, how many book" target={meetingRateTarget} />
-            <KPICard label="ROAS" value={roas} suffix="x" loading={overviewLoading} description="For every AED spent, how many you make back" target={roasTarget} recommendation="Close active opportunities to improve ROAS." />
+            <KPICard label="ROAS" value={roas} suffix="x" loading={overviewLoading} description="For every AED spent, how many you make back" target={roasTarget} missingNote="Needs both ad spend and a closed deal" recommendation="Close active opportunities to improve ROAS." />
           </div>
         )}
       </ErrorBoundary>
