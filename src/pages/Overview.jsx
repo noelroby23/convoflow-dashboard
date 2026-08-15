@@ -99,6 +99,9 @@ export default function Overview() {
   const meetingsBooked = overview?.meetings_booked ?? 0
   const showedUp = overview?.showed_up ?? 0
   const activeOpps = overview?.active_opportunities ?? 0
+  const pipelineValue = overview?.pipeline_value ?? null
+  const costPerCustomer = overview?.cost_per_customer ?? null
+  const winRate = overview?.win_rate ?? null
   const closedWon = overview?.closed_won ?? 0
   const totalSpend = overview?.total_spend ?? 0
   const closedRevenue = overview?.closed_revenue ?? 0
@@ -121,6 +124,9 @@ export default function Overview() {
   const showRateTarget = targets?.show_rate ?? 75
   const meetingRateTarget = targets?.meeting_rate ?? 18
   const roasTarget = targets?.roas_target ?? 4
+  const pipelineTarget = targets?.pipeline_value ?? 200000
+  const costPerCustomerTarget = targets?.cost_per_customer ?? 2500
+  const winRateTarget = targets?.win_rate ?? 30
   const formattedSpend = Number(totalSpend).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   const formattedCpl = Number(cpl).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   const formattedCostPerMeeting = Number(costPerMeeting).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -218,7 +224,7 @@ export default function Overview() {
             <KPICard label="Total Leads" value={totalLeads} loading={overviewLoading} description="People who raised their hand interested in you" target={leadsTarget} fromPrevious={step(attributedLeads, totalLeads, "of them came from ads")} />
             <KPICard label="Meetings Booked" value={meetingsBooked} loading={overviewLoading} description="Sales conversations Sarah booked" target={meetingsTarget} fromPrevious={step(meetingsBooked, totalLeads, "of leads booked")} />
             <KPICard label="Showed Up" value={showedUp} loading={overviewLoading} description="People who actually attended their meeting" target={showsTarget} fromPrevious={step(showedUp, meetingsBooked, "of booked meetings")} />
-            <KPICard label="Active Opportunities" value={activeOpps} loading={overviewLoading} description="Open deals in the sales pipeline right now" target={activeOppsTarget} fromPrevious={{ value: "live", label: "count, not this date range" }} />
+            <KPICard label="Pipeline Value" value={pipelineValue} prefix="AED " loading={overviewLoading} description="Money sitting in deals that are still open" target={pipelineTarget} missingNote="No open deals in the sales pipeline" fromPrevious={activeOpps ? { value: activeOpps, label: "open deals, live right now" } : null} />
             <KPICard label="Closed Won" value={closedWon} loading={overviewLoading} description="New customers who signed and paid" target={closesTarget} missingNote="No deals recorded yet" fromPrevious={step(closedWon, showedUp, "of people who showed up")} />
           </div>
         )}
@@ -230,9 +236,9 @@ export default function Overview() {
           <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">
             <KPICard label="Cost per Lead" value={cpl} prefix="AED " decimals={2} inverse={true} loading={overviewLoading} description="Ad spend divided by the leads those ads produced" target={cplTarget} missingNote="No ad spend, or no leads from ads, in this range" recommendation="If CPL is above target, pause underperforming ads." />
             <KPICard label="Cost per Meeting" value={costPerMeeting} prefix="AED " decimals={2} inverse={true} loading={overviewLoading} description="What each booked sales conversation costs you" target={costPerMeetingTarget} missingNote="No ad spend, or no meetings, in this range" />
-            <KPICard label="Cost per Active Opp" value={costPerActive} prefix="AED " inverse={true} loading={overviewLoading} description="What it costs to open a new deal" target={costPerActiveTarget} missingNote="No new deals were opened in this range" />
+            <KPICard label="Cost per Customer" value={costPerCustomer} prefix="AED " decimals={0} inverse={true} loading={overviewLoading} description="Ad spend divided by the customers who signed and paid" target={costPerCustomerTarget} missingNote="No deals closed in this range" />
             <KPICard label="Show Rate" value={showRate} suffix="%" loading={overviewLoading} description="Out of 10 booked meetings, how many show up" target={showRateTarget} recommendation="Add WhatsApp reminders 24h and 1h before meetings." />
-            <KPICard label="Meeting Rate" value={meetingRate} suffix="%" decimals={2} loading={overviewLoading} description="Out of 100 interested people, how many book" target={meetingRateTarget} />
+            <KPICard label="Win Rate" value={winRate} suffix="%" decimals={1} loading={overviewLoading} description="Of the deals that finished, how many you won" target={winRateTarget} missingNote="No deals have finished in this range" recommendation="Losses cluster at Proposal Sent and Ghosting. Chase those two stages first." />
             <KPICard label="ROAS" value={roas} suffix="x" loading={overviewLoading} description="For every AED spent, how many you make back" target={roasTarget} missingNote="Needs both ad spend and a closed deal" recommendation="Close active opportunities to improve ROAS." />
           </div>
         )}
