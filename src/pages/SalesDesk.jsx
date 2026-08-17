@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CalendarCheck, Banknote, Loader2, ExternalLink } from 'lucide-react'
+import { CalendarCheck, Banknote, Loader2, ExternalLink, Plus, UserPlus, X} from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useDashboard } from '../store/dashboard'
 import { Panel } from '../components/ui/Console'
@@ -27,10 +27,114 @@ const when = (iso) => iso
 
 // Meeting columns map onto lead_state, which cf.set_state already mirrors to
 // GHL. Nothing new is invented here.
+// Kept in step with cf.lead_channel. A label here and a key there is fine;
+// two lists of CHANNELS would drift, which is why the picker reads cf_channels.
+const CHANNEL_LABEL = {
+  meta_ads: 'Meta ads', website: 'Website', referral: 'Referral',
+  organic: 'Organic', outbound: 'Outbound', partner: 'Partner', other: 'Other',
+}
+
+
+// Adds somebody to the sales pipeline. Two callers, one path: a brand-new
+// prospect typed into the desk, and an attended lead that has no deal yet.
+//
+// 🔑 IT GOES THROUGH THE EDGE FUNCTION, NOT STRAIGHT TO THE DATABASE, because
+// GHL owns the sale. cf-prospect creates the contact and the opportunity there
+// FIRST and records them here only on success — a deal that exists in the
+// dashboard and not in GHL is invisible to the people actually selling.
+async function addToPipeline(body) {
+  const { data: session } = await supabase.auth.getSession()
+  const token = session?.session?.access_token
+  const res = await fetch(`${supabase.supabaseUrl}/functions/v1/cf-prospect`, {
+    method: 'POST',
+    headers: {
+      apikey: supabase.supabaseKey,
+      Authorization: `Bearer ${token ?? supabase.supabaseKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  })
+  const out = await res.json().catch(() => null)
+  if (!res.ok || out?.ok === false) {
+    throw new Error(out?.error ? `${out.error}` : `HTTP ${res.status}`)
+  }
+  return out
+}
+
+
+// Abdus: "I need to be able to create cards and create prospects in the sales
+// desk. Also some people have come in organically through my other channels."
+//
+// The channel is asked for at creation rather than inferred, because that is
+// the whole point: a lead that arrived through a referral must not have ad
+// spend divided by it (§7 item 172's neighbour — cost per lead is only honest
+// over the leads the ads actually produced).
+function NewProspect({ channels, onClose, onCreate }) {
+  const [name, setName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [channel, setChannel] = useState('referral')
+  const [value, setValue] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const submit = async (e) => {
+    e.preventDefault()
+    if (!name.trim()) return
+    setSaving(true)
+    try { await onCreate({ name: name.trim(), phone: phone.trim() || null, channel, value: Number(value) || 0 }) }
+    finally { setSaving(false) }
+  }
+
+  return (
+    <div className="cf-ld__scrim" onClick={onClose}>
+      <form className="cf-new" onClick={e => e.stopPropagation()} onSubmit={submit}>
+        <header className="cf-ld__head">
+          <h2 className="cf-ld__name">New prospect</h2>
+          <button type="button" onClick={onClose} className="cf-ld__x"><X size={13} /> Close</button>
+        </header>
+        <div className="cf-new__body">
+          <label className="cf-new__f">
+            <span>Name</span>
+            <input value={name} onChange={e => setName(e.target.value)} autoFocus required />
+          </label>
+          <label className="cf-new__f">
+            <span>Phone</span>
+            <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+9715…" />
+          </label>
+          <label className="cf-new__f">
+            <span>Where did they come from?</span>
+            <select value={channel} onChange={e => setChannel(e.target.value)}>
+              {channels.map(c => (
+                <option key={c.channel_key} value={c.channel_key}>{c.label}</option>
+              ))}
+            </select>
+          </label>
+          <label className="cf-new__f">
+            <span>Deal value (AED)</span>
+            <input value={value} onChange={e => setValue(e.target.value.replace(/[^0-9.]/g, ''))}
+                   inputMode="decimal" placeholder="0" />
+          </label>
+          <p className="cf-new__note">
+            Creates the contact and the opportunity in GHL first, then records it here.
+          </p>
+        </div>
+        <footer className="cf-new__foot">
+          <button type="submit" className="cf-new__go" disabled={saving || !name.trim()}>
+            {saving ? 'Creating…' : 'Add to pipeline'}
+          </button>
+        </footer>
+      </form>
+    </div>
+  )
+}
+
 const MEETING_STATE = {
   booked: 'meeting_booked',
   attended: 'meeting_attended',
   missed: 'meeting_missed',
+  // Abdus: "a lot of these I didn't attend because they are disqualified."
+  // Filing that as a no-show would hand the lead to the 10-touch recovery —
+  // ten calls and seven messages chasing somebody already ruled out.
+  disqualified: 'disqualified',
 }
 
 function Card({ children, onDragStart, dim, onOpen }) {
@@ -86,6 +190,8 @@ export default function SalesDesk() {
   const [busy, setBusy] = useState(null)
   const [drag, setDrag] = useState(null)     // { kind, id, from }
   const [over, setOver] = useState(null)
+  const [newOpen, setNewOpen] = useState(false)
+  const [channels, setChannels] = useState([])
   // Clicking a card opens the prep sheet, not the full record: this page
   // is used in the minute before a call, not for a post-mortem.
   const [prep, setPrep] = useState(null)
@@ -203,6 +309,28 @@ export default function SalesDesk() {
     }
   }
 
+  useEffect(() => {
+    supabase.rpc('cf_channels', { p: {} }).then(({ data }) => setChannels(data ?? []))
+  }, [])
+
+  // Promote an attended lead. The contact already exists in GHL, so only the
+  // opportunity is created.
+  const promote = async (lead) => {
+    setBusy(lead.lead_id)
+    try {
+      await addToPipeline({
+        name: lead.name, phone: lead.phone,
+        ghl_contact_id: lead.ghl_contact_id, channel: lead.channel,
+      })
+      toast.success(`${lead.name} added to the pipeline`)
+      await load()
+    } catch (e) {
+      toast.error(e.message || 'Could not add them')
+    } finally {
+      setBusy(null)
+    }
+  }
+
   const onDrop = (kind, target) => (e) => {
     e.preventDefault()
     setOver(null)
@@ -243,7 +371,10 @@ export default function SalesDesk() {
               over={over === `m:${col.key}`}
               onDragOver={allow(`m:${col.key}`)}
               onDrop={onDrop('meeting', col.key)}
-              hint={col.key === 'booked' ? 'Nothing booked' : 'None'}
+              hint={col.key === 'booked' ? 'Nothing booked'
+                  : col.key === 'disqualified' ? 'Drag here if they are not a fit'
+                  : col.key === 'missed' ? 'Drag here if they did not show'
+                  : 'None'}
             >
               {(col.cards ?? []).map(c => (
                 <Card key={c.id} dim={busy === c.id}
@@ -264,6 +395,46 @@ export default function SalesDesk() {
         </div>
 
       </Panel>
+
+      {/* Attended, and on no sales board anywhere. Measured at 13 of 23 when
+          this was built: they had a meeting, it went well enough to attend, and
+          nothing downstream knew about them. */}
+      {(board?.awaiting_pipeline ?? []).length > 0 && (
+        <div className="cf-await">
+          <div className="cf-await__head">
+            <span className="cf-await__lbl">
+              Attended — not in the pipeline yet ({board.awaiting_pipeline.length})
+            </span>
+            <span className="cf-await__hint">click to add them to the first stage</span>
+          </div>
+          <div className="cf-await__list">
+            {board.awaiting_pipeline.map(l => (
+              <button key={l.lead_id} type="button" className="cf-await__chip"
+                      disabled={busy === l.lead_id}
+                      onClick={() => promote(l)}>
+                <Plus size={11} /> {l.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {newOpen && (
+        <NewProspect
+          channels={channels}
+          onClose={() => setNewOpen(false)}
+          onCreate={async (body) => {
+            try {
+              await addToPipeline(body)
+              toast.success(`${body.name} added to the pipeline`)
+              setNewOpen(false)
+              await load()
+            } catch (e) {
+              toast.error(e.message || 'Could not create that prospect')
+            }
+          }}
+        />
+      )}
 
       {/* Sales */}
       <Panel eyebrow="Sales pipeline"

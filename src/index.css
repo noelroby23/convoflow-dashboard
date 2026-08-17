@@ -1050,3 +1050,58 @@ html, body, #root {
   background: rgba(255,255,255,.06); color: var(--ink); border: 1px solid var(--edge);
 }
 .cf-noevent__chip:hover { border-color: var(--edge-hi); background: rgba(255,255,255,.1); }
+
+/* ── Attended, not yet in the pipeline ────────────────────────────────────────
+   Measured at 13 of 23 attended leads when this shipped: they had a meeting,
+   attended it, and appeared on no sales board. Quiet by design — it is a
+   to-do list, not an alarm, and Abdus asked for the amber boxes to go. */
+.cf-await {
+  border: 1px solid var(--edge); border-radius: 14px; padding: 14px 16px;
+  background: var(--glass); margin-bottom: 18px;
+}
+.cf-await__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+.cf-await__lbl {
+  font-family: 'DM Mono', ui-monospace, monospace; font-size: 10px;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--muted);
+}
+.cf-await__hint { font-size: 11px; color: var(--faint); }
+.cf-await__list { display: flex; flex-wrap: wrap; gap: 7px; }
+.cf-await__chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  border: 1px solid var(--edge); border-radius: 999px; padding: 5px 11px;
+  font-size: 12px; color: var(--ink); background: transparent;
+  transition: border-color .16s, background .16s;
+}
+.cf-await__chip:hover:not(:disabled) { border-color: #34D399; background: rgba(52,211,153,.10); }
+.cf-await__chip:disabled { opacity: .45; }
+
+/* ── New prospect ─────────────────────────────────────────────────────────── */
+.cf-newbtn {
+  display: inline-flex; align-items: center; gap: 5px;
+  border: 1px solid var(--edge); border-radius: 999px; padding: 5px 11px;
+  font-size: 11px; color: var(--ink); background: transparent;
+}
+.cf-newbtn:hover { border-color: var(--edge-hi); background: rgba(255,255,255,.05); }
+.cf-new {
+  width: min(440px, 94vw); background: var(--panel); border: 1px solid var(--edge);
+  border-radius: 16px; overflow: hidden; margin: auto;
+}
+.cf-new__body { padding: 18px; display: grid; gap: 14px; }
+.cf-new__f { display: grid; gap: 6px; }
+.cf-new__f > span {
+  font-family: 'DM Mono', ui-monospace, monospace; font-size: 10px;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--muted);
+}
+.cf-new__f input, .cf-new__f select {
+  width: 100%; background: rgba(255,255,255,.04); border: 1px solid var(--edge);
+  border-radius: 9px; padding: 9px 11px; font-size: 13px; color: var(--ink);
+}
+.cf-new__f input:focus, .cf-new__f select:focus { outline: none; border-color: #EC4899; }
+.cf-new__f select option { background: #17171A; color: #FAFAF9; }
+.cf-new__note { font-size: 11px; color: var(--faint); line-height: 1.5; margin: 0; }
+.cf-new__foot { padding: 0 18px 18px; }
+.cf-new__go {
+  width: 100%; border-radius: 10px; padding: 10px; font-size: 13px; font-weight: 500;
+  background: #EC4899; color: #fff; border: none;
+}
+.cf-new__go:disabled { opacity: .45; }

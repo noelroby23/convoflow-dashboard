@@ -12,12 +12,12 @@ import LiveListen from './LiveListen'
  */
 
 export const BOARD_COLUMNS = [
-  { key: 'on_the_call',  label: 'On the call',       icon: PhoneCall,     accent: '#16A34A' },
-  { key: 'up_next',      label: 'Up next',           icon: Clock,         accent: '#2E62E0' },
-  { key: 'following_up', label: 'Following up',      icon: RotateCcw,     accent: '#E8AE35' },
-  { key: 'callback',     label: 'Callback arranged', icon: ArrowRight,    accent: '#0C7291' },
-  { key: 'booked',       label: 'Booked',            icon: CalendarCheck, accent: '#14794A' },
-  { key: 'not_a_fit',    label: 'Not a fit',         icon: XCircle,       accent: '#B91C1C' },
+  { key: 'on_the_call',  label: 'On the call',       icon: PhoneCall,     accent: '#34D399' },
+  { key: 'up_next',      label: 'Up next',           icon: Clock,         accent: '#60A5FA' },
+  { key: 'following_up', label: 'Following up',      icon: RotateCcw,     accent: '#FBBF24' },
+  { key: 'callback',     label: 'Callback arranged', icon: ArrowRight,    accent: '#38BDF8' },
+  { key: 'booked',       label: 'Booked',            icon: CalendarCheck, accent: '#34D399' },
+  { key: 'not_a_fit',    label: 'Not a fit',         icon: XCircle,       accent: '#F87171' },
 ]
 
 function age(days) {

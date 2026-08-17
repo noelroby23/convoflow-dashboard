@@ -15,15 +15,15 @@ import { useEffect, useRef, useState } from 'react'
  * The stages stay deliberately quiet; the connectors are the one loud thing.
  */
 
-const INK = '#22211D'
-const MUTED = '#6D6B63'
-const FAINT = '#B5B3AC'
+const INK = '#FAFAF9'    // was #22211D — near-black on a now-dark card
+const MUTED = '#A8A59E'  // was #6D6B63
+const FAINT = '#6B6862'  // was #B5B3AC — too bright for a 'faint' on dark
 
 // Signal colours already used by the board and the activity feed, so a green
 // here means the same thing it means there.
-const GOOD = '#14794A'
-const FAIR = '#96660C'
-const POOR = '#B91C1C'
+const GOOD = '#34D399'   // was #14794A, matching the dark remap in index.css
+const FAIR = '#FBBF24'   // was #96660C
+const POOR = '#F87171'   // was #B91C1C
 
 // Thresholds are a UI judgement, not a target from cf.target — deliberately so,
 // since nothing in the database defines a "good" connect rate. ~59% of dials
