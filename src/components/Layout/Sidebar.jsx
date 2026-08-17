@@ -3,7 +3,7 @@ import { NavLink, useSearchParams } from 'react-router-dom'
 import {
   LayoutDashboard, Megaphone, Bot, Users, DollarSign,
   TrendingUp, Target, Search, MessageCircle, Settings, ChevronDown, LogOut,
-  Headphones, ScanSearch
+  Headphones, ScanSearch, Banknote
 } from 'lucide-react'
 import { DEFAULT_CLIENT_ID, DEFAULT_CLIENT_NAME, useDashboard } from '../../store/dashboard'
 import { useClients } from '../../hooks/useDashboardData'
@@ -20,14 +20,20 @@ const navItems = [
   { to: '/home', label: 'Home', icon: LayoutDashboard },
   { to: '/lead-desk', label: 'Lead Desk', icon: Headphones },
   { to: '/lead-lookup', label: 'Lead Lookup', icon: ScanSearch },
+  // Everything after the booking: meeting outcomes and the sales pipeline.
+  { to: '/sales-desk', label: 'Sales Desk', icon: Banknote },
   // Back from phase 2: cf now holds Meta spend and per-lead ad attribution
   // (migrations 033/034), so this page has real data behind it again.
   { to: '/creative-performance', label: 'Creative Performance', icon: Megaphone },
   { to: '/sarahs-performance', label: "Sarah's Performance", icon: Bot },
   { to: '/week-over-week', label: 'Week-over-Week', icon: TrendingUp },
   { to: '/target-progress', label: 'Target Progress', icon: Target },
-  { to: '/lead-tracker', label: 'Lead Tracker', icon: Search },
-  { to: '/conversations', label: 'Conversations', icon: MessageCircle },
+  // Lead Tracker removed: the Lead Desk board carries the same list with
+  // search, stage filters and CSV export, and clicking a row now opens the
+  // full record. Two pages showing one list is two places to look.
+  // Conversations removed from the nav: the whole thread now lives on the
+  // lead itself, and a separate page for half the story is a second place
+  // to look. The route still resolves so old bookmarks keep working.
 ]
 
 export default function Sidebar({ onLogout }) {
@@ -72,14 +78,13 @@ export default function Sidebar({ onLogout }) {
   }
 
   return (
-    <div className="fixed left-0 top-0 h-full w-[220px] bg-white border-r border-[#E5E7EB] flex flex-col z-40">
-      {/* Logo */}
-      <div className="px-4 py-3 border-b border-[#E5E7EB] flex items-center justify-center">
-        <img src="/convoflow-logo-v2.jpg" alt="ConvoFlow" className="max-h-20 w-auto object-contain" />
-      </div>
+    <div className="cf-rail">
+      {/* Logo removed at Abdus's request until a better asset is supplied.
+          A wordmark that has to be colour-corrected to survive a dark
+          panel is the wrong asset, not a styling problem. */}
 
       {/* Client selector */}
-      <div className="px-3 py-3 border-b border-[#E5E7EB]">
+      <div className="px-3 py-3 border-b border-[#E5E7EB] cf-rail__hide">
         <div className="relative">
           <select
             value={currentClientId ?? ''}
@@ -111,7 +116,7 @@ export default function Sidebar({ onLogout }) {
             }
           >
             <Icon size={16} className="flex-shrink-0" />
-            <span className="truncate">{label}</span>
+            <span className="truncate cf-rail__label">{label}</span>
           </NavLink>
         ))}
 
@@ -128,7 +133,7 @@ export default function Sidebar({ onLogout }) {
             }
           >
             <Settings size={16} />
-            <span>Settings</span>
+            <span className="cf-rail__label">Settings</span>
           </NavLink>
         </div>
       </nav>
@@ -139,7 +144,7 @@ export default function Sidebar({ onLogout }) {
           <div className="w-7 h-7 rounded-full bg-[#EC4899] flex items-center justify-center flex-shrink-0">
             <span className="text-white text-xs font-bold">M</span>
           </div>
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 cf-rail__hide">
             <p className="text-xs font-semibold text-[#333333] truncate">Mark</p>
             <p className="text-[10px] text-[#9CA3AF]">Admin</p>
           </div>
@@ -148,8 +153,8 @@ export default function Sidebar({ onLogout }) {
           onClick={onLogout}
           className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs text-[#6B7280] hover:bg-[#F3F4F6] hover:text-[#DC2626] transition-colors"
         >
-          <LogOut size={13} />
-          Sign out
+          <LogOut size={13} className="flex-shrink-0" />
+          <span className="cf-rail__label">Sign out</span>
         </button>
       </div>
     </div>

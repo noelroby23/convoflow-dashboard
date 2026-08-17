@@ -30,9 +30,386 @@ input[type=number] { -moz-appearance: textfield; }
   font-family: 'Outfit', sans-serif;
 }
 
-body {
-  background: var(--cf-bg);
-  color: var(--cf-text);
+html, body, #root {
+  background: #09090b;
+  color: #FAFAF9;
+}
+
+/* The funnel connectors on the Lead Desk. The fill is the pass-through rate,
+   so it draws itself to the real number on mount: vertical when the row is
+   stacked on a narrow screen, horizontal once it lays out side by side. */
+.cf-flow {
+  position: relative;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: #E9E9E7;
+}
+.cf-flow > i {
+  position: absolute;
+  inset: auto auto 0 0;
+  width: 100%;
+  height: var(--p, 0%);
+  border-radius: inherit;
+  transition: height 900ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+@media (min-width: 1024px) {
+  .cf-flow > i {
+    inset: 0 auto 0 0;
+    height: 100%;
+    width: var(--p, 0%);
+    transition: width 900ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+}
+
+/* The only thing on the desk that is genuinely live is the call in progress,
+   so it is the only thing allowed to move on its own. */
+@keyframes cf-breathe {
+  0%, 100% { opacity: 1;   transform: scale(1); }
+  50%      { opacity: 0.45; transform: scale(0.82); }
+}
+.cf-live-dot { animation: cf-breathe 2s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .cf-flow > i { transition: none; }
+  .cf-live-dot { animation: none; }
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   THE HOME CONSOLE — dark, glass, mission control.
+
+   Scoped to .cf-app so the rest of the app stays light. Everything inside
+   inherits the dark ground, including the light-styled components Home already
+   renders: the overrides at the bottom re-skin `bg-white` and friends rather
+   than rewriting five working components, which is the cheap half of this and
+   the half least likely to break something.
+
+   Palette: Abdus's spec ground (#09090b) with the BRAND accent (#EC4899), not
+   the coral in the pasted template — his own words were "matching the current
+   font and the brand colors". Type is Outfit + DM Mono, same pairing as the
+   Lead Desk funnel, so numbers read as instrument readings on both pages.
+   ════════════════════════════════════════════════════════════════════════ */
+.cf-app {
+  --ink: #FAFAF9;
+  --muted: #8A8781;
+  --faint: #57544E;
+  --edge: rgba(255, 255, 255, .09);
+  --edge-hi: rgba(255, 255, 255, .18);
+  --glass: rgba(255, 255, 255, .045);
+  --glass-hi: rgba(255, 255, 255, .07);
+  --brand: #EC4899;
+
+  position: relative;
+  min-height: 100vh;
+  background: #09090b;
+  color: var(--ink);
+}
+/* One ambient wash, brand-tinted, so the ground is not a flat black rectangle.
+   Fixed rather than absolute so it stays put as a long page scrolls, and it
+   never intercepts a click. */
+.cf-app::before {
+  content: '';
+  position: fixed; inset: 0 0 auto 0; height: 46vh; z-index: 0;
+  background: radial-gradient(52% 60% at 28% 0%, rgba(236, 72, 153, .12), transparent 72%);
+  pointer-events: none;
+}
+.cf-main { position: relative; z-index: 1; }
+
+/* ── Shell: sidebar and header ───────────────────────────────────────── */
+.cf-rail {
+  position: fixed; inset: 0 auto 0 0; z-index: 40;
+  display: flex; flex-direction: column;
+  background: rgba(255, 255, 255, .035);
+  border-right: 1px solid var(--edge);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  width: 220px;
+  transition: width .26s cubic-bezier(.22, .61, .36, 1);
+  overflow: hidden;
+}
+.cf-app[data-rail="closed"] .cf-rail { width: 68px; }
+/* Labels fade rather than reflow, so the icons never jump as the rail moves. */
+.cf-rail__label {
+  white-space: nowrap;
+  transition: opacity .18s, transform .22s;
+}
+.cf-app[data-rail="closed"] .cf-rail__label {
+  opacity: 0; transform: translateX(-6px); pointer-events: none;
+}
+.cf-app[data-rail="closed"] .cf-rail__hide { display: none; }
+
+.cf-logo { transition: max-height .26s cubic-bezier(.22, .61, .36, 1); }
+.cf-app[data-rail="closed"] .cf-logo { max-height: 2rem; }
+/* The logo is a light-ground JPEG, so it needs lifting off a near-black panel
+   rather than sitting in its own white box. */
+.cf-app .cf-logo {
+  background: #fff; border-radius: 10px; padding: 6px;
+  box-shadow: 0 0 0 1px var(--edge);
+}
+
+/* Nav: pink-on-white active state does not survive a dark ground. */
+.cf-app .cf-rail a[class*="bg-pink-50"],
+.cf-app .cf-rail a.active {
+  background: rgba(236, 72, 153, .14) !important;
+  color: #F9A8D4 !important;
+}
+.cf-app .cf-rail a:hover { background: rgba(255, 255, 255, .06) !important; }
+
+.cf-railtoggle {
+  position: fixed; top: 74px; z-index: 50;
+  left: 204px;
+  width: 32px; height: 32px; border-radius: 999px;
+  display: grid; place-items: center;
+  background: var(--brand); color: #fff;
+  border: 1px solid rgba(255, 255, 255, .22);
+  box-shadow: 0 6px 20px -6px rgba(236, 72, 153, .75);
+  transition: left .26s cubic-bezier(.22, .61, .36, 1), transform .16s, filter .16s;
+}
+.cf-app[data-rail="closed"] .cf-railtoggle { left: 52px; }
+.cf-railtoggle:hover { transform: scale(1.08); filter: brightness(1.08); }
+.cf-railtoggle:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+.cf-topbar {
+  position: fixed; top: 0; right: 0; z-index: 30;
+  height: 64px; display: flex; align-items: center;
+  background: rgba(9, 9, 11, .72);
+  border-bottom: 1px solid var(--edge);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  left: 220px;
+  transition: left .26s cubic-bezier(.22, .61, .36, 1);
+}
+.cf-app[data-rail="closed"] .cf-topbar { left: 68px; }
+
+.cf-main {
+  margin-left: 220px; margin-top: 64px; padding: 24px;
+  transition: margin-left .26s cubic-bezier(.22, .61, .36, 1);
+}
+.cf-app[data-rail="closed"] .cf-main { margin-left: 68px; }
+
+@media (max-width: 860px) {
+  .cf-rail { width: 68px; }
+  .cf-rail__label { opacity: 0; pointer-events: none; }
+  .cf-topbar, .cf-main { left: 68px; margin-left: 68px; }
+  .cf-railtoggle { left: 52px; }
+}
+
+.cf-eyebrow {
+  font-family: 'DM Mono', ui-monospace, monospace;
+  font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted);
+}
+
+/* ── Glass panel ─────────────────────────────────────────────────────── */
+.cf-panel {
+  background: var(--glass);
+  border: 1px solid var(--edge);
+  border-radius: 16px;
+  padding: 18px 20px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.cf-panel__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.cf-panel__title { margin: 2px 0 0; font-size: 14px; font-weight: 600; color: var(--ink); }
+/* The glow is reserved for the recommendation panel — one loud thing. */
+.cf-panel--glow {
+  border-color: rgba(236, 72, 153, .34);
+  box-shadow: 0 0 0 1px rgba(236, 72, 153, .10), 0 8px 40px -12px rgba(236, 72, 153, .35);
+}
+
+/* ── The pipeline ────────────────────────────────────────────────────── */
+.cf-pipe { display: flex; flex-direction: column; gap: 0; }
+@media (min-width: 1100px) { .cf-pipe { flex-direction: row; align-items: stretch; } }
+
+.cf-node {
+  flex: 1; min-width: 0;
+  background: var(--glass);
+  border: 1px solid var(--edge);
+  border-radius: 16px;
+  padding: 16px 18px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: transform .22s, border-color .22s, background .22s;
+}
+.cf-node:hover { transform: translateY(-2px); border-color: var(--edge-hi); background: var(--glass-hi); }
+.cf-node__label {
+  display: flex; align-items: center; gap: 7px;
+  font-family: 'DM Mono', ui-monospace, monospace;
+  font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted);
+}
+.cf-node__dot { width: 6px; height: 6px; border-radius: 999px; flex: none; }
+.cf-node__value {
+  font-family: 'DM Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums;
+  /* Scales with the column instead of wrapping. A five-figure spend in a
+     narrow node was breaking as "1,71 / 0", which reads as two numbers. */
+  font-size: clamp(22px, 2.1vw, 32px);
+  line-height: 1.05; letter-spacing: -.03em; margin-top: 10px; color: var(--ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cf-node__prefix { font-size: 14px; color: var(--faint); margin-right: 6px; letter-spacing: 0; }
+.cf-node__foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 9px; min-height: 16px; }
+.cf-node__note { font-size: 11px; color: var(--faint); }
+
+.cf-delta { font-family: 'DM Mono', ui-monospace, monospace; font-size: 11px; }
+.cf-delta--up { color: #10B981; }
+.cf-delta--down { color: #F43F5E; }
+.cf-delta--flat { color: var(--faint); }
+
+.cf-link { display: flex; align-items: center; gap: 8px; padding: 6px 0 6px 22px; }
+@media (min-width: 1100px) {
+  .cf-link { flex-direction: column; justify-content: center; width: 96px; flex: none; padding: 0 6px; gap: 7px; }
+}
+.cf-link__track {
+  position: relative; overflow: hidden; border-radius: 999px;
+  background: rgba(255, 255, 255, .09); height: 30px; width: 3px; flex: none;
+}
+@media (min-width: 1100px) { .cf-link__track { height: 3px; width: 100%; } }
+.cf-link__track > i {
+  position: absolute; inset: auto auto 0 0; width: 100%; height: var(--p, 0%);
+  border-radius: inherit; transition: height 950ms cubic-bezier(.22, .61, .36, 1);
+}
+@media (min-width: 1100px) {
+  .cf-link__track > i {
+    inset: 0 auto 0 0; height: 100%; width: var(--p, 0%);
+    transition: width 950ms cubic-bezier(.22, .61, .36, 1);
+  }
+}
+.cf-link__label {
+  font-family: 'DM Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums;
+  font-size: 10px; white-space: nowrap; color: var(--faint);
+}
+.cf-link__label span { color: var(--faint); }
+
+/* ── Radial gauges ───────────────────────────────────────────────────── */
+.cf-gauge { position: relative; display: flex; flex-direction: column; align-items: center; padding: 4px 0 0; }
+.cf-gauge__svg { width: 128px; height: 128px; transform: rotate(-90deg); }
+.cf-gauge__track { fill: none; stroke: rgba(255, 255, 255, .08); stroke-width: 8; }
+.cf-gauge__fill {
+  fill: none; stroke-width: 8; stroke-linecap: round;
+  transition: stroke-dashoffset 1s cubic-bezier(.22, .61, .36, 1);
+}
+.cf-gauge__mid {
+  position: absolute; inset: 4px 0 auto 0; height: 128px;
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: none;
+}
+.cf-gauge__value {
+  font-family: 'DM Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums;
+  font-size: 24px; letter-spacing: -.02em; color: var(--ink); line-height: 1;
+}
+/* Four or five digits need to step down or they touch the stroke. */
+.cf-gauge__value.is-long { font-size: 19px; letter-spacing: -.04em; }
+.cf-gauge__label {
+  font-family: 'DM Mono', ui-monospace, monospace; text-align: center;
+  font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted);
+  margin-top: 10px;
+}
+.cf-gauge__foot { margin-top: 8px; font-size: 11px; color: var(--faint); text-align: center; }
+
+/* ── Chart ───────────────────────────────────────────────────────────── */
+.cf-chart__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.cf-chart__title { margin: 2px 0 0; font-size: 14px; font-weight: 600; }
+.cf-chart__foot { margin-top: 10px; font-size: 11px; color: var(--faint); }
+.cf-seg { display: inline-flex; border: 1px solid var(--edge); border-radius: 999px; overflow: hidden; }
+.cf-seg button {
+  padding: 5px 12px; font-size: 11px; color: var(--muted); background: transparent;
+  transition: background .18s, color .18s;
+}
+.cf-seg button:hover { color: var(--ink); background: rgba(255, 255, 255, .05); }
+.cf-seg button.is-on { background: var(--brand); color: #fff; }
+.cf-empty { padding: 28px 0; text-align: center; font-size: 13px; color: var(--faint); }
+
+/* ── Re-skin the light components Home already renders ───────────────── */
+/* Large light surfaces go OPAQUE, not glass.
+   The first cut used a translucent wash, which turned the date-range dialog
+   into a window onto the page behind it and left striped table rows unreadable.
+   Glass is for the panels this file draws deliberately; anything inherited from
+   the old light theme gets a solid panel colour it can be read on.
+   [class*="bg-white"] rather than .bg-white so odd:/even:/hover: variants —
+   which is what the table stripes are — are caught too. */
+.cf-app [class*="bg-white"],
+.cf-app .bg-gray-50,
+.cf-app .bg-gray-100,
+.cf-app [class*="bg-\[\#FAFAFA\]"],
+.cf-app [class*="bg-\[\#FAFAF9\]"],
+.cf-app [class*="bg-\[\#F9FAFB\]"],
+.cf-app [class*="bg-\[\#F8F8F7\]"],
+.cf-app [class*="bg-\[\#F7F7F6\]"],
+.cf-app [class*="bg-\[\#F0EFEC\]"],
+.cf-app [class*="bg-\[\#FDF2F8\]"],
+.cf-app [class*="bg-\[\#F3F4F6\]"] {
+  background: #131316 !important;
+}
+/* Anything floating above the page — dialog, dropdown, popover — must be fully
+   opaque and sit on its own shadow, or it reads as a rendering fault. */
+.cf-app [class*="fixed"][class*="bg-white"],
+.cf-app [class*="absolute"][class*="bg-white"],
+.cf-app [class*="z-50"],
+.cf-app [role="dialog"] {
+  background: #16161A !important;
+  border-color: var(--edge) !important;
+  box-shadow: 0 24px 70px -20px rgba(0, 0, 0, .85) !important;
+}
+/* Gradient panels (the AI summary) have no single background to swap. */
+.cf-app [class*="bg-gradient"] {
+  background: linear-gradient(180deg, rgba(236,72,153,.10), rgba(255,255,255,.03)) !important;
+}
+/* A white overlay scrim reads as a white flash on a dark app. */
+.cf-app [class*="bg-black/"], .cf-app [class*="bg-white/"] { backdrop-filter: blur(4px); }
+.cf-app [class*="border-[#E"],
+.cf-app [class*="border-[#e"],
+.cf-app [class*="border-[#F"],
+.cf-app .border-gray-100,
+.cf-app .border-gray-200,
+.cf-app .divide-\[\#F3F4F6\] > * { border-color: var(--edge) !important; }
+
+/* Dark inks become light. Every near-black the app uses, in one place. */
+.cf-app .text-\[\#111\],
+.cf-app .text-\[\#0F0F1A\],
+.cf-app .text-\[\#333333\],
+.cf-app .text-\[\#22211D\],
+.cf-app .text-\[\#374151\],
+.cf-app .text-black,
+.cf-app .text-gray-900,
+.cf-app .text-gray-800 { color: var(--ink) !important; }
+.cf-app .text-\[\#6B7280\],
+.cf-app .text-\[\#6D6B63\],
+.cf-app .text-gray-600,
+.cf-app .text-gray-500 { color: var(--muted) !important; }
+.cf-app .text-\[\#9CA3AF\],
+.cf-app .text-\[\#B5B3AC\],
+.cf-app .text-gray-400 { color: var(--faint) !important; }
+
+/* Status chips keep their hue and get a dark-legible treatment: the tint
+   becomes a translucent wash and the text lifts to the same family. */
+.cf-app [class*="bg-amber-50"], .cf-app [class*="bg-amber-100"],
+.cf-app [class*="bg-yellow-50"], .cf-app [class*="bg-yellow-100"] { background: rgba(245,158,11,.16) !important; }
+.cf-app [class*="bg-green-50"], .cf-app [class*="bg-green-100"],
+.cf-app [class*="bg-emerald-50"], .cf-app [class*="bg-emerald-100"] { background: rgba(16,185,129,.16) !important; }
+.cf-app [class*="bg-red-50"], .cf-app [class*="bg-red-100"],
+.cf-app [class*="bg-rose-50"], .cf-app [class*="bg-rose-100"] { background: rgba(244,63,94,.16) !important; }
+.cf-app [class*="bg-blue-50"], .cf-app [class*="bg-blue-100"] { background: rgba(96,165,250,.16) !important; }
+.cf-app [class*="bg-slate-100"], .cf-app [class*="bg-slate-50"] { background: rgba(255,255,255,.08) !important; }
+.cf-app [class*="bg-pink-50"] { background: rgba(236,72,153,.16) !important; }
+
+.cf-app [class*="text-amber-8"], .cf-app [class*="text-amber-7"],
+.cf-app [class*="text-\[\#D97706\]"], .cf-app [class*="text-\[\#96660C\]"] { color: #FBBF24 !important; }
+.cf-app [class*="text-green-8"], .cf-app [class*="text-emerald-8"],
+.cf-app [class*="text-\[\#16A34A\]"], .cf-app [class*="text-\[\#14794A\]"] { color: #34D399 !important; }
+.cf-app [class*="text-red-8"], .cf-app [class*="text-rose-8"],
+.cf-app [class*="text-\[\#DC2626\]"], .cf-app [class*="text-\[\#B91C1C\]"] { color: #FB7185 !important; }
+.cf-app [class*="text-blue-8"], .cf-app [class*="text-\[\#2563EB\]"],
+.cf-app [class*="text-\[\#2E62E0\]"] { color: #93B4FB !important; }
+.cf-app [class*="text-slate-7"], .cf-app [class*="text-slate-6"] { color: var(--muted) !important; }
+.cf-app table thead tr { color: var(--muted) !important; }
+.cf-app input,
+.cf-app select {
+  background: rgba(255, 255, 255, .05) !important;
+  color: var(--ink) !important;
+  border-color: var(--edge) !important;
+}
+.cf-app input::placeholder { color: var(--faint) !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .cf-link__track > i, .cf-gauge__fill, .cf-node { transition: none; }
 }
 
 /* Skeleton animation */
@@ -82,3 +459,594 @@ body {
   body.printing-report .report-modal-card { box-shadow: none !important; max-height: none !important; overflow: visible !important; }
   body.printing-report .report-modal-footer { display: none !important; }
 }
+
+/* ── Date range dialog ───────────────────────────────────────────────────
+   Styled deliberately rather than left to the generic light-to-dark remap.
+   That remap darkened the panel and left the calendar's own inks (#1F2937,
+   #374151) untouched, so it rendered dark text on a dark sheet — a dialog
+   that was open, opaque, and completely unreadable. It also matched the
+   SCRIM, because the scrim carries z-50, which painted the whole viewport.
+   A component with its own palette gets its own rules. */
+.cf-dr__scrim {
+  position: fixed; inset: 0; z-index: 60;
+  background: rgba(4, 4, 6, .66);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  transition: opacity .2s;
+}
+.cf-dr__panel {
+  position: absolute; right: 24px; top: 80px;
+  width: min(1080px, calc(100vw - 2rem));
+  border-radius: 16px; overflow: hidden;
+  background: #131317 !important;
+  border: 1px solid rgba(255, 255, 255, .12);
+  box-shadow: 0 32px 90px -24px rgba(0, 0, 0, .9);
+  transition: opacity .2s, transform .2s;
+}
+/* Everything inside inherits legible ink, so a colour I have not enumerated
+   cannot come out dark-on-dark the way the first attempt did. */
+.cf-dr__panel, .cf-dr__panel * { color: #F2F1ED; }
+.cf-dr__panel [class*="bg-white"],
+.cf-dr__panel [class*="bg-[#F8F9FA]"],
+.cf-dr__panel [class*="bg-[#FFF0F3]"] { background: rgba(255, 255, 255, .04) !important; }
+.cf-dr__panel [class*="bg-gradient"] {
+  background: linear-gradient(90deg, #EC4899, #F472B6) !important;
+}
+.cf-dr__panel [class*="border-"] { border-color: rgba(255, 255, 255, .12) !important; }
+.cf-dr__panel button:hover { background: rgba(255, 255, 255, .07) !important; }
+.cf-dr__panel input {
+  background: rgba(255, 255, 255, .05) !important;
+  border-color: rgba(255, 255, 255, .14) !important;
+  color: #F2F1ED !important;
+}
+/* The selected day and the primary action keep brand pink; everything else
+   in the calendar is quiet so the selection is the only thing that shouts. */
+.cf-dr__panel [class*="bg-[#FF6B8A]"],
+.cf-dr__panel [class*="bg-[#EC4899]"] { background: #EC4899 !important; color: #fff !important; }
+.cf-dr__panel [class*="text-[#9CA3AF]"] { color: #8A8781 !important; }
+
+/* The loading skeleton is a light-grey shimmer — a white flash on a dark app,
+   which is exactly what it looks like when a page is opening. */
+.cf-app .skeleton {
+  background: linear-gradient(90deg, #17171b 25%, #232329 50%, #17171b 75%) !important;
+  background-size: 200% 100%;
+}
+
+/* The header sat at 72% black over the pink wash, which composites to grey. */
+.cf-topbar { background: #0b0b0e !important; }
+
+/* The logo is a transparent PNG now, so it needs no chip behind it. */
+.cf-app .cf-logo { background: none; box-shadow: none; padding: 0; }
+.cf-node__unit {
+  margin-left: auto; font-size: 9px; letter-spacing: .1em; color: var(--faint);
+}
+
+/* ── Aesthetic pass ──────────────────────────────────────────────────────
+   Mesh gradient, etched-glass edges, flowing pipes, glow on live things. */
+
+/* Two washes rather than one flat black: brand pink top-left, a cold blue
+   bottom-right. Fixed, behind everything, never interactive. */
+.cf-app::after {
+  content: '';
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(38% 44% at 82% 88%, rgba(56, 96, 210, .16), transparent 70%),
+    radial-gradient(30% 36% at 8% 62%, rgba(236, 72, 153, .07), transparent 72%);
+}
+
+/* Etched glass: a hairline that catches light at the top-left and fades out,
+   drawn as a mask so it stays 1px at any radius. */
+.cf-panel, .cf-node, .cf-dr__panel {
+  position: relative;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+}
+.cf-panel::before, .cf-node::before {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
+  background: linear-gradient(to bottom right, rgba(255,255,255,.16), rgba(255,255,255,.02) 42%, transparent 70%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* Pipes, not hairlines: a channel with a filled core and a soft bloom. */
+.cf-link__track { height: 34px !important; width: 6px !important; }
+@media (min-width: 1100px) {
+  .cf-link__track { height: 6px !important; width: 100% !important; }
+}
+.cf-link__track {
+  background: rgba(255, 255, 255, .06);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .07);
+}
+.cf-link__track > i { box-shadow: 0 0 14px -1px currentColor; filter: saturate(1.15); }
+
+/* "new" repeated five times is noise. One live badge, and it breathes. */
+.cf-delta--up { color: #34D399; }
+.cf-badge-live {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: 'DM Mono', ui-monospace, monospace; font-size: 10px;
+  padding: 2px 8px; border-radius: 999px;
+  color: #6EE7B7; background: rgba(16, 185, 129, .12);
+  box-shadow: 0 0 18px -4px rgba(16, 185, 129, .55), inset 0 0 0 1px rgba(16, 185, 129, .28);
+}
+.cf-badge-live i {
+  width: 5px; height: 5px; border-radius: 999px; background: currentColor;
+  animation: cf-breathe 2s ease-in-out infinite;
+}
+
+/* Gauges: value dominant, target clearly secondary. */
+.cf-gauge__label { font-size: 10px !important; color: #A8A69E !important; margin-top: 12px !important; }
+.cf-gauge__foot { margin-top: 4px !important; font-size: 10px !important; opacity: .72; }
+.cf-gauge__fill { filter: drop-shadow(0 0 8px currentColor); }
+
+/* Active nav and the primary action glow rather than merely tint. */
+.cf-app .cf-rail a[aria-current="page"],
+.cf-app .cf-rail a.active {
+  box-shadow: 0 0 22px -6px rgba(236, 72, 153, .6), inset 0 0 0 1px rgba(236, 72, 153, .3);
+}
+.cf-railtoggle { box-shadow: 0 0 26px -4px rgba(236, 72, 153, .85); }
+
+/* No white anywhere in the shell — the logo floats on the glass. */
+.cf-rail img { background: none !important; box-shadow: none !important; }
+.cf-rail > div:first-child { background: transparent !important; }
+
+/* Skeletons outside .cf-app too, so a route that mounts before the shell
+   still cannot flash light. */
+.skeleton {
+  background: linear-gradient(90deg, #17171b 25%, #232329 50%, #17171b 75%) !important;
+  background-size: 200% 100%;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   SURGICAL POLISH — anti-glow.
+   Glow is feedback. When everything glows all the time nothing is
+   important, and the data stops being the hero. Everything below either
+   removes a halo added in the previous pass or replaces it with contrast.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Dials: recessed, not floating. Dark track, solid high-contrast fill,
+   no drop-shadow at all. */
+.cf-gauge__fill { filter: none !important; }
+.cf-gauge__track { stroke: #27272A !important; stroke-width: 9 !important; }
+.cf-gauge__fill  { stroke-width: 9 !important; }
+.cf-gauge__value { font-weight: 500; font-size: 25px !important; }
+.cf-gauge__value.is-long { font-size: 20px !important; }
+.cf-gauge__label { color: #8A8781 !important; letter-spacing: .1em !important; }
+.cf-gauge__foot  { color: #57544E !important; opacity: 1 !important; }
+
+/* Connectors: clean solid line. Colour carries the conversion, nothing else. */
+.cf-link__track {
+  height: 26px !important; width: 2px !important;
+  background: #27272A !important; box-shadow: none !important;
+}
+@media (min-width: 1100px) {
+  .cf-link__track { height: 2px !important; width: 100% !important; }
+}
+.cf-link__track > i { box-shadow: none !important; filter: none !important; }
+
+/* Cards: keep the etched edge, drop the bloom. */
+.cf-panel, .cf-node { box-shadow: none !important; }
+.cf-panel::before, .cf-node::before {
+  background: linear-gradient(to bottom right, rgba(255,255,255,.10), rgba(255,255,255,.02) 40%, transparent 68%);
+}
+.cf-node:hover { border-color: rgba(255,255,255,.16) !important; }
+
+/* Badge: a quiet chip, no halo and no pulse. */
+.cf-badge-live {
+  color: #6EE7B7; background: rgba(255,255,255,.05);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.10) !important;
+}
+.cf-badge-live i { animation: none !important; }
+
+/* Nav: a rule on the left and a 5% tint. No block, no glow. */
+.cf-app .cf-rail a[aria-current="page"],
+.cf-app .cf-rail a.active,
+.cf-app .cf-rail a[class*="bg-pink-50"] {
+  background: rgba(255,255,255,.05) !important;
+  color: #FAFAF9 !important;
+  box-shadow: inset 2px 0 0 0 #EC4899 !important;
+  border-left-color: transparent !important;
+}
+.cf-railtoggle { box-shadow: 0 2px 10px -2px rgba(0,0,0,.6) !important; }
+
+/* Ambient wash pulled right back — depth, not a light show. */
+.cf-app::before { background: radial-gradient(48% 52% at 26% 0%, rgba(236,72,153,.055), transparent 72%) !important; }
+.cf-app::after {
+  background:
+    radial-gradient(36% 40% at 84% 90%, rgba(56,96,210,.07), transparent 72%) !important;
+}
+
+/* Logo: no chip, no halo, nothing behind it. */
+.cf-rail img, .cf-app .cf-logo {
+  background: none !important; box-shadow: none !important;
+  filter: contrast(1.08) brightness(1.04);
+}
+
+/* ── Date dialog: centre it, cap it, and let nothing white survive ──────
+   It was anchored right:24px/top:80px, so on a narrower viewport it ran off
+   the side and past the fold. Centred and height-capped it always fits. */
+.cf-dr__panel {
+  position: fixed !important;
+  left: 50% !important; top: 50% !important; right: auto !important;
+  transform: translate(-50%, -50%) !important;
+  width: min(1040px, calc(100vw - 3rem)) !important;
+  max-height: min(86vh, 780px) !important;
+  overflow: auto !important;
+  box-shadow: 0 40px 100px -30px rgba(0,0,0,.95) !important;
+}
+.cf-dr__panel.scale-95 { transform: translate(-50%, -50%) scale(.97) !important; }
+/* Catch-all: every background inside the dialog is cleared, then the two
+   that are meant to be coloured are put back. A white panel cannot survive
+   a rule it has to opt out of. */
+.cf-dr__panel [class*="bg-"] { background: transparent !important; }
+.cf-dr__panel [class*="bg-[#FF6B8A]"],
+.cf-dr__panel [class*="bg-[#EC4899]"],
+.cf-dr__panel [class*="bg-gradient"] { background: #EC4899 !important; color: #fff !important; }
+.cf-dr__panel button:hover { background: rgba(255,255,255,.06) !important; }
+
+/* A node that opens something looks like it does. */
+.cf-node--click { cursor: pointer; text-align: left; font: inherit; color: inherit; width: 100%; }
+.cf-node--click:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.cf-node--click:hover .cf-node__value { color: #fff; }
+
+/* ── Sales Desk boards ───────────────────────────────────────────────── */
+.cf-board {
+  display: grid; gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+/* Eleven stages will not fit as equal columns on any screen, so the sales
+   board scrolls sideways in its own container and the page never does. */
+.cf-board--wide {
+  display: flex; overflow-x: auto; padding-bottom: 6px;
+  scroll-snap-type: x proximity;
+}
+.cf-board--wide > * { flex: 0 0 232px; scroll-snap-align: start; }
+@media (max-width: 900px) {
+  .cf-board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.cf-col {
+  background: rgba(255,255,255,.03);
+  border: 1px solid var(--edge);
+  border-radius: 14px; padding: 10px;
+  display: flex; flex-direction: column; min-height: 150px;
+  transition: background .15s, border-color .15s;
+}
+/* The drop target has to be obvious mid-drag, when the cursor is nowhere near
+   the column header. */
+.cf-col.is-over { background: rgba(236,72,153,.10); border-color: rgba(236,72,153,.55); }
+.cf-col__head { display: flex; align-items: center; gap: 7px; margin-bottom: 2px; }
+.cf-col__dot { width: 6px; height: 6px; border-radius: 999px; flex: none; }
+.cf-col__title {
+  font-family: 'DM Mono', ui-monospace, monospace; font-size: 10px;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cf-col__count {
+  margin-left: auto; font-family: 'DM Mono', ui-monospace, monospace;
+  font-size: 11px; color: var(--ink);
+}
+.cf-col__value {
+  font-family: 'DM Mono', ui-monospace, monospace; font-size: 11px;
+  color: var(--faint); margin-bottom: 8px;
+}
+.cf-col__body { display: flex; flex-direction: column; gap: 6px; max-height: 380px; overflow-y: auto; }
+.cf-col__empty { font-size: 11px; color: var(--faint); text-align: center; padding: 14px 0; }
+
+.cf-card {
+  background: rgba(255,255,255,.05);
+  border: 1px solid var(--edge);
+  border-radius: 10px; padding: 8px 10px;
+  cursor: grab; transition: transform .15s, border-color .15s, opacity .15s;
+}
+.cf-card:hover { border-color: var(--edge-hi); transform: translateY(-1px); }
+.cf-card:active { cursor: grabbing; }
+.cf-card.is-dim { opacity: .45; pointer-events: none; }
+.cf-card__name { font-size: 12px; color: var(--ink); font-weight: 500; }
+.cf-card__meta { font-size: 10px; color: var(--faint); margin-top: 3px; }
+.cf-card__row { display: flex; align-items: center; justify-content: space-between; margin-top: 5px; gap: 6px; }
+.cf-card__money { font-family: 'DM Mono', ui-monospace, monospace; font-size: 11px; color: var(--ink); }
+.cf-card__age { font-family: 'DM Mono', ui-monospace, monospace; font-size: 10px; color: var(--faint); }
+.cf-card__age.is-old { color: #FBBF24; }
+.cf-card__tag {
+  display: inline-block; margin-top: 5px; font-size: 9px; letter-spacing: .04em;
+  color: #93B4FB; background: rgba(96,165,250,.12); border-radius: 999px; padding: 1px 6px;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cf-card__link {
+  display: inline-flex; align-items: center; gap: 3px; margin-top: 5px;
+  font-size: 10px; color: var(--brand);
+}
+
+.cf-stalled { display: flex; flex-direction: column; gap: 1px; }
+.cf-stalled__row {
+  display: grid; grid-template-columns: 1fr 150px 100px 44px; gap: 10px;
+  align-items: center; padding: 7px 2px; border-bottom: 1px solid var(--edge);
+  font-size: 12px;
+}
+.cf-stalled__row:last-child { border-bottom: 0; }
+.cf-stalled__name { color: var(--ink); }
+.cf-stalled__stage { color: var(--muted); font-size: 11px; }
+.cf-stalled__money, .cf-stalled__age {
+  font-family: 'DM Mono', ui-monospace, monospace; font-size: 11px;
+  color: var(--faint); text-align: right;
+}
+@media (max-width: 780px) {
+  .cf-stalled__row { grid-template-columns: 1fr 64px; }
+  .cf-stalled__stage, .cf-stalled__money { display: none; }
+}
+
+.cf-saving {
+  position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); z-index: 60;
+  display: flex; align-items: center; gap: 7px;
+  background: #16161A; border: 1px solid var(--edge); border-radius: 999px;
+  padding: 7px 14px; font-size: 12px; color: var(--muted);
+}
+
+.cf-card__money--set {
+  background: none; border: 0; padding: 0; cursor: pointer;
+  text-align: left; transition: color .15s;
+}
+.cf-card__money--set:hover { color: var(--brand); }
+.cf-card__money--set.is-empty { color: var(--faint); font-style: normal; }
+.cf-card__money--set.is-empty:hover { color: var(--brand); }
+.cf-seg-btn {
+  font-size: 11px; padding: 4px 10px; border-radius: 999px;
+  border: 1px solid var(--edge); color: var(--muted); white-space: nowrap;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.cf-seg-btn:hover { color: var(--ink); background: rgba(255,255,255,.05); }
+.cf-seg-btn.is-on { background: var(--brand); color: #fff; border-color: var(--brand); }
+
+.cf-emptyrange {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: rgba(245,158,11,.08); border: 1px solid rgba(245,158,11,.28);
+  border-radius: 12px; padding: 10px 14px; margin-bottom: 12px;
+  font-size: 12px; color: #FBBF24;
+}
+.cf-emptyrange em { font-style: normal; color: #fff; }
+.cf-emptyrange__btn {
+  margin-left: auto; font-size: 11px; padding: 4px 12px; border-radius: 999px;
+  background: var(--brand); color: #fff; white-space: nowrap;
+}
+
+/* ── The lead record ─────────────────────────────────────────────────── */
+.cf-ld__scrim {
+  position: fixed; inset: 0; z-index: 70;
+  background: rgba(4,4,6,.72);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+/* Full screen rather than a side drawer: this is the whole record of a person,
+   not a sidebar note, and the calls, thread and journey all need width. */
+.cf-ld {
+  width: min(1180px, 100%); height: min(92vh, 100%);
+  overflow-y: auto; border-radius: 18px;
+  background: #121216; border: 1px solid var(--edge);
+  box-shadow: 0 40px 120px -30px rgba(0,0,0,.95);
+  display: flex; flex-direction: column;
+}
+/* Two columns once there is room, so the conversation sits beside the facts
+   instead of below a long scroll. */
+@media (min-width: 1000px) {
+  .cf-ld__body { display: grid; grid-template-columns: 1fr 1fr; align-items: start; }
+  .cf-ld__body > .cf-ld__grid,
+  .cf-ld__body > .cf-ld__killed,
+  .cf-ld__body > .cf-ld__ghl { grid-column: 1 / -1; }
+}
+@media (max-width: 640px) {
+  .cf-ld__scrim { padding: 0; }
+  .cf-ld { height: 100vh; border-radius: 0; }
+}
+.cf-ld__head {
+  position: sticky; top: 0; z-index: 2;
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 16px 18px; background: #121216; border-bottom: 1px solid var(--edge);
+}
+.cf-ld__name { margin: 0; font-size: 17px; font-weight: 600; color: var(--ink); }
+.cf-ld__sub { margin: 3px 0 0; font-size: 12px; color: var(--muted); }
+.cf-ld__x {
+  margin-left: auto; flex: none; display: inline-flex; align-items: center; gap: 6px;
+  color: var(--muted); padding: 6px 12px; border-radius: 999px;
+  border: 1px solid var(--edge); font-size: 12px;
+}
+.cf-ld__x:hover { color: var(--ink); background: rgba(255,255,255,.08); border-color: var(--edge-hi); }
+.cf-ld__x:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.cf-ld__body { padding: 14px 18px 40px; display: flex; flex-direction: column; gap: 12px; }
+
+.cf-ld__grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px 16px; }
+.cf-ld__grid > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cf-ld__grid span { font-family: 'DM Mono', ui-monospace, monospace; font-size: 9px;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--faint); }
+.cf-ld__grid b { font-weight: 500; font-size: 12px; color: var(--ink); word-break: break-word; }
+
+.cf-ld__killed {
+  font-size: 12px; color: #FB7185; background: rgba(244,63,94,.10);
+  border: 1px solid rgba(244,63,94,.24); border-radius: 10px; padding: 8px 12px; margin: 0;
+}
+.cf-ld__ghl { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--brand); }
+
+.cf-ld__sec { border: 1px solid var(--edge); border-radius: 12px; overflow: hidden; }
+.cf-ld__sechead {
+  width: 100%; display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px; background: rgba(255,255,255,.03);
+  font-size: 12px; font-weight: 500; color: var(--ink);
+}
+.cf-ld__sechead:hover { background: rgba(255,255,255,.06); }
+.cf-ld__count {
+  font-family: 'DM Mono', ui-monospace, monospace; font-size: 10px;
+  color: var(--muted); background: rgba(255,255,255,.06); border-radius: 999px; padding: 1px 7px;
+}
+.cf-ld__chev { margin-left: auto; color: var(--faint); font-size: 14px; }
+.cf-ld__secbody { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+
+.cf-ld__call { border-top: 1px solid var(--edge); padding-top: 9px; }
+.cf-ld__call:first-child { border-top: 0; padding-top: 0; }
+.cf-ld__callhead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cf-ld__pill {
+  font-size: 10px; padding: 2px 8px; border-radius: 999px;
+  background: rgba(255,255,255,.07); color: var(--muted);
+}
+.cf-ld__pill.is-good { background: rgba(16,185,129,.16); color: #6EE7B7; }
+.cf-ld__meta { font-size: 11px; color: var(--faint); }
+.cf-ld__meta.is-bad { color: #FB7185; }
+.cf-ld__summary { margin: 6px 0 0; font-size: 12px; line-height: 1.55; color: var(--muted); }
+
+.cf-ld__rec { display: inline-flex; align-items: center; gap: 6px; }
+.cf-ld__play {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10px; padding: 3px 9px; border-radius: 999px;
+  background: rgba(236,72,153,.14); color: #F9A8D4;
+}
+.cf-ld__play:disabled { opacity: .5; }
+.cf-ld__recnote, .cf-ld__norec { font-size: 10px; color: var(--faint); }
+.cf-ld__audio { display: block; width: 100%; margin-top: 6px; height: 30px; }
+.cf-ld__audio:not([controls]) { display: none; }
+
+/* A call transcript, split so the lead's words are visibly theirs. */
+.cf-ld__transcript { margin-top: 8px; display: flex; flex-direction: column; gap: 4px;
+  max-height: 260px; overflow-y: auto; }
+.cf-ld__line { display: flex; gap: 8px; font-size: 12px; line-height: 1.5; }
+.cf-ld__who {
+  font-family: 'DM Mono', ui-monospace, monospace; font-size: 9px;
+  text-transform: uppercase; letter-spacing: .1em; flex: none; width: 44px; padding-top: 3px;
+}
+.cf-ld__line--lead { color: var(--ink); }
+.cf-ld__line--lead .cf-ld__who { color: #6EE7B7; }
+.cf-ld__line--us { color: var(--muted); }
+.cf-ld__line--us .cf-ld__who { color: var(--faint); }
+
+.cf-ld__thread { display: flex; flex-direction: column; gap: 8px; max-height: 460px; overflow-y: auto; }
+.cf-ld__msg { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.cf-ld__msg.is-them { align-items: flex-start; }
+.cf-ld__bubble {
+  max-width: 78%; font-size: 12px; line-height: 1.5; padding: 7px 11px; border-radius: 12px;
+  background: rgba(236,72,153,.14); color: var(--ink);
+}
+.cf-ld__msg.is-them .cf-ld__bubble { background: rgba(255,255,255,.07); }
+.cf-ld__msgmeta { font-size: 9px; color: var(--faint); }
+
+.cf-ld__row { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--ink);
+  padding: 5px 0; border-bottom: 1px solid var(--edge); }
+.cf-ld__row:last-child { border-bottom: 0; }
+.cf-ld__link { font-size: 11px; color: var(--brand); }
+.cf-ld__qa { border-top: 1px solid var(--edge); padding-top: 8px; }
+.cf-ld__qa:first-child { border-top: 0; padding-top: 0; }
+.cf-ld__qahead { display: flex; align-items: center; gap: 8px; }
+.cf-ld__qatitle { margin: 5px 0 0; font-size: 12px; color: var(--ink); font-weight: 500; }
+.cf-ld__empty { font-size: 12px; color: var(--faint); text-align: center; padding: 12px 0; margin: 0; }
+
+@media (max-width: 640px) {
+  .cf-ld__grid { grid-template-columns: 1fr; }
+  .cf-ld { width: 100vw; }
+}
+
+/* ── Prep sheet: what you need in the minute before a call ───────────── */
+.cf-prep {
+  width: min(560px, 100%); max-height: min(88vh, 100%);
+  overflow-y: auto; border-radius: 18px;
+  background: #121216; border: 1px solid var(--edge);
+  box-shadow: 0 40px 120px -30px rgba(0,0,0,.95);
+  display: flex; flex-direction: column;
+}
+.cf-prep__when { margin: 4px 0 0; display: flex; align-items: center; gap: 6px;
+  font-size: 12px; color: #6EE7B7; }
+.cf-prep__body { padding: 16px 18px 26px; display: flex; flex-direction: column; gap: 14px; }
+.cf-prep__contact { display: flex; gap: 8px; flex-wrap: wrap; }
+.cf-prep__phone, .cf-prep__join {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; padding: 6px 12px; border-radius: 999px;
+  border: 1px solid var(--edge); color: var(--ink);
+}
+.cf-prep__join { background: rgba(236,72,153,.14); color: #F9A8D4; border-color: transparent; }
+.cf-prep__phone:hover, .cf-prep__join:hover { background: rgba(255,255,255,.08); }
+
+.cf-prep__facts { margin: 0; display: flex; flex-direction: column; gap: 0; }
+.cf-prep__facts > div {
+  display: grid; grid-template-columns: 148px 1fr; gap: 12px;
+  padding: 9px 0; border-bottom: 1px solid var(--edge);
+}
+.cf-prep__facts > div:last-child { border-bottom: 0; }
+.cf-prep__facts dt {
+  font-family: 'DM Mono', ui-monospace, monospace; font-size: 9px;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--faint); padding-top: 2px;
+}
+.cf-prep__facts dd { margin: 0; font-size: 13px; color: var(--ink); line-height: 1.45; }
+
+.cf-prep__none {
+  margin: 0; font-size: 12px; line-height: 1.6; color: #FBBF24;
+  background: rgba(245,158,11,.08); border: 1px solid rgba(245,158,11,.26);
+  border-radius: 12px; padding: 11px 14px;
+}
+.cf-prep__quote {
+  margin: 0; font-size: 13px; line-height: 1.55; color: var(--ink);
+  border-left: 2px solid var(--brand); padding: 2px 0 2px 12px;
+}
+.cf-prep__quote cite { display: block; margin-top: 5px; font-style: normal;
+  font-size: 10px; color: var(--faint); }
+.cf-prep__call { display: flex; flex-direction: column; gap: 4px; }
+.cf-prep__lbl {
+  font-family: 'DM Mono', ui-monospace, monospace; font-size: 9px;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--faint);
+}
+.cf-prep__call p { margin: 0; font-size: 12px; line-height: 1.55; color: var(--muted); }
+.cf-prep__ad { margin: 0; display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: var(--faint); }
+.cf-prep__ad b { color: #93B4FB; font-weight: 500; }
+.cf-card.is-clickable { cursor: pointer; }
+@media (max-width: 640px) {
+  .cf-prep { height: 100vh; border-radius: 0; }
+  .cf-prep__facts > div { grid-template-columns: 1fr; gap: 2px; }
+}
+
+.cf-prep__block { display: flex; flex-direction: column; gap: 6px; }
+.cf-prep__lbl { display: inline-flex; align-items: center; gap: 5px; }
+.cf-prep__summary {
+  margin: 0; font-size: 13px; line-height: 1.6; color: var(--ink);
+  white-space: pre-line;   /* the CRM summary arrives as a bulleted block */
+  background: rgba(255,255,255,.04); border: 1px solid var(--edge);
+  border-radius: 12px; padding: 11px 13px;
+}
+.cf-prep__note { margin: 0; font-size: 12px; line-height: 1.55; color: var(--muted); }
+.cf-prep__words { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.cf-prep__words li {
+  font-size: 12.5px; line-height: 1.5; color: var(--ink);
+  border-left: 2px solid var(--brand); padding-left: 11px;
+}
+.cf-prep__foot {
+  display: flex; flex-wrap: wrap; gap: 6px 16px;
+  border-top: 1px solid var(--edge); padding-top: 11px; margin-top: 2px;
+}
+
+.cf-ld__stage {
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(255,255,255,.04); border: 1px solid var(--edge);
+  border-radius: 12px; padding: 9px 12px;
+}
+.cf-ld__stage > span {
+  font-family: 'DM Mono', ui-monospace, monospace; font-size: 9px;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--faint); flex: none;
+}
+.cf-ld__stage select {
+  flex: 1; min-width: 0; font-size: 12px; color: var(--ink);
+  background: rgba(255,255,255,.05); border: 1px solid var(--edge);
+  border-radius: 8px; padding: 5px 9px;
+}
+.cf-ld__stage select:disabled { opacity: .5; }
+.cf-ld__stage option { background: #16161A; color: var(--ink); }
+
+.cf-noevent {
+  margin-top: 10px; padding: 10px 12px; border-radius: 12px;
+  background: rgba(245,158,11,.07); border: 1px solid rgba(245,158,11,.22);
+  display: flex; flex-direction: column; gap: 7px;
+}
+.cf-noevent__lbl {
+  font-family: 'DM Mono', ui-monospace, monospace; font-size: 10px;
+  letter-spacing: .1em; text-transform: uppercase; color: #FBBF24;
+}
+.cf-noevent__list { display: flex; flex-wrap: wrap; gap: 6px; }
+.cf-noevent__chip {
+  font-size: 11px; padding: 4px 10px; border-radius: 999px;
+  background: rgba(255,255,255,.06); color: var(--ink); border: 1px solid var(--edge);
+}
+.cf-noevent__chip:hover { border-color: var(--edge-hi); background: rgba(255,255,255,.1); }

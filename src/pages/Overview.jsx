@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useDashboardAdOptions, useDashboardContactsByBucket, useTargets } from '../hooks/useDashboardData'
-import { useDashboardOverview } from '../hooks/useDashboardOverview'
+import { useDashboardOverview, useCfGrowth } from '../hooks/useDashboardOverview'
+import { PipelineFlow, Gauge, GrowthChart, Panel } from '../components/ui/Console'
 import KPICard from '../components/ui/KPICard'
 import InsightsFeed from '../components/ui/InsightsFeed'
 import Funnel from '../components/ui/Funnel'
@@ -74,6 +75,15 @@ export default function Overview() {
   const { data: activeLeads, loading: activeLeadsLoading, error: activeLeadsError } = useDashboardContactsByBucket('leads')
   const { data: activePipeline, loading: pipelineLoading, error: pipelineError } = useDashboardContactsByBucket('active')
   const { data: adOptions } = useDashboardAdOptions()
+  const { data: growth } = useCfGrowth(dateRange.from, dateRange.to)
+  const [chartMetric, setChartMetric] = useState('leads')
+  const leadsRef = useRef(null)
+  const showEveryLead = () => {
+    setActiveLeadStageFilter('all')
+    setActiveLeadSourceFilter('all')
+    setShowAllLeads(true)
+    leadsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
   const [showAllLeads, setShowAllLeads] = useState(false)
   const [activeLeadStageFilter, setActiveLeadStageFilter] = useState('all')
   const [activeLeadSourceFilter, setActiveLeadSourceFilter] = useState('all')
@@ -102,6 +112,11 @@ export default function Overview() {
   const pipelineValue = overview?.pipeline_value ?? null
   const costPerCustomer = overview?.cost_per_customer ?? null
   const winRate = overview?.win_rate ?? null
+  // Migration 158 ships the denominator alongside the rate, because 100% off a
+  // single finished deal is what this window actually holds.
+  const winRateN = overview?.win_rate_n ?? null
+  const winRateAll = overview?.win_rate_alltime ?? null
+  const windowDays = overview?.window_days ?? null
   const closedWon = overview?.closed_won ?? 0
   const totalSpend = overview?.total_spend ?? 0
   const closedRevenue = overview?.closed_revenue ?? 0
@@ -199,6 +214,9 @@ export default function Overview() {
   if (activeOpps > 0) insights.push({ severity: 'info', title: `${activeOpps} active opportunities — total value AED ${(overview?.pipeline_value ?? 0).toLocaleString()}`, href: '/revenue' })
 
   return (
+    // Everything Home renders sits inside the console, so the light components
+    // it already uses (funnel, active leads, insights) inherit the dark ground
+    // from the scoped overrides in index.css rather than being rewritten.
     <div>
       <DailyAISummaryModal />
 
@@ -212,37 +230,79 @@ export default function Overview() {
         </div>
       )}
 
-      <h2 className="text-xs font-semibold uppercase tracking-wide text-[#6B7280] mb-3">Volume</h2>
+      {/* The five stages and the four ratios between them. Every card that used
+          to sit here was one of those nine, cut out of the sequence it belongs
+          to and laid in a grid. */}
       <ErrorBoundary>
         {overviewError && !overviewLoading ? (
-          <div className="bg-white rounded-xl border border-[#E5E7EB] p-8 text-center mb-6">
-            <p className="text-sm text-[#B91C1C]">KPI data is unavailable right now.</p>
+          <div className="cf-panel mb-5 text-center">
+            <p className="text-sm text-[#F43F5E]">KPI data is unavailable right now.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">
-            <KPICard label="Total Spend" value={totalSpend} prefix="AED " inverse={true} loading={overviewLoading} description="What you spent on ads this period" target={spendTarget} missingNote="No ad spend recorded for these dates" fromPrevious={attributedLeads ? { value: attributedLeads, label: "leads came from these ads" } : null} />
-            <KPICard label="Total Leads" value={totalLeads} loading={overviewLoading} description="People who raised their hand interested in you" target={leadsTarget} fromPrevious={step(attributedLeads, totalLeads, "of them came from ads")} />
-            <KPICard label="Meetings Booked" value={meetingsBooked} loading={overviewLoading} description="Sales conversations Sarah booked" target={meetingsTarget} fromPrevious={step(meetingsBooked, totalLeads, "of leads booked")} />
-            <KPICard label="Showed Up" value={showedUp} loading={overviewLoading} description="People who actually attended their meeting" target={showsTarget} fromPrevious={step(showedUp, meetingsBooked, "of booked meetings")} />
-            <KPICard label="Pipeline Value" value={pipelineValue} prefix="AED " loading={overviewLoading} description="Money sitting in deals that are still open" target={pipelineTarget} missingNote="No open deals in the sales pipeline" fromPrevious={activeOpps ? { value: activeOpps, label: "open deals, live right now" } : null} />
-            <KPICard label="Closed Won" value={closedWon} loading={overviewLoading} description="New customers who signed and paid" target={closesTarget} missingNote="No deals recorded yet" fromPrevious={step(closedWon, showedUp, "of people who showed up")} />
+          <div className="mb-5">
+            <div className="cf-eyebrow mb-2.5">The pipeline · {windowDays} days</div>
+            <PipelineFlow kpis={overview} growth={growth} onShowLeads={showEveryLead} />
           </div>
         )}
       </ErrorBoundary>
 
-      <h2 className="text-xs font-semibold uppercase tracking-wide text-[#6B7280] mb-3">Unit Economics</h2>
+      {/* Efficiency. Radial rather than numeric because the question is always
+          "how close to target", and an arc answers that without arithmetic. */}
       <ErrorBoundary>
         {overviewError && !overviewLoading ? null : (
-          <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">
-            <KPICard label="Cost per Lead" value={cpl} prefix="AED " decimals={2} inverse={true} loading={overviewLoading} description="Ad spend divided by the leads those ads produced" target={cplTarget} missingNote="No ad spend, or no leads from ads, in this range" recommendation="If CPL is above target, pause underperforming ads." />
-            <KPICard label="Cost per Meeting" value={costPerMeeting} prefix="AED " decimals={2} inverse={true} loading={overviewLoading} description="What each booked sales conversation costs you" target={costPerMeetingTarget} missingNote="No ad spend, or no meetings, in this range" />
-            <KPICard label="Cost per Customer" value={costPerCustomer} prefix="AED " decimals={0} inverse={true} loading={overviewLoading} description="Ad spend divided by the customers who signed and paid" target={costPerCustomerTarget} missingNote="No deals closed in this range" />
-            <KPICard label="Show Rate" value={showRate} suffix="%" loading={overviewLoading} description="Out of 10 booked meetings, how many show up" target={showRateTarget} recommendation="Add WhatsApp reminders 24h and 1h before meetings." />
-            <KPICard label="Win Rate" value={winRate} suffix="%" decimals={1} loading={overviewLoading} description="Of the deals that finished, how many you won" target={winRateTarget} missingNote="No deals have finished in this range" recommendation="Losses cluster at Proposal Sent and Ghosting. Chase those two stages first." />
-            <KPICard label="ROAS" value={roas} suffix="x" loading={overviewLoading} description="For every AED spent, how many you make back" target={roasTarget} missingNote="Needs both ad spend and a closed deal" recommendation="Close active opportunities to improve ROAS." />
-          </div>
+          <Panel eyebrow="Unit economics" title="Are the ads paying for themselves?"
+                 right={<span className="text-[11px] text-[#57544E]">hover a dial for its definition</span>}>
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-2">
+              <Gauge label="Cost / lead"
+                     display={cpl ? `${Math.round(cpl)}` : '—'}
+                     pct={cpl ? Math.min(100, (cplTarget / cpl) * 100) : null}
+                     tone={cpl && cpl <= cplTarget ? '#10B981' : '#F43F5E'}
+                     hint="Ad spend divided by the leads those ads produced. Lower is better."
+                     footnote={`AED · target ${cplTarget}`} />
+              <Gauge label="Cost / meeting"
+                     display={costPerMeeting ? `${Math.round(costPerMeeting)}` : '—'}
+                     pct={costPerMeeting ? Math.min(100, (costPerMeetingTarget / costPerMeeting) * 100) : null}
+                     tone={costPerMeeting && costPerMeeting <= costPerMeetingTarget ? '#10B981' : '#F43F5E'}
+                     hint="What each booked sales conversation costs you. Lower is better."
+                     footnote={`AED · target ${costPerMeetingTarget}`} />
+              <Gauge label="Cost / customer"
+                     display={costPerCustomer ? `${Math.round(costPerCustomer)}` : '—'}
+                     pct={costPerCustomer ? Math.min(100, (costPerCustomerTarget / costPerCustomer) * 100) : null}
+                     tone={costPerCustomer && costPerCustomer <= costPerCustomerTarget ? '#10B981' : '#F43F5E'}
+                     hint="Ad spend divided by the customers who signed and paid. Lower is better."
+                     footnote={`AED · target ${costPerCustomerTarget}`} />
+              <Gauge label="Win rate"
+                     display={winRate == null ? '—' : `${winRate}%`}
+                     pct={winRate == null ? null : Math.min(100, (winRate / winRateTarget) * 100)}
+                     tone={winRate != null && winRate >= winRateTarget ? '#10B981' : '#F59E0B'}
+                     hint="Of the deals that finished in this range, how many you won. Open deals are excluded."
+                     /* The denominator travels with the rate. 100% off one deal
+                        and 100% off forty are the same number, not the same
+                        fact — and this window holds exactly one. */
+                     footnote={winRateN != null
+                       ? `${winRateN} deal${winRateN === 1 ? '' : 's'} finished · ${winRateAll}% all-time`
+                       : `target ${winRateTarget}%`} />
+              <Gauge label="ROAS"
+                     display={roas ? `${Number(roas).toFixed(1)}x` : '—'}
+                     pct={roas ? Math.min(100, (roas / roasTarget) * 100) : null}
+                     tone={roas && roas >= roasTarget ? '#10B981' : '#F59E0B'}
+                     hint="For every AED spent, how many you make back."
+                     footnote={`target ${roasTarget}x`} />
+            </div>
+          </Panel>
         )}
       </ErrorBoundary>
+
+      {/* Direction. Twelve numbers and no trend was the gap — a single instant
+          cannot say whether this is the best week or the worst. */}
+      <ErrorBoundary>
+        <div className="mt-5">
+          <Panel>
+            <GrowthChart growth={growth} metric={chartMetric} onMetric={setChartMetric} />
+          </Panel>
+        </div>
+      </ErrorBoundary>
+      <div className="h-5" />
 
       <ErrorBoundary>
         <div className="bg-white rounded-xl border border-[#E5E7EB] p-6 shadow-sm mb-6">
@@ -256,7 +316,7 @@ export default function Overview() {
       </ErrorBoundary>
 
       <ErrorBoundary>
-        <div className="bg-white rounded-xl border border-[#E5E7EB] p-6 shadow-sm mb-6">
+        <div ref={leadsRef} className="bg-white rounded-xl border border-[#E5E7EB] p-6 shadow-sm mb-6 scroll-mt-20">
           <div className="flex items-center justify-between gap-4 mb-4">
             <div>
               <h2 className="text-sm font-bold text-[#0F0F1A] mb-1">Active Leads</h2>

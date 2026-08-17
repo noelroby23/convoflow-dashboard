@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ConvoFlow Dashboard</title>
+    <script>
+      // Pre-boot error reporter.
+      //
+      // A React error boundary cannot catch a failure that happens while the
+      // module graph is still being evaluated — the app never mounts, and the
+      // page stays pure white with nothing to act on. This catches that case
+      // and prints the reason into the page.
+      (function () {
+        var shown = false
+        function show(title, detail) {
+          if (shown) return
+          shown = true
+          var root = document.getElementById('root')
+          if (!root) return
+          root.innerHTML =
+            '<div style="min-height:100vh;background:#FAFAFA;padding:40px;' +
+            'font-family:ui-sans-serif,system-ui,sans-serif">' +
+            '<div style="max-width:860px;margin:0 auto;background:#fff;' +
+            'border:1px solid #FECDD3;border-radius:16px;padding:28px">' +
+            '<h1 style="margin:0;font-size:18px;color:#9F1239">Dashboard failed to start</h1>' +
+            '<p style="color:#6B7280;font-size:14px;margin:6px 0 0">' + title + '</p>' +
+            '<pre style="margin-top:16px;padding:14px;background:#FFF1F2;border-radius:10px;' +
+            'font-size:12px;white-space:pre-wrap;color:#881337">' + detail + '</pre>' +
+            '</div></div>'
+        }
+        window.addEventListener('error', function (e) {
+          show('A script failed while loading.',
+               (e.message || 'unknown') + '\n\n' + (e.filename || '') + ':' + (e.lineno || '') +
+               '\n\n' + ((e.error && e.error.stack) || ''))
+        })
+        window.addEventListener('unhandledrejection', function (e) {
+          var r = e.reason
+          show('A promise rejected during startup.',
+               ((r && (r.stack || r.message)) || String(r)))
+        })
+        // If React has not mounted after 6s, something silently stalled.
+        window.setTimeout(function () {
+          var root = document.getElementById('root')
+          if (root && root.children.length === 0) {
+            show('The app loaded but never rendered within 6 seconds.',
+                 'No exception was thrown. This usually means a module hung, ' +
+                 'or the bundle did not execute.\n\nBundle: ' +
+                 (document.querySelector('script[type=module]') || {}).src)
+          }
+        }, 6000)
+      })()
+    </script>
+    <style id="cf-boot">
+      /* Painted before any JS parses, so the first frame is already dark.
+         The flash was the browser rendering default white until React
+         mounted and the themed shell arrived. */
+      html, body, #root { background: #09090b; color: #FAFAF9; }
+    </style>
+    <script type="module" crossorigin src="/assets/index-DBPtd-ie.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-BjYbRWC8.css">
+  </head>
+  <body style="background:#09090b">
+    <div id="root"></div>
+  </body>
+</html>

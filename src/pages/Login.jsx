@@ -27,7 +27,7 @@ export default function Login() {
           {/* Logo */}
           <div className="flex flex-col items-center mb-8">
             <div className="w-16 h-16 mb-4">
-              <img src="/convoflow-logo.png" alt="ConvoFlow" className="w-full h-full object-contain" />
+              <span className="text-2xl font-semibold tracking-tight text-[#EC4899]">ConvoFlow</span>
             </div>
             <h1 className="text-2xl font-bold text-[#EC4899]">ConvoFlow</h1>
             <p className="text-sm text-[#6B7280] mt-1 text-center">Attribution & Performance Dashboard</p>

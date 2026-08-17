@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Search, Loader2, PhoneCall, MessageSquare, GitBranch, Bug, FileText } from 'lucide-react'
 import { lookupLead, useCfQaDigest, useCfEod } from '../hooks/useCfDesk'
 
@@ -27,25 +28,42 @@ function Panel({ title, icon: Icon, children }) {
 }
 
 export default function LeadLookup() {
-  const [q, setQ] = useState('')
+  const [params] = useSearchParams()
+  const [q, setQ] = useState(params.get('q') ?? '')
   const [res, setRes] = useState(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState(null)
   const { data: qa } = useCfQaDigest(7)
   const { data: eod } = useCfEod('uae')
 
-  const search = async (e) => {
-    e?.preventDefault()
-    if (!q.trim()) return
+  const run = async (term) => {
+    const t = (term ?? '').trim()
+    // cf_lead_lookup with an empty q returns found:true and an arbitrary lead
+    // (CLAUDE.md 7.46), so an empty term must never reach it.
+    if (!t) return
     setBusy(true); setErr(null)
     try {
-      setRes(await lookupLead(q.trim()))
+      setRes(await lookupLead(t))
     } catch (e2) {
       setErr(e2.message || 'Lookup failed')
     } finally {
       setBusy(false)
     }
   }
+
+  const search = (e) => { e?.preventDefault(); run(q) }
+
+  // Arriving from a Lead Desk board card: /lead-lookup?q=+9715…
+  // Guarded on the term itself rather than a "did I run" boolean, so clicking a
+  // second lead from the desk searches again instead of showing the first one.
+  const lastAuto = useRef(null)
+  useEffect(() => {
+    const incoming = (params.get('q') ?? '').trim()
+    if (!incoming || lastAuto.current === incoming) return
+    lastAuto.current = incoming
+    setQ(incoming)
+    run(incoming)
+  }, [params])
 
   const lead = res?.lead
 
@@ -152,9 +170,9 @@ export default function LeadLookup() {
             <Panel title="WhatsApp" icon={MessageSquare}>
               <div className="space-y-2 max-h-80 overflow-y-auto">
                 {res.messages?.length ? res.messages.map((m, i) => (
-                  <div key={i} className={`text-sm ${m.dir === 'in' ? '' : 'text-right'}`}>
+                  <div key={i} className={`text-sm ${m.dir === 'inbound' ? '' : 'text-right'}`}>
                     <span className={`inline-block px-3 py-1.5 rounded-2xl ${
-                      m.dir === 'in' ? 'bg-[#F3F4F6]' : 'bg-[#FDF2F8]'}`}>
+                      m.dir === 'inbound' ? 'bg-[#F3F4F6]' : 'bg-[#FDF2F8]'}`}>
                       {m.text}
                     </span>
                     <span className="block text-[11px] text-[#9CA3AF]">{fmt(m.at)}</span>

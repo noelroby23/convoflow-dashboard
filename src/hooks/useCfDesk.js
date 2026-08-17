@@ -68,14 +68,14 @@ export const useCfHeadline = (region = 'uae', range) =>
 export const useCfQueue = () =>
   useCfRpc('cf_dash_queue', { p: {} }, { intervalMs: 10_000 })
 
-export const useCfPipeline = (region = 'uae') =>
-  useCfRpc('cf_dash_pipeline', { p: { region } }, { intervalMs: 30_000 })
+export const useCfPipeline = (region = 'uae', range) =>
+  useCfRpc('cf_dash_pipeline', { p: withRange(region, range) }, { intervalMs: 30_000 })
 
-export const useCfMeetings = (region = 'uae') =>
-  useCfRpc('cf_dash_meetings', { p: { region } }, { intervalMs: 30_000 })
+export const useCfMeetings = (region = 'uae', range) =>
+  useCfRpc('cf_dash_meetings', { p: withRange(region, range) }, { intervalMs: 30_000 })
 
-export const useCfSplit = (view, region = 'uae') =>
-  useCfRpc('cf_dash_split', { p: { region, view } }, { intervalMs: 30_000 })
+export const useCfSplit = (view, region = 'uae', range) =>
+  useCfRpc('cf_dash_split', { p: { ...withRange(region, range), view } }, { intervalMs: 30_000 })
 
 export const useCfQaDigest = (days = 7) =>
   useCfRpc('cf_qa_digest', { p_days: days }, { intervalMs: 120_000 })
@@ -86,8 +86,8 @@ export const useCfEod = (region = 'uae') =>
 export const useCfTargets = (region = 'uae', range) =>
   useCfRpc('cf_dash_targets', { p: withRange(region, range) }, { intervalMs: 60_000 })
 
-export const useCfAttention = (region = 'uae') =>
-  useCfRpc('cf_dash_attention', { p: { region } }, { intervalMs: 30_000 })
+export const useCfAttention = (region = 'uae', range) =>
+  useCfRpc('cf_dash_attention', { p: withRange(region, range) }, { intervalMs: 30_000 })
 
 export const useCfCalls = (region = 'uae', range) =>
   useCfRpc('cf_dash_calls', { p: { ...withRange(region, range), limit: 100 } },
@@ -117,11 +117,11 @@ export const useCfBoard = (region = 'uae', filter = 'all', range, q) =>
 
 // `date` is a yyyy-MM-dd in Dubai; omit for today. Drives the Today/Yesterday
 // toggle without touching the page's main date range, which scopes history.
-export const useCfToday = (region = 'uae', date) =>
-  useCfRpc('cf_dash_today', { p: date ? { region, date } : { region } }, { intervalMs: 30_000 })
+export const useCfToday = (region = 'uae', range) =>
+  useCfRpc('cf_dash_today', { p: withRange(region, range) }, { intervalMs: 30_000 })
 
-export const useCfActivity = (region = 'uae', date) =>
-  useCfRpc('cf_dash_activity', { p: date ? { region, date, limit: 40 } : { region, limit: 40 } },
+export const useCfActivity = (region = 'uae', range) =>
+  useCfRpc('cf_dash_activity', { p: { ...withRange(region, range), limit: 40 } },
            { intervalMs: 20_000 })
 
 export async function lookupLead(q) {

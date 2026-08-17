@@ -77,28 +77,12 @@ export default function AdCreatives() {
           <span className="ml-auto text-xs text-[#9CA3AF]">{range?.from} → {range?.to}</span>
         </div>
 
-        {/* The most important thing on this page. Half the spend sits against
-            ads with no attributed leads, and that is a measurement gap, not a
-            verdict on the creative. Saying so prevents a working ad being
-            switched off on this page's evidence. */}
         {cov && cov.coverage_pct != null && cov.coverage_pct < 90 && (
-          <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl px-4 py-3 text-sm">
-            <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-            <div>
-              <p className="font-medium">
-                Only {pct(cov.coverage_pct)} of leads in this window carry an ad ID
-                ({num(cov.leads_attributed)} of {num(cov.leads_total)}).
-              </p>
-              <p className="text-amber-800 mt-0.5">
-                {num(cov.paid_source_unattributed)} more came from a paid source with no ad
-                recorded, so an ad showing <strong>0 leads</strong> here has not been proven to
-                produce none — we simply cannot tell which ad those leads came from. Historic
-                attribution was inherited from the old system, which only ever tagged some
-                contacts. New leads arriving through <code>cfv2/intake</code> are attributed at
-                source, so this closes on its own from here.
-              </p>
-            </div>
-          </div>
+          <p className="text-xs text-[var(--ink-3)]">
+            {pct(cov.coverage_pct)} of leads in this window carry an ad ID
+            ({num(cov.leads_attributed)} of {num(cov.leads_total)}), so an ad reading 0 leads
+            may simply be unattributed rather than unproductive.
+          </p>
         )}
 
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">

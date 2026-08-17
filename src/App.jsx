@@ -6,8 +6,6 @@ import Layout from './components/Layout/Layout'
 import Login from './pages/Login'
 import Overview from './pages/Overview'
 import AdCreatives from './pages/AdCreatives'
-import LeadTracker from './pages/LeadTracker'
-import ConversationsPage from './pages/ConversationsPage'
 import Trends from './pages/Trends'
 import Health from './pages/Health'
 import Settings from './pages/Settings'
@@ -15,6 +13,7 @@ import SarahsPerformance from './pages/SarahsPerformance'
 import SalesPerformance from './pages/SalesPerformance'
 import Revenue from './pages/Revenue'
 import LeadDesk from './pages/LeadDesk'
+import SalesDesk from './pages/SalesDesk'
 import LeadLookup from './pages/LeadLookup'
 import ReportModal from './components/ui/ReportModal'
 import { Toaster } from 'sonner'
@@ -94,10 +93,8 @@ export default function App() {
     { path: '/trends', component: <Trends /> },
     { path: '/target-progress', component: <Health /> },
     { path: '/health', component: <Health /> },
-    { path: '/lead-tracker', component: <LeadTracker /> },
-    { path: '/leads', component: <LeadTracker /> },
-    { path: '/conversations', component: <ConversationsPage /> },
     { path: '/lead-desk', component: <LeadDesk /> },
+    { path: '/sales-desk', component: <SalesDesk /> },
     { path: '/desk', component: <LeadDesk /> },
     { path: '/lead-lookup', component: <LeadLookup /> },
     { path: '/lookup', component: <LeadLookup /> },

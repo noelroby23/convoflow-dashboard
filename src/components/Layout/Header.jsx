@@ -62,7 +62,7 @@ export default function Header() {
   }
 
   return (
-    <div className="fixed top-0 left-[220px] right-0 h-16 bg-white border-b border-[#E5E7EB] flex items-center justify-between px-6 z-30">
+    <div className="cf-topbar justify-between px-6 w-auto">
       <h1 className="text-lg font-bold text-[#0F0F1A]">{title}</h1>
 
       <div className="flex items-center gap-3">

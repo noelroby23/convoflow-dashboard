@@ -32,19 +32,24 @@ function LeadCard({ lead, onOpen }) {
   return (
     <button
       onClick={() => onOpen?.(lead)}
-      className="w-full text-left bg-white border border-[#E9E9E7] rounded-lg px-2.5 py-2
-                 hover:border-[#C9C8C4] transition-colors"
+      className="group w-full text-left bg-white border border-[#E9E9E7] rounded-lg px-2.5 py-2
+                 transition-[transform,border-color,box-shadow] duration-200
+                 hover:-translate-y-px hover:border-[#C9C8C4]
+                 hover:shadow-[0_2px_10px_rgba(34,33,29,0.07)]
+                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EC4899]
+                 focus-visible:ring-offset-1"
     >
       <div className="flex items-center gap-2">
         <span className="shrink-0 w-7 h-7 rounded-full bg-[#F0EFEC] text-[#6D6B63]
-                         text-[11px] font-semibold grid place-items-center">
+                         text-[11px] font-semibold grid place-items-center
+                         transition-colors duration-200 group-hover:bg-[#22211D] group-hover:text-white">
           {lead.initials || '?'}
         </span>
         <span className="text-sm text-[#22211D] truncate flex-1">{lead.name}</span>
-        <span className="text-[11px] text-[#9CA3AF] shrink-0">{age(lead.age_days)}</span>
+        <span className="font-meter text-[10px] text-[#9CA3AF] shrink-0">{age(lead.age_days)}</span>
       </div>
       <div className="mt-1 pl-9 text-[11px] text-[#6D6B63] truncate">{lead.status}</div>
-      <div className="pl-9 text-[11px] text-[#B5B3AC] truncate">{lead.phone}</div>
+      <div className="pl-9 font-meter text-[10px] text-[#B5B3AC] truncate">{lead.phone}</div>
     </button>
   )
 }
@@ -91,31 +96,9 @@ export function Board({ board, dialing, onOpen }) {
   )
 }
 
-const TODAY_TILES = [
-  { key: 'new_leads',             label: 'New leads' },
-  { key: 'calls_made',            label: 'Calls made' },
-  { key: 'answered',              label: 'Answered' },
-  { key: 'no_answer',             label: 'Didn’t answer' },
-  { key: 'reactivation_made',     label: 'Reactivation calls' },
-  { key: 'reactivation_answered', label: 'Reactivation answered' },
-  { key: 'meetings_booked',       label: 'Meetings booked' },
-  { key: 'reminders_sent',        label: 'Reminders sent' },
-]
-
-export function TodaySoFar({ today }) {
-  return (
-    <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
-      {TODAY_TILES.map(t => (
-        <div key={t.key} className="bg-white border border-[#E9E9E7] rounded-xl px-3 py-2.5">
-          <div className="text-[11px] text-[#6D6B63] leading-tight">{t.label}</div>
-          <div className="text-xl font-semibold text-[#22211D] mt-0.5">
-            {today?.[t.key] ?? '—'}
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}
+/* TodaySoFar lived here — eight equal tiles reading the same cf_dash_today
+   payload. Replaced by TodayRail, which renders it as a funnel so the connect
+   rate is a shape rather than a division the reader has to do. */
 
 const KIND_STYLE = {
   call:     { dot: '#2E62E0', label: 'call' },

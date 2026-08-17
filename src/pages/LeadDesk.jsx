@@ -4,27 +4,21 @@ import {
   Target, BellRing, FileText, ListChecks,
 } from 'lucide-react'
 import {
-  useCfHeadline, useCfQueue, useCfPipeline, useCfMeetings, useCfSplit,
+  useCfQueue, useCfPipeline, useCfMeetings, useCfSplit,
   useCfTargets, useCfAttention, useCfCalls, useCfEod,
   useCfBoard, useCfToday, useCfActivity,
   setLeadState,
 } from '../hooks/useCfDesk'
-import { Board, TodaySoFar, ActivityFeed, BOARD_COLUMNS } from '../components/ui/CommandCenter'
+import { Board, ActivityFeed, BOARD_COLUMNS } from '../components/ui/CommandCenter'
+import TodayRail from '../components/ui/TodayRail'
+import LeadDetail from '../components/ui/LeadDetail'
 import LiveListen from '../components/ui/LiveListen'
 import { exportCsv } from '../lib/exportCsv'
 import { useDashboard } from '../store/dashboard'
 import { toast } from 'sonner'
+import { useNavigate } from 'react-router-dom'
 
 const DUBAI = 'Asia/Dubai'
-// Yesterday in Dubai, as yyyy-MM-dd. Computed in the region's timezone rather
-// than the viewer's, or someone in London gets a different "yesterday".
-const yesterdayDubai = () => {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: DUBAI, year: 'numeric', month: '2-digit', day: '2-digit',
-  }).formatToParts(new Date(Date.now() - 86_400_000))
-  const v = Object.fromEntries(parts.map(p => [p.type, p.value]))
-  return `${v.year}-${v.month}-${v.day}`
-}
 const fmtTime = (iso) =>
   iso ? new Date(iso).toLocaleTimeString('en-GB', { timeZone: DUBAI, hour: '2-digit', minute: '2-digit' }) : '—'
 const fmtDay = (iso) =>
@@ -48,17 +42,6 @@ function Card({ title, icon: Icon, right, children }) {
   )
 }
 
-function Stat({ label, value, suffix, tone }) {
-  return (
-    <div className="bg-white rounded-2xl border border-[#EEE] p-4">
-      <p className="text-xs text-[#6B7280]">{label}</p>
-      <p className={`text-2xl font-semibold mt-1 ${tone || 'text-[#111]'}`}>
-        {value ?? '—'}{value != null && suffix ? <span className="text-base text-[#6B7280]">{suffix}</span> : null}
-      </p>
-    </div>
-  )
-}
-
 function Empty({ children }) {
   return <p className="text-sm text-[#9CA3AF] py-6 text-center">{children}</p>
 }
@@ -69,31 +52,33 @@ export default function LeadDesk() {
   // panels below it — queue, pipeline, meetings, attention — are deliberately
   // "right now" and ignore it; a queue filtered to last month is meaningless.
   const range = useDashboard(s => s.dateRange)
-  const { data: head } = useCfHeadline(region, range)
+  const navigate = useNavigate()
   const { data: queue, loading: qLoading } = useCfQueue()
-  const { data: pipeline } = useCfPipeline(region)
-  const { data: meetings, refresh: refreshMeetings } = useCfMeetings(region)
+  const { data: pipeline } = useCfPipeline(region, range)
+  const { data: meetings, refresh: refreshMeetings } = useCfMeetings(region, range)
   const [view, setView] = useState('followup')
-  const { data: split } = useCfSplit(view, region)
+  const { data: split } = useCfSplit(view, region, range)
   const { data: targets } = useCfTargets(region, range)
-  const { data: attention } = useCfAttention(region)
+  const { data: attention } = useCfAttention(region, range)
   const { data: calls } = useCfCalls(region, range)
   const { data: eod } = useCfEod(region)
   const [busyId, setBusyId] = useState(null)
+  // Clicking any lead opens the whole record — calls with playable audio,
+  // both sides of the WhatsApp thread, journey, QA, what is queued next.
+  const [openLead, setOpenLead] = useState(null)
 
-  // Command Center parity. `day` is its own control, separate from the page's
-  // date range: the range scopes history, this scopes "what happened today".
-  const [day, setDay] = useState('today')
+  // The today/yesterday toggle is gone: it was a second date control that
+  // ignored the header's picker, so the page had two answers to "what period
+  // am I looking at". The header is the only one now.
   const [boardFilter, setBoardFilter] = useState('all')
   const [boardQ, setBoardQ] = useState('')
-  // The board is a live work surface by default. "Use date range" makes it
-  // follow the picker in the header instead, scoped by when the lead arrived.
-  const [boardByDate, setBoardByDate] = useState(false)
-  const dayParam = day === 'today' ? undefined : yesterdayDubai()
-  const { data: today } = useCfToday(region, dayParam)
-  const { data: activity } = useCfActivity(region, dayParam)
+  // The board follows the header's picker, like every other panel. It used to
+  // need a second in-page toggle, which is why setting the range at the top
+  // appeared to do nothing.
+  const { data: today } = useCfToday(region, range)
+  const { data: activity } = useCfActivity(region, range)
   const { data: board } = useCfBoard(
-    region, boardFilter, boardByDate ? range : undefined, boardQ.trim() || undefined)
+    region, boardFilter, range, boardQ.trim() || undefined)
 
   const paused = queue?.global_paused
   const breaker = queue?.breaker_active
@@ -107,7 +92,7 @@ export default function LeadDesk() {
         status: l.status, state: l.state, age_days: l.age_days,
       })))
     if (!rows.length) { toast.error('Nothing on the board to export'); return }
-    exportCsv(rows, `convoflow-board-${day}`)
+    exportCsv(rows, `convoflow-board-${range?.from}_${range?.to}`)
   }
 
   const markAttendance = async (leadId, state) => {
@@ -125,6 +110,7 @@ export default function LeadDesk() {
 
   return (
     <div className="space-y-6">
+      <LeadDetail leadId={openLead} onClose={() => setOpenLead(null)} />
       {(paused || breaker) && (
         <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl px-4 py-3 text-sm">
           <AlertTriangle size={16} />
@@ -134,29 +120,20 @@ export default function LeadDesk() {
         </div>
       )}
 
-      {/* Today so far — the Command Center's opening strip. Reactivation and
-          reminders are here because they answer questions the headline KPIs
-          cannot: how hard is the agent working the old list, and is the
-          meeting machinery actually firing. */}
+      {/* The shift, as a funnel. Deliberately ignores the header's date range —
+          this is "what is happening on the desk", and the range-scoped version
+          of these same numbers lives on Home. Reactivation and reminders sit
+          underneath it because they answer questions the funnel cannot: how
+          hard is the agent working the old list, and is the meeting machinery
+          firing at all. */}
       <section className="space-y-3">
         <div className="flex items-center gap-2">
           <h2 className="text-sm font-semibold text-[#111]">
-            {day === 'today' ? 'Today so far' : 'Yesterday'}
+            {range?.from === range?.to ? 'That day' : `${range?.from} → ${range?.to}`}
           </h2>
-          <div className="inline-flex rounded-lg border border-[#E9E9E7] overflow-hidden">
-            {['today', 'yesterday'].map(d => (
-              <button
-                key={d}
-                onClick={() => setDay(d)}
-                className={`px-2.5 py-1 text-xs capitalize ${
-                  day === d ? 'bg-[#22211D] text-white' : 'bg-white text-[#6D6B63] hover:bg-[#F7F7F6]'
-                }`}
-              >{d}</button>
-            ))}
-          </div>
           <span className="ml-auto text-xs text-[#9CA3AF]">all times Dubai</span>
         </div>
-        <TodaySoFar today={today} />
+        <TodayRail today={today} onFilter={setBoardFilter} />
       </section>
 
       {/* The board. Cards move on their own as calls happen, and the one that
@@ -185,18 +162,6 @@ export default function LeadDesk() {
               className="text-xs px-2.5 py-1 rounded-lg border border-[#E9E9E7] w-44
                          text-[#22211D] placeholder:text-[#9CA3AF] outline-none focus:border-[#C9C8C4]"
             />
-            <button
-              onClick={() => setBoardByDate(v => !v)}
-              title={boardByDate
-                ? `Showing leads that arrived ${range?.from} to ${range?.to}`
-                : 'Showing everything currently in play'}
-              className={`text-xs px-2.5 py-1 rounded-lg border ${
-                boardByDate
-                  ? 'bg-[#22211D] text-white border-[#22211D]'
-                  : 'border-[#E9E9E7] text-[#6D6B63] hover:bg-[#F7F7F6]'}`}
-            >
-              {boardByDate ? 'Date range on' : 'Use date range'}
-            </button>
             <button onClick={exportBoard}
                     className="text-xs px-2.5 py-1 rounded-lg border border-[#E9E9E7] text-[#6D6B63] hover:bg-[#F7F7F6]">
               Export CSV
@@ -205,27 +170,25 @@ export default function LeadDesk() {
         }
       >
         <p className="text-xs text-[#9CA3AF] mb-3">
-          {boardByDate
-            ? `Leads that arrived ${range?.from} → ${range?.to}`
-            : 'Everything currently in play — queued, scheduled, in a cadence, or moved in the last 14 days'}
+          {`Leads that arrived ${range?.from} → ${range?.to}`}
           {boardQ.trim() ? ` · matching “${boardQ.trim()}”` : ''}
         </p>
-        <Board board={board} dialing={queue?.dialing_now} />
+        {/* Every card on this board was a button that did nothing — Board has
+            always taken onOpen and nothing was ever passed. Until the lead
+            drawer is rebuilt it hands the phone to Lead Lookup, which answers
+            the same question with an RPC that already exists. */}
+        <Board
+          board={board}
+          dialing={queue?.dialing_now}
+          onOpen={(lead) => setOpenLead(lead?.lead_id)}
+        />
       </Card>
 
-      {/* "Should simply tell me" — PDF section 10 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
-        <Stat label={range?.from === range?.to ? 'Leads today' : 'Leads'} value={head?.leads_today} />
-        {/* Dials and reached are separate on purpose: 59% of dials never
-            connect (CLAUDE.md 7.7), so one number cannot carry both. */}
-        <Stat label="Dials" value={head?.dials} />
-        <Stat label="Actually reached" value={head?.reached} />
-        <Stat label="Connect rate" value={head?.connect_rate} suffix="%" />
-        <Stat label="Bookings" value={head?.bookings} />
-        <Stat label="Booking % of reached" value={head?.booking_rate} suffix="%" />
-        <Stat label="Show-up (30d)" value={head?.showup_rate_30d} suffix="%" />
-        <Stat label="Close rate (30d)" value={head?.close_rate_30d} suffix="%" />
-      </div>
+      {/* The eight-tile headline row that used to sit here has gone. It said
+          Dials / Actually reached / Connect rate, which is the same reading the
+          funnel above already gives — measured 15 Aug, both rendered 11 / 1 / 9%
+          from the same cf.call rows — and Leads / Bookings / Show-up / Close
+          rate are Home's job. One number, one place. */}
 
       {/* Targets & Progress — PDF 5.9 "KPIs with targets for Ads · Agent · Sales" */}
       <Card title="Targets & progress" icon={Target}>
@@ -295,8 +258,11 @@ export default function LeadDesk() {
                 {queue?.dialing_now?.length ? (
                   queue.dialing_now.map((c, i) => (
                     <div key={i} className="flex items-center gap-2 bg-[#FDF2F8] rounded-lg px-3 py-2">
+                      {/* The one genuinely live thing on the page, so the only
+                          thing that animates continuously. */}
+                      <span className="cf-live-dot w-2 h-2 rounded-full bg-[#14794A] shrink-0" />
                       <span className="text-sm font-medium">{c.name}</span>
-                      <span className="text-xs text-[#6B7280]">since {fmtTime(c.since)}</span>
+                      <span className="font-meter text-[11px] text-[#6B7280]">since {fmtTime(c.since)}</span>
                       {/* VAPI streams the live audio of this call over
                           monitor.listenUrl. Captured by migration 030. */}
                       <span className="ml-auto"><LiveListen listenUrl={c.listen_url} name={c.name} /></span>
@@ -354,7 +320,7 @@ export default function LeadDesk() {
             </thead>
             <tbody className="divide-y divide-[#F3F4F6]">
               {meetings?.length ? meetings.map((m) => (
-                <tr key={m.event_id}>
+                <tr key={m.event_id} onClick={() => setOpenLead(m.lead_id)} className="cursor-pointer hover:bg-white/5">
                   <td className="py-2 whitespace-nowrap">
                     {fmtDay(m.start_at)} <span className="text-[#6B7280]">{fmtTime(m.start_at)}</span>
                     {m.same_day && <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">same-day</span>}
@@ -411,7 +377,7 @@ export default function LeadDesk() {
             </thead>
             <tbody className="divide-y divide-[#F3F4F6]">
               {split?.length ? split.map((l) => (
-                <tr key={l.lead_id}>
+                <tr key={l.lead_id} onClick={() => setOpenLead(l.lead_id)} className="cursor-pointer hover:bg-white/5">
                   <td className="py-2">{l.name}<span className="block text-xs text-[#9CA3AF]">{l.phone}</span></td>
                   <td className="text-xs">{l.state}</td>
                   <td className="tabular-nums">{l.step}</td>
@@ -469,7 +435,7 @@ export default function LeadDesk() {
       {/* What just happened — one merged stream of state changes, calls and
           messages, so the desk shows motion rather than only totals. */}
       <Card title="What just happened" icon={BellRing}
-            right={<span className="text-xs text-[#9CA3AF]">live · {day}</span>}>
+            right={<span className="text-xs text-[#9CA3AF]">{range?.from} → {range?.to}</span>}>
         <ActivityFeed items={activity} />
       </Card>
 

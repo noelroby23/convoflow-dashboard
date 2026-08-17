@@ -194,107 +194,51 @@ export function useFunnelSummary() {
 }
 
 export function useAdPerformance() {
-  const { currentClientId, dateRange, refreshKey } = useDashboardQueryState()
+  const { dateRange, refreshKey } = useDashboardQueryState()
   return useSupabaseQuery(
     async () => {
-      const { data, error } = await supabase.rpc('dashboard_ad_performance', {
-        p_start_date: dateRange.from,
-        p_end_date: dateRange.to,
-        p_client_id: currentClientId,
+      const { data, error } = await supabase.rpc('cf_dash_creative', {
+        p: { region: 'uae', from: dateRange.from, to: dateRange.to, group_by: 'ad' },
       })
-
       if (error) return { data: null, error }
-
-      const normalized = (data ?? []).map(row => {
-        const totalSpend = Number(row.total_spend ?? 0)
-        const totalImpressions = Number(row.total_impressions ?? 0)
-        const totalClicks = Number(row.total_clicks ?? 0)
-        const totalLeads = Number(row.total_leads ?? 0)
-        const meetingsBooked = Number(row.meetings_booked ?? 0)
-        const showedUp = Number(row.showed_up ?? 0)
-        const activeOpps = Number(row.active_opportunities ?? 0)
-        const closedWon = Number(row.closed_won ?? 0)
-
-        return {
-          ...row,
-          total_spend: totalSpend,
-          total_impressions: totalImpressions,
-          total_clicks: totalClicks,
-          avg_frequency: Number(row.avg_frequency ?? 0),
-          avg_ctr: Number(row.avg_ctr ?? 0),
-          total_leads: totalLeads,
-          meetings_booked: meetingsBooked,
-          showed_up: showedUp,
-          active_opportunities: activeOpps,
-          closed_won: closedWon,
-          closed_revenue: Number(row.closed_revenue ?? 0),
-          pipeline_value: Number(row.pipeline_value ?? 0),
-          cost_per_lead: row.cost_per_lead == null ? null : Number(row.cost_per_lead),
-          cost_per_active: row.cost_per_active == null ? null : Number(row.cost_per_active),
-        }
-      }).filter(row => (
-        Number(row.total_spend ?? 0) > 0 ||
-        Number(row.total_impressions ?? 0) > 0 ||
-        Number(row.total_clicks ?? 0) > 0 ||
-        Number(row.total_leads ?? 0) > 0 ||
-        Number(row.meetings_booked ?? 0) > 0 ||
-        Number(row.showed_up ?? 0) > 0 ||
-        Number(row.active_opportunities ?? 0) > 0 ||
-        Number(row.closed_won ?? 0) > 0
-      ))
-
-      return { data: normalized, error: null }
+      const rows = (data?.rows ?? []).map(r => ({
+        ad_id: r.key,
+        ad_name: r.name,
+        adset_name: r.adset_name,
+        campaign_name: r.campaign_name,
+        total_spend: Number(r.spend ?? 0),
+        total_impressions: Number(r.impressions ?? 0),
+        total_clicks: Number(r.clicks ?? 0),
+        total_leads: Number(r.leads ?? 0),
+        meetings_booked: Number(r.booked ?? 0),
+        showed_up: Number(r.attended ?? 0),
+        active_opportunities: 0,
+        closed_won: 0,
+        // Null, not 0: an unknown cost is not a free one (§7 item 56).
+        cost_per_lead: r.cost_per_lead ?? null,
+        avg_frequency: r.frequency ?? null,
+      }))
+      return { data: rows, error: null }
     },
-    [currentClientId, dateRange.from, dateRange.to, refreshKey], mockFallbackAds
-  )
-}
-
-export function useAdDrilldown(metaAdId = null, metric = null) {
-  const { currentClientId, dateRange, refreshKey } = useDashboardQueryState()
-  return useSupabaseQuery(
-    async () => {
-      if (!metaAdId || !metric) return { data: [], error: null }
-
-      const { data, error } = await supabase.rpc('dashboard_ad_drilldown', {
-        p_meta_ad_id: String(metaAdId),
-        p_metric: metric,
-        p_start_date: dateRange.from,
-        p_end_date: dateRange.to,
-        p_client_id: currentClientId ?? null,
-      })
-
-      if (error) return { data: null, error }
-
-      return {
-        data: (data ?? []).map(row => ({
-          ...row,
-          full_name: row.full_name || [row.first_name, row.last_name].filter(Boolean).join(' ') || null,
-          monetary_value: Number(row.monetary_value ?? 0),
-        })),
-        error: null,
-      }
-    },
-    [currentClientId, dateRange.from, dateRange.to, metaAdId, metric, refreshKey],
-    []
+    [dateRange.from, dateRange.to, refreshKey], []
   )
 }
 
 export function useRepDrilldown(repName = null, metric = null) {
-  const { currentClientId, dateRange, refreshKey } = useDashboardQueryState()
+  // dashboard_rep_drilldown does not exist on this project. The leads behind a
+  // rep's number are reachable from cf_contacts_by_bucket, which does.
+  const { dateRange, refreshKey } = useDashboardQueryState()
   return useSupabaseQuery(
     async () => {
       if (!repName || !metric) return { data: [], error: null }
-
-      const { data, error } = await supabase.rpc('dashboard_rep_drilldown', {
-        p_rep_name: repName,
-        p_metric: metric,
-        p_start_date: dateRange.from,
-        p_end_date: dateRange.to,
-        p_client_id: currentClientId ?? null,
+      const bucket = metric === 'closes' ? 'closed_won'
+                   : metric === 'shows' ? 'showed_up'
+                   : metric === 'no_shows' ? 'no_shows'
+                   : 'meetings_booked'
+      const { data, error } = await supabase.rpc('cf_contacts_by_bucket', {
+        p: { region: 'uae', from: dateRange.from, to: dateRange.to, bucket },
       })
-
       if (error) return { data: null, error }
-
       return {
         data: (data ?? []).map(row => ({
           ...row,
@@ -304,25 +248,7 @@ export function useRepDrilldown(repName = null, metric = null) {
         error: null,
       }
     },
-    [currentClientId, dateRange.from, dateRange.to, repName, metric, refreshKey],
-    []
-  )
-}
-
-// One RPC now serves all five contact hooks. cf_contacts_by_bucket already
-// returns stage_name and meta_ad_id_raw, so the old mergeStageNames /
-// mergeMetaAdIds round-trips against `contacts` and `lead_tracker` are gone —
-// those tables do not exist here, and the extra queries were only ever
-// stitching back what one query can return.
-function useCfContacts(bucket, { emptyWhenNoBucket = false } = {}) {
-  const { dateRange, refreshKey } = useDashboardQueryState()
-  return useNormalizedContactQuery(
-    async () => {
-      if (emptyWhenNoBucket && !bucket) return { data: [], error: null }
-      return supabase.rpc('cf_contacts_by_bucket', cfArgs(dateRange, { bucket: bucket ?? 'leads' }))
-    },
-    [dateRange.from, dateRange.to, bucket, refreshKey],
-    null
+    [dateRange.from, dateRange.to, repName, metric, refreshKey], []
   )
 }
 
@@ -342,6 +268,23 @@ export function useLeadTrackerContacts() {
   return useCfContacts(null)
 }
 
+// Shared by all five contact hooks below. NOT exported — which is precisely
+// how it got deleted: an edit that removed the function above it sliced
+// 'up to the next export' and swallowed this on the way past. Vite does not
+// error on an undefined reference, it treats it as a global, so the build
+// passed clean and the page threw ReferenceError in the browser.
+function useCfContacts(bucket, { emptyWhenNoBucket = false } = {}) {
+  const { dateRange, refreshKey } = useDashboardQueryState()
+  return useNormalizedContactQuery(
+    async () => {
+      if (emptyWhenNoBucket && !bucket) return { data: [], error: null }
+      return supabase.rpc('cf_contacts_by_bucket', cfArgs(dateRange, { bucket: bucket ?? 'leads' }))
+    },
+    [dateRange.from, dateRange.to, bucket, refreshKey],
+    null
+  )
+}
+
 export function useLeadTrackerBucketContacts(bucket = null) {
   return useCfContacts(bucket, { emptyWhenNoBucket: true })
 }
@@ -350,11 +293,12 @@ export function useDashboardAdOptions() {
   const { currentClientId, dateRange, refreshKey } = useDashboardQueryState()
   return useSupabaseQuery(
     async () => {
-      const { data, error } = await supabase.rpc('dashboard_ad_options', {
-        p_start_date: dateRange.from,
-        p_end_date: dateRange.to,
-        p_client_id: currentClientId ?? null,
-      })
+      // Every cf_* function takes exactly one jsonb argument named `p`. This
+      // call was still passing the legacy flat arguments, so PostgREST could
+      // not resolve it, the lookup came back empty, and every lead on Home fell
+      // through to the "website" default under Source Ad. Same builder as the
+      // other fifteen call sites now, so the shape cannot drift again.
+      const { data, error } = await supabase.rpc('cf_dash_ad_options', cfArgs(dateRange))
 
       if (error) return { data: null, error }
 
@@ -438,68 +382,56 @@ export function useTrendMetricsByDate() {
 }
 
 export function useSalesPerformance() {
-  const { currentClientId, dateRange, refreshKey } = useDashboardQueryState()
+  const { dateRange, refreshKey } = useDashboardQueryState()
   return useSupabaseQuery(
     async () => {
-      const { data: kpiData, error: kpiError } = await supabase.rpc('dashboard_kpis', {
-        start_date: dateRange.from,
-        end_date: dateRange.to,
-        p_client_id: currentClientId,
+      const { data, error } = await supabase.rpc('cf_sales_perf', {
+        p: { region: 'uae', from: dateRange.from, to: dateRange.to },
       })
-      if (kpiError) return { data: null, error: kpiError }
+      if (error) return { data: null, error }
 
-      const { data: repsData, error: repsError } = await supabase.rpc('dashboard_sales_rep_performance', {
-        p_start_date: dateRange.from,
-        p_end_date: dateRange.to,
-        p_client_id: currentClientId,
-      })
-      if (repsError) return { data: null, error: repsError }
-
-      const totals = Array.isArray(kpiData) ? (kpiData[0] ?? {}) : (kpiData ?? {})
-      const perRep = Array.isArray(repsData) ? repsData : []
-
+      const t = data?.totals ?? {}
       return {
         data: {
           totals: {
-            meetings_scheduled: Number(totals.meetings_booked ?? 0),
-            shows: Number(totals.showed_up ?? 0),
-            no_shows: Number(totals.no_shows ?? 0),
-            closes: Number(totals.closed_won ?? 0),
-            disqualified: Number(totals.disqualified ?? 0),
-            lost_not_interested: Number(totals.closed_lost ?? 0),
-            revenue_closed: Number(totals.deal_value ?? totals.closed_revenue ?? 0),
+            meetings_scheduled: Number(t.meetings_booked ?? 0),
+            shows: Number(t.showed_up ?? 0),
+            no_shows: Number(t.no_shows ?? 0),
+            closes: Number(t.closed_won ?? 0),
+            disqualified: 0,
+            lost_not_interested: Number(t.closed_lost ?? 0),
+            revenue_closed: Number(t.closed_revenue ?? 0),
+            pipeline_value: Number(t.pipeline_value ?? 0),
+            active: Number(t.active ?? 0),
           },
-          per_rep: perRep.map(rep => ({
-            ...rep,
-            meetings_scheduled: Number(rep.meetings_booked ?? rep.meetings_scheduled ?? 0),
-            meetings_booked: Number(rep.meetings_booked ?? rep.meetings_scheduled ?? 0),
-            shows: Number(rep.showed_up ?? rep.shows ?? 0),
-            showed_up: Number(rep.showed_up ?? rep.shows ?? 0),
-            no_shows: Number(rep.no_shows ?? 0),
-            active: Number(rep.active ?? 0),
-            closes: Number(rep.closed_won ?? rep.closes ?? 0),
-            closed_won: Number(rep.closed_won ?? rep.closes ?? 0),
-            closed_lost: Number(rep.closed_lost ?? 0),
-            revenue_closed: Number(rep.revenue ?? rep.revenue_closed ?? 0),
-            revenue: Number(rep.revenue ?? rep.revenue_closed ?? 0),
-            pipeline_value: Number(rep.pipeline_value ?? 0),
+          // Per-rep meeting columns stay null on purpose — GHL records the
+          // calendar, not who ran the meeting, so a 0 would be a claim we
+          // cannot support. The page renders null as a dash.
+          per_rep: (data?.per_rep ?? []).map(r => ({
+            ...r,
+            rep_name: r.rep_name,
+            meetings_scheduled: r.meetings_booked,
+            meetings_booked: r.meetings_booked,
+            shows: r.showed_up,
+            showed_up: r.showed_up,
+            no_shows: r.no_shows,
+            active: Number(r.active ?? 0),
+            closes: Number(r.closed_won ?? 0),
+            closed_won: Number(r.closed_won ?? 0),
+            closed_lost: Number(r.closed_lost ?? 0),
+            revenue_closed: Number(r.revenue ?? 0),
+            revenue: Number(r.revenue ?? 0),
+            pipeline_value: Number(r.pipeline_value ?? 0),
           })),
+          note: data?.note ?? null,
         },
         error: null,
       }
     },
-    [currentClientId, dateRange.from, dateRange.to, refreshKey], mockFallbackSalesPerformance
+    [dateRange.from, dateRange.to, refreshKey], null
   )
 }
 
-// cf.target is the single source for targets (Section 5.9, "KPIs with targets
-// for Ads / Agent / Sales"). It stores one row per metric per period and
-// cf_targets_map derives the daily/weekly/monthly variants the UI asks for, so
-// the same number cannot be stored twice and drift.
-//
-// The old hard-coded fallback is gone deliberately. It quietly supplied
-// spend/CPL/ROAS targets that nothing measures any more, which made those cards
-// render a target line against a value that is always null.
 export function useTargets() {
   const { refreshKey } = useDashboardQueryState({ includeDateRange: false })
   return useSupabaseQuery(

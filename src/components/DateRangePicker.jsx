@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   addMonths,
   eachDayOfInterval,
@@ -222,13 +223,13 @@ export default function DateRangePicker() {
         <ChevronDown size={14} />
       </button>
 
-      {isOpen && (
+      {isOpen && createPortal(
         <div
-          className={`fixed inset-0 z-50 bg-slate-900/25 backdrop-blur-sm transition-opacity duration-200 ${isVisible ? 'opacity-100' : 'opacity-0'}`}
+          className={`cf-dr__scrim ${isVisible ? 'opacity-100' : 'opacity-0'}`}
           onClick={handleClose}
         >
           <div
-            className={`absolute right-6 top-20 w-[min(1080px,calc(100vw-2rem))] rounded-[12px] bg-white shadow-2xl overflow-hidden transition-all duration-200 ${isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
+            className={`cf-dr__panel ${isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
             onClick={(event) => event.stopPropagation()}
           >
             <div className="px-6 py-4 bg-gradient-to-r from-[#FF6B8A] to-[#FF8FA3]">
@@ -347,7 +348,8 @@ export default function DateRangePicker() {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   )

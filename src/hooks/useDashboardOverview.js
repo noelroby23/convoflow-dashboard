@@ -28,6 +28,31 @@ const mockFallbackOverview = USE_MOCK ? {
   roas: 2.6,
 } : null
 
+/**
+ * The growth series behind Home's chart. Migration 159 counts leads, meetings
+ * and spend here with the SAME rules cf_dash_kpis uses — distinct people,
+ * appointments rather than lead state, testers excluded — so the chart and the
+ * cards above it can never tell different stories about the same window.
+ *
+ * It also returns the previous window of equal length, which is what every
+ * "vs last period" figure on the page reads. No delta is computed in the
+ * browser.
+ */
+export function useCfGrowth(dateFrom, dateTo) {
+  const refreshKey = useDashboard(s => s.refreshKey)
+  return useSupabaseQuery(
+    async () => {
+      const { data, error } = await supabase.rpc('cf_dash_growth', {
+        p: { region: 'uae', from: dateFrom, to: dateTo },
+      })
+      if (error) return { data: null, error }
+      return { data: Array.isArray(data) ? (data[0] ?? null) : data, error: null }
+    },
+    [dateFrom, dateTo, refreshKey],
+    null
+  )
+}
+
 export function useDashboardOverview(dateFrom, dateTo) {
   const currentClientId = useDashboard(s => s.currentClientId)
   const refreshKey = useDashboard(s => s.refreshKey)
@@ -82,7 +107,13 @@ export function useDashboardOverview(dateFrom, dateTo) {
           cost_per_lead: prefer(row.cost_per_lead, perUnit(totalLeads)),
           cost_per_meeting: prefer(row.cost_per_meeting, perUnit(meetingsBooked)),
           cost_per_active: prefer(row.cost_per_active_opp, perUnit(activeOpps)),
-          show_rate: meetingsBooked > 0 ? (showedUp / meetingsBooked) * 100 : 0,
+          // Must come from the database, and this is no longer a preference.
+          // Migration 158 made these two different populations: meetings_booked
+          // counts appointments CREATED in the window, showed_up counts those
+          // DUE in it. Dividing one by the other is a ratio of two unrelated
+          // sets. The RPC divides attended by attended+missed and leaves
+          // cancelled out, because a cancelled meeting was not a no-show.
+          show_rate: row.show_rate == null ? null : Number(row.show_rate),
           meeting_rate: totalLeads > 0 ? (meetingsBooked / totalLeads) * 100 : 0,
           roas: prefer(row.roas, totalSpend && closedRevenue != null ? closedRevenue / totalSpend : null),
         },

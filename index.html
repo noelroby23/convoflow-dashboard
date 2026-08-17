@@ -52,8 +52,14 @@
         }, 6000)
       })()
     </script>
+    <style id="cf-boot">
+      /* Painted before any JS parses, so the first frame is already dark.
+         The flash was the browser rendering default white until React
+         mounted and the themed shell arrived. */
+      html, body, #root { background: #09090b; color: #FAFAF9; }
+    </style>
   </head>
-  <body>
+  <body style="background:#09090b">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
