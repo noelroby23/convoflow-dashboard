@@ -448,6 +448,9 @@ export default function SalesDesk() {
                      ? `${board?.deals_shown ?? 0} of ${board?.deals_total ?? 0} open deals opened in this range`
                      : `${board?.deals_total ?? 0} open · ${board?.won_all ?? 0} won · ${board?.lost_all ?? 0} lost`}
                  </span>
+                 <button type="button" onClick={() => setNewOpen(true)} className="cf-newbtn">
+                   <UserPlus size={12} /> New prospect
+                 </button>
                  <button type="button" onClick={() => setShowAll(v => !v)}
                    title={showAll
                      ? 'Currently ignoring the date range'
