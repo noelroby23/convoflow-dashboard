@@ -300,6 +300,29 @@ export default function SalesDesk() {
       if (error) throw new Error(error.message)
       if (body?.ok === false) throw new Error(body.error)
       toast.success(`Marked ${columnKey === 'missed' ? 'no-show' : columnKey} · Home and GHL updated`)
+
+      // Attending is what puts somebody into the sales pipeline. Doing it on
+      // the drag rather than on a separate strip means one action, not two —
+      // and a lead can no longer sit attended-but-invisible, which is how 13
+      // of 23 ended up on no sales board at all.
+      if (columnKey === 'attended') {
+        const card = (board?.meetings ?? [])
+          .flatMap(c => c.cards ?? []).find(c => c.id === eventId)
+        if (card?.lead_id) {
+          try {
+            const r = await addToPipeline({
+              name: card.name, phone: card.phone, channel: card.channel,
+              ghl_contact_id: card.ghl_contact_id, lead_id: card.lead_id,
+            })
+            if (r?.already) toast.message(`${card.name} is already in the pipeline`)
+            else toast.success(`${card.name} added to the sales pipeline`)
+          } catch (e) {
+            // The meeting outcome is already saved; only the pipeline step
+            // failed. Say which, rather than implying the drag was lost.
+            toast.error(`Marked attended, but not added to the pipeline — ${e.message}`)
+          }
+        }
+      }
       await load()
     } catch (e) {
       toast.error(e.message || 'Could not update that meeting')
@@ -395,29 +418,6 @@ export default function SalesDesk() {
         </div>
 
       </Panel>
-
-      {/* Attended, and on no sales board anywhere. Measured at 13 of 23 when
-          this was built: they had a meeting, it went well enough to attend, and
-          nothing downstream knew about them. */}
-      {(board?.awaiting_pipeline ?? []).length > 0 && (
-        <div className="cf-await">
-          <div className="cf-await__head">
-            <span className="cf-await__lbl">
-              Attended — not in the pipeline yet ({board.awaiting_pipeline.length})
-            </span>
-            <span className="cf-await__hint">click to add them to the first stage</span>
-          </div>
-          <div className="cf-await__list">
-            {board.awaiting_pipeline.map(l => (
-              <button key={l.lead_id} type="button" className="cf-await__chip"
-                      disabled={busy === l.lead_id}
-                      onClick={() => promote(l)}>
-                <Plus size={11} /> {l.name}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
       {newOpen && (
         <NewProspect
