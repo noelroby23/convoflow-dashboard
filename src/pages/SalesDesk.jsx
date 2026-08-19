@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { CalendarCheck, Banknote, Loader2, ExternalLink, Plus, UserPlus, X} from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useDashboard } from '../store/dashboard'
-import { Panel } from '../components/ui/Console'
+import { Panel, PipelineFlow } from '../components/ui/Console'
+import { useDashboardOverview, useCfGrowth } from '../hooks/useDashboardOverview'
 import PrepSheet from '../components/ui/PrepSheet'
 import { toast } from 'sonner'
 
@@ -192,6 +193,10 @@ export default function SalesDesk() {
   const [over, setOver] = useState(null)
   const [newOpen, setNewOpen] = useState(false)
   const [channels, setChannels] = useState([])
+  // Same hook Home uses, deliberately: one source means the funnel reads
+  // identically on both pages and cannot drift.
+  const { data: overview } = useDashboardOverview(dateRange?.from, dateRange?.to)
+  const { data: growth } = useCfGrowth(dateRange?.from, dateRange?.to)
   // Clicking a card opens the prep sheet, not the full record: this page
   // is used in the minute before a call, not for a post-mortem.
   const [prep, setPrep] = useState(null)
@@ -379,6 +384,12 @@ export default function SalesDesk() {
   return (
     <div className="space-y-5">
       <PrepSheet leadId={prep} onClose={() => setPrep(null)} />
+
+      {/* The same funnel Home shows, fed by the same hook, so the two pages
+          cannot report different numbers for one window. */}
+      <Panel eyebrow="The pipeline" title="Where the money is coming from">
+        <PipelineFlow kpis={overview} growth={growth} />
+      </Panel>
       {/* Meetings first: nothing reaches the sales board until a meeting has
           happened, so the order on screen matches the order in real life. */}
       <Panel eyebrow="After the booking" title="Meetings"
@@ -389,8 +400,9 @@ export default function SalesDesk() {
               key={col.key}
               title={col.label}
               count={col.count}
-              tone={col.key === 'attended' ? '#10B981' : col.key === 'missed' ? '#F43F5E'
-                   : col.key === 'cancelled' ? '#57544E' : '#EC4899'}
+              tone={col.key === 'attended' ? '#34D399' : col.key === 'missed' ? '#F87171'
+                   : col.key === 'disqualified' ? '#A78BFA'
+                   : col.key === 'cancelled' ? '#6B6862' : '#EC4899'}
               over={over === `m:${col.key}`}
               onDragOver={allow(`m:${col.key}`)}
               onDrop={onDrop('meeting', col.key)}
@@ -405,6 +417,7 @@ export default function SalesDesk() {
                       onDragStart={() => setDrag({ kind: 'meeting', id: c.id, leadId: c.lead_id, from: col.key })}>
                   <div className="cf-card__name">{c.name}</div>
                   <div className="cf-card__meta">{when(c.when)}</div>
+                  {c.channel && <div className="cf-card__tag">{CHANNEL_LABEL[c.channel] ?? c.channel}</div>}
                   {c.ad && <div className="cf-card__tag">{c.ad}</div>}
                   {c.link && (
                     <a href={c.link} target="_blank" rel="noreferrer" className="cf-card__link">
