@@ -14,6 +14,7 @@ import SalesPerformance from './pages/SalesPerformance'
 import Revenue from './pages/Revenue'
 import LeadDesk from './pages/LeadDesk'
 import SalesDesk from './pages/SalesDesk'
+import Reactivation from './pages/Reactivation'
 import LeadLookup from './pages/LeadLookup'
 import ReportModal from './components/ui/ReportModal'
 import { Toaster } from 'sonner'
@@ -96,6 +97,7 @@ export default function App() {
     { path: '/lead-desk', component: <LeadDesk /> },
     { path: '/sales-desk', component: <SalesDesk /> },
     { path: '/desk', component: <LeadDesk /> },
+    { path: '/reactivation', component: <Reactivation /> },
     { path: '/lead-lookup', component: <LeadLookup /> },
     { path: '/lookup', component: <LeadLookup /> },
     { path: '/settings', component: <Settings /> },

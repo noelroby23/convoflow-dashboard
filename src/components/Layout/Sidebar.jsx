@@ -3,7 +3,7 @@ import { NavLink, useSearchParams } from 'react-router-dom'
 import {
   LayoutDashboard, Megaphone, Bot, Users, DollarSign,
   TrendingUp, Target, Search, MessageCircle, Settings, ChevronDown, LogOut,
-  Headphones, ScanSearch, Banknote
+  Headphones, ScanSearch, Banknote, RefreshCcwDot
 } from 'lucide-react'
 import { DEFAULT_CLIENT_ID, DEFAULT_CLIENT_NAME, useDashboard } from '../../store/dashboard'
 import { useClients } from '../../hooks/useDashboardData'
@@ -22,6 +22,10 @@ const navItems = [
   { to: '/lead-lookup', label: 'Lead Lookup', icon: ScanSearch },
   // Everything after the booking: meeting outcomes and the sales pipeline.
   { to: '/sales-desk', label: 'Sales Desk', icon: Banknote },
+  // The old database, called again. Its own page because the question it
+  // answers is not "where is this lead" but "why is the campaign quiet" —
+  // the launch gate, the kill criteria and the pacer's decision log.
+  { to: '/reactivation', label: 'Reactivation', icon: RefreshCcwDot },
   // Back from phase 2: cf now holds Meta spend and per-lead ad attribution
   // (migrations 033/034), so this page has real data behind it again.
   { to: '/creative-performance', label: 'Creative Performance', icon: Megaphone },
