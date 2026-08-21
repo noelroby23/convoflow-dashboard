@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   X, Phone, MessageSquare, GitBranch, Bug, CalendarDays, Megaphone,
-  Loader2, ExternalLink, Play, Pause, ListChecks,
+  Loader2, ExternalLink, ListChecks,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useDashboard } from '../../store/dashboard'
 import { toast } from 'sonner'
+import { CallRecording as Recording, CallTranscript as Transcript } from './CallRecording'
 
 /**
  * Everything that ever happened to one lead, in one panel.
@@ -35,88 +36,6 @@ const day = (iso) => iso
 const VERDICT = {
   ai_failure: '#FB7185', system_failure: '#FBBF24',
   lead_not_ready: '#8A8781', unclear: '#57544E',
-}
-
-/** Plays a call. The URL is minted on demand — VAPI's presigned links expire
- *  in 30 minutes, so one fetched at page load would be dead by the time
- *  anybody pressed play. */
-function Recording({ callId, hasRecording }) {
-  const [state, setState] = useState('idle')   // idle | loading | ready | gone | error
-  const [msg, setMsg] = useState('')
-  const audioRef = useRef(null)
-
-  if (!hasRecording) return <span className="cf-ld__norec">no recording</span>
-
-  const play = async () => {
-    if (state === 'ready') {
-      const el = audioRef.current
-      if (el) { el.paused ? el.play() : el.pause() }
-      return
-    }
-    setState('loading')
-    try {
-      const { data: session } = await supabase.auth.getSession()
-      const token = session?.session?.access_token
-      const res = await fetch(`${supabase.supabaseUrl}/functions/v1/cf-recording`, {
-        method: 'POST',
-        headers: {
-          apikey: supabase.supabaseKey,
-          Authorization: `Bearer ${token ?? supabase.supabaseKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ call_id: callId }),
-      })
-      const body = await res.json().catch(() => null)
-      if (res.status === 404 || body?.expired) {
-        // VAPI keeps audio 14 days. "Gone" and "broken" need different words
-        // and different reactions (§7 item 140).
-        setState('gone'); setMsg('audio expired — VAPI keeps 14 days'); return
-      }
-      if (!res.ok || !body?.url) throw new Error(body?.error ?? `HTTP ${res.status}`)
-      audioRef.current.src = body.url
-      await audioRef.current.play()
-      setState('ready')
-    } catch (e) {
-      setState('error'); setMsg(e.message || 'could not load the audio')
-    }
-  }
-
-  return (
-    <span className="cf-ld__rec">
-      <button type="button" onClick={play} disabled={state === 'loading' || state === 'gone'}
-              className="cf-ld__play">
-        {state === 'loading' ? <Loader2 size={11} className="animate-spin" />
-          : state === 'ready' ? <Pause size={11} /> : <Play size={11} />}
-        {state === 'gone' ? 'expired' : state === 'error' ? 'failed' : 'play'}
-      </button>
-      {(state === 'gone' || state === 'error') && <span className="cf-ld__recnote">{msg}</span>}
-      <audio ref={audioRef} preload="none" controls={state === 'ready'} className="cf-ld__audio" />
-    </span>
-  )
-}
-
-/** A VAPI transcript is "AI:" / "User:" lines. Split it so the lead's words
- *  are visibly theirs, the same as the WhatsApp thread. */
-function Transcript({ text }) {
-  const lines = useMemo(() => {
-    if (!text) return []
-    return text.split('\n').filter(Boolean).map(l => {
-      const m = l.match(/^\s*(AI|User)\s*:\s*(.*)$/i)
-      return m ? { who: m[1].toLowerCase() === 'user' ? 'lead' : 'us', text: m[2] }
-               : { who: 'us', text: l }
-    })
-  }, [text])
-  if (!lines.length) return <p className="cf-ld__empty">No transcript.</p>
-  return (
-    <div className="cf-ld__transcript">
-      {lines.map((l, i) => (
-        <div key={i} className={`cf-ld__line cf-ld__line--${l.who}`}>
-          <span className="cf-ld__who">{l.who === 'lead' ? 'them' : 'Sarah'}</span>
-          <span>{l.text}</span>
-        </div>
-      ))}
-    </div>
-  )
 }
 
 function Section({ icon: Icon, title, count, children, defaultOpen = false }) {

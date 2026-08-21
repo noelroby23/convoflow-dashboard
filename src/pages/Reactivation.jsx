@@ -1,18 +1,22 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   Play, Pause, RotateCcw, ShieldAlert, Search, Voicemail, Loader2,
+  FileText, X,
 } from 'lucide-react'
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, Legend,
 } from 'recharts'
 import { Panel } from '../components/ui/Console'
+// The app's ONE call player and ONE transcript renderer, lifted out of the
+// lead record so this page reuses it rather than growing a second one.
+import { CallRecording, CallTranscript } from '../components/ui/CallRecording'
 import { useDashboard } from '../store/dashboard'
 import { toast } from 'sonner'
 import {
   useCampaignOverview, useCampaignFunnel, useCampaignDaily,
-  useCampaignMembers, useCampaignEvents, useCampaignPool,
-  campaignControl,
+  useCampaignQueue, useCampaignEvents, useCampaignPool,
+  campaignControl, fetchCampaignCall,
 } from '../hooks/useCfCampaign'
 
 /**
@@ -114,6 +118,151 @@ function Bar2({ value, max, tone = 'bg-[#EC4899]' }) {
   )
 }
 
+/**
+ * THE ONE STATUS A HUMAN READS, coloured by what it means rather than by which
+ * table it came from. cf_campaign_members already collapses queue state and
+ * call outcome into a single `live_status` string, so this map is the only
+ * place the page has an opinion about any of them.
+ *
+ * The grouping is the point: what is happening RIGHT NOW has to be findable
+ * from across the room, and a miss must not look like a rejection — "no answer"
+ * is a lead we have not reached yet, "not interested" is one we have.
+ */
+const LIVE_TONE = {
+  // Happening now. The two that make this screen worth watching.
+  'Dialing now':        'bg-[#EC4899] text-white',
+  'Calling next':       'bg-blue-100 text-blue-800',
+
+  // Coming, but not yet. Quiet on purpose — most of the list sits here.
+  'Scheduled':          'bg-slate-100 text-slate-700',
+  'Waiting to start':   'bg-slate-100 text-slate-700',
+
+  // Someone engaged. These are the reason the campaign exists.
+  'Meeting booked':     'bg-emerald-100 text-emerald-800',
+  'Interested':         'bg-emerald-100 text-emerald-800',
+  'Callback asked':     'bg-emerald-100 text-emerald-800',
+  'Wants a human':      'bg-emerald-100 text-emerald-800',
+  'Asked for WhatsApp': 'bg-emerald-100 text-emerald-800',
+
+  // We did not get through. Not a rejection — worth another attempt.
+  'No answer':          'bg-amber-100 text-amber-800',
+  'Voicemail':          'bg-amber-100 text-amber-800',
+  'Busy':               'bg-amber-100 text-amber-800',
+  'Did not connect':    'bg-amber-100 text-amber-800',
+  'Never reached':      'bg-amber-100 text-amber-800',
+  'Said nothing':       'bg-amber-100 text-amber-800',
+
+  // Closed. The ladder is over for this person.
+  'Not interested':     'bg-rose-100 text-rose-800',
+  'Wrong number':       'bg-rose-100 text-rose-800',
+  'Disqualified':       'bg-rose-100 text-rose-800',
+  'Not called':         'bg-slate-100 text-slate-700',
+  'Released':           'bg-slate-100 text-slate-700',
+}
+
+/** A status with no tone is still a status. The RPC title-cases any outcome it
+ *  does not have a phrase for, so an unmapped value is a real thing that
+ *  happened — it gets the neutral tone, never a blank cell. */
+function LiveStatus({ status }) {
+  if (!status) return <span className="text-xs text-[#9CA3AF]">—</span>
+  const live = status === 'Dialing now'
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded-full whitespace-nowrap
+                      ${LIVE_TONE[status] ?? 'bg-slate-100 text-slate-700'}`}>
+      {live && <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
+      {status}
+    </span>
+  )
+}
+
+/**
+ * One call, opened on demand.
+ *
+ * The transcript is not in the list payload on purpose — 25 rows carrying 25
+ * transcripts is a slow table nobody asked for — so this fetches it when
+ * somebody actually wants to read it. Chrome is the lead record's own scrim
+ * and panel classes, so there is no second modal to keep in step.
+ *
+ * ⚠️ `found: false` is an ANSWER, not a failure: cf_campaign_call refuses a
+ * call id that is not this campaign's, because the VAPI org is shared with
+ * other clients. Rendering that as a spinner or an error would be a lie.
+ */
+export function CallModal({ callId, onClose }) {
+  const [call, setCall] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    if (!callId) return
+    let cancelled = false
+    setLoading(true); setError(null); setCall(null)
+    fetchCampaignCall(callId)
+      .then(d => { if (!cancelled) setCall(d) })
+      .catch(e => { if (!cancelled) setError(e) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [callId])
+
+  useEffect(() => {
+    const esc = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', esc)
+    return () => window.removeEventListener('keydown', esc)
+  }, [onClose])
+
+  if (!callId) return null
+
+  return (
+    <div className="cf-ld__scrim" onClick={onClose}>
+      <aside className="cf-ld" onClick={(e) => e.stopPropagation()}>
+        <header className="cf-ld__head">
+          <div className="min-w-0">
+            <h2 className="cf-ld__name">{call?.name ?? (loading ? 'Loading…' : 'Call')}</h2>
+            <p className="cf-ld__sub">
+              {call?.phone ?? '—'}
+              {call?.at_label && <> · {call.at_label}</>}
+              {call?.duration_sec != null && <> · {num(call.duration_sec)}s</>}
+            </p>
+          </div>
+          <button onClick={onClose} className="cf-ld__x" aria-label="Close">
+            <X size={13} /> Close
+          </button>
+        </header>
+
+        <div className="cf-ld__body">
+          {loading && <div className="skeleton h-32 w-full" />}
+
+          {!loading && error && (
+            <p className="cf-ld__killed">Could not read that call — {String(error.message || error)}</p>
+          )}
+
+          {!loading && !error && call?.found === false && (
+            <p className="cf-ld__empty">
+              {words(call.reason) || 'That call is not part of this campaign.'}
+            </p>
+          )}
+
+          {!loading && !error && call?.found && (
+            <>
+              <div className="cf-ld__callhead">
+                <span className={`cf-ld__pill${call.connected ? ' is-good' : ''}`}>
+                  {words(call.outcome) || (call.connected ? 'connected' : 'no connect')}
+                </span>
+                <span className="ml-auto">
+                  <CallRecording callId={call.vapi_call_id} hasRecording={call.has_recording} />
+                </span>
+              </div>
+              {call.summary
+                ? <p className="cf-ld__summary">{call.summary}</p>
+                : <p className="cf-ld__empty">No summary.</p>}
+              <CallTranscript text={call.transcript} />
+            </>
+          )}
+        </div>
+      </aside>
+    </div>
+  )
+}
+
 export default function Reactivation() {
   const range = useDashboard(s => s.dateRange)
 
@@ -125,13 +274,18 @@ export default function Reactivation() {
 
   const [busy, setBusy] = useState(null)
 
-  // Members: filtered, searched and paged. The search is debounced so a slow
+  // The queue: filtered, searched and paged. The search is debounced so a slow
   // RPC is not called on every keystroke.
   const PAGE = 25
   const [memberStatus, setMemberStatus] = useState('all')
   const [typed, setTyped] = useState('')
   const [search, setSearch] = useState('')
   const [offset, setOffset] = useState(0)
+
+  // The call whose transcript is open, and whether the cursor is in the search
+  // box. Either one freezes the auto-refresh — see below.
+  const [openCall, setOpenCall] = useState(null)
+  const [searchFocused, setSearchFocused] = useState(false)
 
   useEffect(() => {
     const id = setTimeout(() => setSearch(typed.trim()), 350)
@@ -142,9 +296,25 @@ export default function Reactivation() {
   // narrower result silently renders empty because the offset is past its end.
   useEffect(() => { setOffset(0) }, [memberStatus, search])
 
-  const { data: members, loading: membersLoading } = useCampaignMembers({
+  // 🔑 THE QUEUE REFRESHES ITSELF, BUT NOT WHILE SOMEBODY IS USING IT. Without
+  // the interval, "Dialing now" never moves and this screen is a photograph of
+  // a live thing; with an unconditional interval the rows shuffle out from
+  // under a half-typed search or behind an open transcript. Both are true, so
+  // both are handled — the pause lives in a ref inside the hook, so switching
+  // it does not itself trigger a fetch.
+  const paused = !!openCall || searchFocused
+  const { data: queue, loading: queueLoading } = useCampaignQueue({
     status: memberStatus, q: search || undefined, limit: PAGE, offset,
+    intervalMs: 15_000, paused,
   })
+
+  // Whether the count in the title is "everyone" or "everyone matching". Two
+  // different claims, so they do not get to share a word.
+  const filtered = memberStatus !== 'all' || !!search
+
+  // The ladder's own length, so "attempt 2 / 4" comes from the cadence rather
+  // than from a 4 typed into this page.
+  const ladderSteps = overview?.ladder?.length ?? null
 
   const status = overview?.status
   const gate = overview?.gate
@@ -527,10 +697,17 @@ export default function Reactivation() {
         ) : <Empty>No days in this range</Empty>}
       </Panel>
 
-      {/* ── 8. Members ────────────────────────────────────────────────── */}
+      {/* ── 8. The queue ──────────────────────────────────────────────── */}
       <Panel
-        eyebrow="Who is in it"
-        title="Members"
+        eyebrow="Who is being called"
+        title={
+          <span className="flex items-baseline gap-2">
+            Queue
+            <span className="text-sm font-normal text-[#9CA3AF] tabular-nums">
+              {num(queue?.total)} {filtered ? 'matching' : 'people'}
+            </span>
+          </span>
+        }
         right={
           <div className="flex items-center gap-2">
             <div className="relative">
@@ -538,24 +715,33 @@ export default function Reactivation() {
               <input
                 value={typed}
                 onChange={e => setTyped(e.target.value)}
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() => setSearchFocused(false)}
                 placeholder="Search name or phone…"
                 className="text-xs pl-7 pr-2.5 py-1 rounded-lg border border-[#E9E9E7] w-48
                            text-[#22211D] placeholder:text-[#9CA3AF] outline-none focus:border-[#C9C8C4]"
               />
             </div>
-            <span className="text-xs text-[#6B7280]">{num(members?.total)} in view</span>
+            {/* Says out loud whether the table is moving. A live view that has
+                quietly stopped refreshing looks exactly like a campaign that
+                has quietly stopped dialling. */}
+            <span className="text-xs text-[#6B7280] whitespace-nowrap">
+              {paused ? 'paused' : 'live · every 15s'}
+            </span>
           </div>
         }
       >
         {/* The breakdown as chips. It is both the filter and the answer to
             "how many were excluded, and for what" — the reason lives in the
-            key, so it must be readable rather than hidden behind a dropdown. */}
+            key, so it must be readable rather than hidden behind a dropdown.
+            The key goes through untouched: cf_campaign_members works out for
+            itself whether a value is a status or an exclusion reason. */}
         <div className="flex flex-wrap gap-1.5 mb-3">
           <button type="button" onClick={() => setMemberStatus('all')}
                   className={`cf-seg-btn${memberStatus === 'all' ? ' is-on' : ''}`}>
-            All {members?.total != null ? `· ${num(members.total)}` : ''}
+            All {queue?.total != null && memberStatus === 'all' && !search ? `· ${num(queue.total)}` : ''}
           </button>
-          {Object.entries(members?.breakdown ?? {}).map(([k, v]) => (
+          {Object.entries(queue?.breakdown ?? {}).map(([k, v]) => (
             <button key={k} type="button" onClick={() => setMemberStatus(k)}
                     className={`cf-seg-btn${memberStatus === k ? ' is-on' : ''}`}>
               {words(k)} · {num(v)}
@@ -569,57 +755,89 @@ export default function Reactivation() {
               <tr className="text-left text-xs uppercase tracking-wide text-[#9CA3AF]">
                 <th className="py-2">Lead</th>
                 <th>Status</th>
-                <th>Lead state</th>
-                <th className="text-right">Step</th>
-                <th className="text-right">Attempts</th>
-                <th>Reached</th>
-                <th>Last outcome</th>
-                <th>Next action</th>
+                <th className="text-right">Attempt</th>
+                <th>Last call</th>
+                <th className="text-right">Recording</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#F3F4F6]">
-              {membersLoading ? (
-                <tr><td colSpan={8}><Empty>Loading…</Empty></td></tr>
-              ) : members?.rows?.length ? members.rows.map((m) => (
-                <tr key={m.lead_id}>
-                  <td className="py-2">
-                    {m.name || '—'}
-                    <span className="block text-xs text-[#9CA3AF]">{m.phone || '—'}</span>
-                  </td>
-                  <td className="whitespace-nowrap">
-                    <Pill tone={
-                      m.status === 'released' ? 'bg-emerald-100 text-emerald-800'
-                      : m.status === 'excluded' ? 'bg-slate-100 text-slate-700'
-                      : 'bg-blue-100 text-blue-800'
-                    }>{words(m.status)}</Pill>
-                    {/* Never hidden: an excluded row without its reason is a
-                        row nobody can act on. */}
-                    {m.exclude_reason && (
-                      <span className="block text-[11px] text-[#6B7280] mt-0.5">{words(m.exclude_reason)}</span>
-                    )}
-                  </td>
-                  <td className="text-xs">{words(m.lead_state) || '—'}</td>
-                  <td className="text-right tabular-nums">{m.step_no ?? '—'}</td>
-                  <td className="text-right tabular-nums">{num(m.attempts)}</td>
-                  <td className="text-xs">{m.reached ? 'yes' : 'no'}</td>
-                  <td className="text-xs">{words(m.last_outcome) || '—'}</td>
-                  <td className="text-xs whitespace-nowrap">{fmtWhen(m.next_action_at)}</td>
-                </tr>
-              )) : <tr><td colSpan={8}><Empty>Nobody matches that</Empty></td></tr>}
+              {queueLoading && !queue ? (
+                <tr><td colSpan={5}><Empty>Loading…</Empty></td></tr>
+              ) : queue?.rows?.length ? queue.rows.map((m) => {
+                const c = m.last_call
+                return (
+                  <tr key={m.lead_id} className={m.live_status === 'Dialing now' ? 'bg-[#EC4899]/10' : undefined}>
+                    <td className="py-2 min-w-0">
+                      <span className="block truncate text-[#111]">{m.name || '—'}</span>
+                      <span className="block text-xs text-[#9CA3AF] tabular-nums">{m.phone || '—'}</span>
+                    </td>
+
+                    <td className="whitespace-nowrap">
+                      <LiveStatus status={m.live_status} />
+                      {/* Never hidden: an excluded row without its reason, or a
+                          scheduled one without its time, is a row nobody can
+                          act on. */}
+                      {m.live_detail && (
+                        <span className="block text-[11px] text-[#6B7280] mt-0.5">{words(m.live_detail)}</span>
+                      )}
+                    </td>
+
+                    <td className="text-right whitespace-nowrap">
+                      {/* Step 0 means the ladder has not started. A "0" there
+                          would read as an attempt that was made and failed. */}
+                      <span className="tabular-nums text-[#111]">
+                        {m.attempt ? `${m.attempt}${ladderSteps ? ` / ${ladderSteps}` : ''}` : '—'}
+                      </span>
+                      <span className="block text-[11px] text-[#6B7280] tabular-nums">
+                        {num(m.attempts_made)} dialled
+                      </span>
+                    </td>
+
+                    <td className="text-xs whitespace-nowrap">
+                      {c ? (
+                        <>
+                          <span className="block text-[#111]">{c.at_label || fmtWhen(c.at)}</span>
+                          <span className="block text-[#6B7280]">
+                            {words(c.outcome) || (c.connected ? 'connected' : 'no connect')}
+                            {c.duration_sec != null && ` · ${num(c.duration_sec)}s`}
+                          </span>
+                        </>
+                      ) : <span className="text-[#9CA3AF]">—</span>}
+                    </td>
+
+                    <td className="text-right whitespace-nowrap">
+                      <div className="inline-flex items-center gap-2 justify-end">
+                        {/* The same player the lead record uses. It takes the
+                            CALL ID, not a stored URL — only cf-recording can
+                            mint a URL a browser will play (§7 item 139). */}
+                        {c?.has_recording
+                          ? <CallRecording callId={c.vapi_call_id} hasRecording />
+                          : <span className="cf-ld__norec">no recording</span>}
+                        {c?.has_transcript && (
+                          <button type="button" onClick={() => setOpenCall(c.vapi_call_id)}
+                                  className="cf-seg-btn inline-flex items-center gap-1">
+                            <FileText size={11} /> transcript
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              }) : <tr><td colSpan={5}><Empty>Nobody matches that</Empty></td></tr>}
             </tbody>
           </table>
         </div>
 
-        {(members?.total ?? 0) > PAGE && (
+        {(queue?.total ?? 0) > PAGE && (
           <div className="flex items-center justify-between mt-3">
             <span className="text-xs text-[#6B7280]">
-              {num(offset + 1)}–{num(Math.min(offset + PAGE, members.total))} of {num(members.total)}
+              {num(offset + 1)}–{num(Math.min(offset + PAGE, queue.total))} of {num(queue.total)}
             </span>
             <div className="flex gap-2">
               <button type="button" disabled={offset === 0}
                       onClick={() => setOffset(o => Math.max(0, o - PAGE))}
                       className="cf-seg-btn disabled:opacity-40">Previous</button>
-              <button type="button" disabled={offset + PAGE >= (members?.total ?? 0)}
+              <button type="button" disabled={offset + PAGE >= (queue?.total ?? 0)}
                       onClick={() => setOffset(o => o + PAGE)}
                       className="cf-seg-btn disabled:opacity-40">Next</button>
             </div>
@@ -672,6 +890,10 @@ export default function Reactivation() {
           </div>
         ) : <Empty>Nothing has been assessed for this campaign yet</Empty>}
       </Panel>
+
+      {/* Mounted once at the page root rather than per row, so opening a
+          transcript cannot be affected by the table refreshing beneath it. */}
+      <CallModal callId={openCall} onClose={() => setOpenCall(null)} />
     </div>
   )
 }
