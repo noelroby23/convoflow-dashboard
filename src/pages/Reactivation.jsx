@@ -11,6 +11,10 @@ import { Panel } from '../components/ui/Console'
 // The app's ONE call player and ONE transcript renderer, lifted out of the
 // lead record so this page reuses it rather than growing a second one.
 import { CallRecording, CallTranscript } from '../components/ui/CallRecording'
+// The app's ONE live-call player, already shared by the Lead Desk board. The
+// stream is two-channel s16le PCM with no container, so no <audio> tag can
+// play it (§7 item 54) - this is the only thing in the app that can.
+import LiveListen from '../components/ui/LiveListen'
 import { useDashboard } from '../store/dashboard'
 import { toast } from 'sonner'
 import {
@@ -83,6 +87,90 @@ const STATUS_TONE = {
 const TONE_DIALS = '#60A5FA'
 const TONE_CONNECTS = '#10B981'
 const TONE_RATE = '#EC4899'
+
+/**
+ * Everything cf_campaign_members can say about a row out of its OWN records:
+ * the member's status, the live queue, or a call this campaign placed.
+ *
+ * It hands the phrase over already rendered, so there is no flag saying where
+ * a status came from — this list is how a campaign word is told from a leaked
+ * one. Anything NOT in here, on a row the campaign has never dialled, fell
+ * through to cf.lead.lead_state and was therefore already true.
+ *
+ * Listing the campaign's own vocabulary rather than the lead_state phrases is
+ * deliberate: a new lead_state branch added to the RPC later still gets caught
+ * by default, where a list of known leaks would silently stop covering it.
+ */
+const CAMPAIGN_PHRASES = new Set([
+  'Not called', 'Waiting to start',            // the member's own status
+  'Dialing now', 'Calling next', 'Scheduled',  // a live queue row
+  'Released',                                  // the pacer released them
+])
+
+/**
+ * 🔑 IS THIS ROW'S STATUS A CAMPAIGN RESULT, OR WAS IT ALREADY TRUE?
+ *
+ * cf_campaign_members falls all the way through to `cf.lead.lead_state` when
+ * the campaign has neither queued nor placed a call — so "Never reached" can
+ * be a fact from the twelve-step ladder months ago, printed in a table headed
+ * by a campaign. Read as a campaign outcome it says the reactivation call
+ * failed, when the reactivation call has not happened.
+ *
+ * `excluded` and `pending` members are ruled out first and deliberately: those
+ * ARE the campaign describing its own decision, and labelling them as prior
+ * history would be the same error in reverse. So is "Released" — the pacer
+ * releasing somebody is something this campaign did, however little it says
+ * about the lead.
+ */
+function saysNothingAboutTheCampaign(m) {
+  // The campaign has spoken to them, so the status is its own doing.
+  if (Number(m?.attempts_made ?? 0) > 0 || !!m?.last_call) return false
+  // The campaign is about to speak to them.
+  if (!!m?.next_at || !!m?.listen_url) return false
+  // The campaign's own bookkeeping about a member it has not started on.
+  if (m?.member_status === 'excluded' || m?.member_status === 'pending') return false
+  return !CAMPAIGN_PHRASES.has(m?.live_status)
+}
+
+/**
+ * CONSISTENCY. Two counts of the same population sit on one screen — the
+ * header's "Enrolled" and the Queue's own total — and a reader who spots them
+ * disagreeing has no way to tell a bug from a fact.
+ *
+ * They are built differently and the difference is nameable:
+ *   stats.members_total  count(*) from cf.campaign_member
+ *   queue.total          the same, INNER JOINed to cf.lead
+ * so they part company by exactly the members whose lead row has gone. Such a
+ * member can never be dialled and never appears in the table below, which is
+ * worth saying rather than hiding — it is the one case where the table is
+ * genuinely not showing somebody the campaign thinks it enrolled.
+ *
+ * Silent when the two agree and nothing is filtered: a line confirming that
+ * two numbers match is noise every time it is right.
+ */
+function QueueVsEnrolled({ total, enrolled, filtered }) {
+  if (total == null || enrolled == null) return null
+
+  if (filtered) {
+    return (
+      <p className="text-[11px] text-[#6B7280] mb-2">
+        Showing {num(total)} of {num(enrolled)} enrolled.
+      </p>
+    )
+  }
+
+  const missing = Number(enrolled) - Number(total)
+  if (!missing) return null
+
+  return (
+    <p className="text-[11px] text-[#6B7280] mb-2">
+      {num(total)} listed here against {num(enrolled)} enrolled above
+      {missing > 0
+        ? ` — ${num(missing)} enrolled ${missing === 1 ? 'member has' : 'members have'} no lead record, so ${missing === 1 ? 'it' : 'they'} can never be dialled and ${missing === 1 ? 'is' : 'are'} not listed.`
+        : '.'}
+    </p>
+  )
+}
 
 function Empty({ children }) {
   return <p className="text-sm text-[#9CA3AF] py-6 text-center">{children}</p>
@@ -286,6 +374,9 @@ export default function Reactivation() {
   // box. Either one freezes the auto-refresh — see below.
   const [openCall, setOpenCall] = useState(null)
   const [searchFocused, setSearchFocused] = useState(false)
+  // The lead whose live call is being listened to, if any. Same reason as the
+  // open transcript: the table must not reshuffle out from under it.
+  const [listening, setListening] = useState(null)
 
   useEffect(() => {
     const id = setTimeout(() => setSearch(typed.trim()), 350)
@@ -302,7 +393,7 @@ export default function Reactivation() {
   // under a half-typed search or behind an open transcript. Both are true, so
   // both are handled — the pause lives in a ref inside the hook, so switching
   // it does not itself trigger a fetch.
-  const paused = !!openCall || searchFocused
+  const paused = !!openCall || searchFocused || !!listening
   const { data: queue, loading: queueLoading } = useCampaignQueue({
     status: memberStatus, q: search || undefined, limit: PAGE, offset,
     intervalMs: 15_000, paused,
@@ -731,6 +822,8 @@ export default function Reactivation() {
           </div>
         }
       >
+        <QueueVsEnrolled total={queue?.total} enrolled={stats?.members_total} filtered={filtered} />
+
         {/* The breakdown as chips. It is both the filter and the answer to
             "how many were excluded, and for what" — the reason lives in the
             key, so it must be readable rather than hidden behind a dropdown.
@@ -757,7 +850,7 @@ export default function Reactivation() {
                 <th>Status</th>
                 <th className="text-right">Attempt</th>
                 <th>Last call</th>
-                <th className="text-right">Recording</th>
+                <th className="text-right">Audio</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#F3F4F6]">
@@ -765,6 +858,9 @@ export default function Reactivation() {
                 <tr><td colSpan={5}><Empty>Loading…</Empty></td></tr>
               ) : queue?.rows?.length ? queue.rows.map((m) => {
                 const c = m.last_call
+                // Whether the status cell is reporting this campaign or the
+                // lead's history. Computed once, used in the status cell.
+                const prior = saysNothingAboutTheCampaign(m)
                 return (
                   <tr key={m.lead_id} className={m.live_status === 'Dialing now' ? 'bg-[#EC4899]/10' : undefined}>
                     <td className="py-2 min-w-0">
@@ -779,6 +875,18 @@ export default function Reactivation() {
                           act on. */}
                       {m.live_detail && (
                         <span className="block text-[11px] text-[#6B7280] mt-0.5">{words(m.live_detail)}</span>
+                      )}
+                      {/* 🔑 NOT A CAMPAIGN OUTCOME. The campaign has neither
+                          dialled nor queued this person, so the phrase above
+                          is their state from before it started - "Never
+                          reached" here means the old ladder never reached
+                          them, not that reactivation failed. Said out loud,
+                          because a status sitting in a campaign table reads as
+                          a campaign result unless it denies it. */}
+                      {prior && (
+                        <span className="block text-[11px] text-[#9CA3AF] italic mt-0.5">
+                          before this campaign
+                        </span>
                       )}
                     </td>
 
@@ -807,6 +915,25 @@ export default function Reactivation() {
 
                     <td className="text-right whitespace-nowrap">
                       <div className="inline-flex items-center gap-2 justify-end">
+                        {/* 🔑 PRESENT ONLY WHILE THE CALL IS UP, AND ABSENT
+                            OTHERWISE — never a disabled button. listen_url is
+                            a CAPABILITY, not a field: cf_campaign_members
+                            returns it only for the row whose status is
+                            `dialing`, and it stops existing when the call ends
+                            (§7 item 54). A greyed-out control would imply the
+                            audio is there and merely unavailable.
+
+                            The app's one live player, the same component the
+                            Lead Desk board uses. It decodes two-channel s16le
+                            PCM into the Web Audio clock; an <audio> tag cannot
+                            play this stream at all. */}
+                        {m.listen_url && (
+                          <LiveListen
+                            listenUrl={m.listen_url}
+                            name={m.name}
+                            onActive={(on) => setListening(on ? m.lead_id : null)}
+                          />
+                        )}
                         {/* The same player the lead record uses. It takes the
                             CALL ID, not a stored URL — only cf-recording can
                             mint a URL a browser will play (§7 item 139). */}
@@ -874,6 +1001,15 @@ export default function Reactivation() {
         title={`${num(pool?.eligible)} of ${num(pool?.total)} leads can be called`}
         right={<span className="text-xs text-[#6B7280]">why the rest cannot</span>}
       >
+        {/* CONSISTENCY. This panel does NOT count the campaign — cf_campaign_pool
+            counts every live uae lead in the database, enrolled or not. Sitting
+            under "Enrolled" without saying so, a much larger number reads as the
+            two panels contradicting each other. They are answering different
+            questions, so the question is stated. */}
+        <p className="text-[11px] text-[#6B7280] mb-3">
+          Every live lead in the database, whether or not it is enrolled — not a
+          count of this campaign.
+        </p>
         {Object.keys(pool?.breakdown ?? {}).length ? (
           <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-x-8 gap-y-2">
             {Object.entries(pool.breakdown)

@@ -40,7 +40,7 @@ import { Headphones, Square, AlertTriangle } from 'lucide-react'
 const DEFAULT_RATE = 32000
 const RATES = [8000, 16000, 22050, 24000, 32000, 44100, 48000]
 
-export default function LiveListen({ listenUrl, name }) {
+export default function LiveListen({ listenUrl, name, onActive }) {
   const [state, setState] = useState('idle')   // idle | connecting | live | error
   const [error, setError] = useState(null)
   const [rate, setRate] = useState(DEFAULT_RATE)
@@ -72,6 +72,21 @@ export default function LiveListen({ listenUrl, name }) {
 
   // Never leave a socket or an audio context behind on unmount.
   useEffect(() => stop, [stop])
+
+  // OPTIONAL: tell the host whether audio is currently running, so a page that
+  // refreshes a table underneath this button can hold still while somebody is
+  // listening. Held in a ref so an inline arrow from the caller does not
+  // re-fire the effect on every render.
+  const onActiveRef = useRef(onActive)
+  onActiveRef.current = onActive
+  useEffect(() => {
+    onActiveRef.current?.(state === 'live' || state === 'connecting')
+  }, [state])
+  // 🔑 AND ON THE WAY OUT. When the call ends the host drops listenUrl and this
+  // component unmounts — the effect above never gets to run again, so without
+  // this a host that paused itself while listening would stay paused for ever.
+  // Mount-only, so it fires on unmount and not on every state change.
+  useEffect(() => () => { onActiveRef.current?.(false) }, [])
 
   const start = useCallback(() => {
     if (!listenUrl) return
