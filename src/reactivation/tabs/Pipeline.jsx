@@ -125,12 +125,14 @@ function Card({ card, steps, ladder, onOpen }) {
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open() } }}
     >
       <div className="n">{card.name || '—'}</div>
-      {/* ⚠️ The design puts the lead's own words here. This payload has no
-          quote — `cf_campaign_pipeline` returns name, phone, status, reason,
-          attempt and age, and nothing else — so this is the number you would
-          ring rather than a sentence nobody said. The queue's row carries the
-          call's own summary, which is the nearest thing the record holds. */}
-      <div className="q">{card.phone || '—'}</div>
+      {/* The line that mattered, in their own words (migration 234). Verbatim
+          from their own turn of the last connected call — never a summary, and
+          never Sarah's side of it. A lead who has not spoken shows the number
+          instead, because inventing a characterisation for a card somebody
+          rings from is worse than showing nothing. */}
+      {card.said
+        ? <div className="q" title={card.phone || undefined}>“{card.said}”</div>
+        : <div className="q">{card.phone || '—'}</div>}
       <div className="meta">
         <Dots attempt={card.attempt} steps={steps} ladder={ladder} />
         <span className="when">{oldness(card.age_days) || ''}</span>
