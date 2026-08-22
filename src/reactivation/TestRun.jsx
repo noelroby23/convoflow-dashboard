@@ -93,8 +93,9 @@ export default function TestRun() {
       <p className="eyebrow" style={{ color: 'var(--pink)' }}>Before you launch</p>
       <h2 className="sec-title">Try it on your own phones first</h2>
       <p className="sec-sub">
-        Queues a real reactivation call to the numbers below and nothing else. The campaign stays
-        where it is, and not one of the people on your list is touched.
+        Queues a real reactivation call to the numbers below and nothing else. They are counted
+        as campaign leads while you test, so every tab moves — then the clear button takes them
+        back out. Not one of the people on your real list is touched.
       </p>
 
       {list?.error && <div className="rx-error">Could not load the test numbers. {list.error}</div>}
@@ -199,7 +200,7 @@ export default function TestRun() {
                 <p style={{ margin: 0, fontWeight: 600 }}>Done testing?</p>
                 <p className="mono" style={{ fontSize: 11.5, color: 'var(--dim)', margin: '3px 0 0' }}>
                   {td.calls} test call{td.calls === 1 ? '' : 's'} and {td.queue_rows} queue row
-                  {td.queue_rows === 1 ? '' : 's'} are on the dashboard · nothing else is removed
+                  {td.queue_rows === 1 ? '' : 's'} are on the dashboard · your real leads are not touched
                 </p>
               </div>
               {!confirming ? (
