@@ -280,7 +280,15 @@ export function QueueRow({ m, n, steps, ladder, onOpen, onListen, openCall, onTo
             {m.live_status || 'Queued'}{m.live_detail ? ` · ${m.live_detail}` : ''}
           </span>
         ) : lc?.outcome ? (
-          <OutcomePill outcome={outcomeKey(lc.outcome)}>{m.live_status}</OutcomePill>
+          /* 🔑 `m.tag` is the honest label, from the same function the board
+             reads (migration 243). The classifier returns "booked" on calls
+             where the lead only asked to be rung back, so the raw outcome read
+             "Booked" in green here while the board said CALL BACK BOOKED about
+             the same call. The raw outcome is still in the payload for the QA
+             tab - it is the evidence that the classifier is mislabelling. */
+          <OutcomePill outcome={outcomeKey(lc.outcome)}>
+            {m.tag || m.live_status}
+          </OutcomePill>
         ) : (
           <span className="out noans">{m.live_status || '—'}</span>
         )}
