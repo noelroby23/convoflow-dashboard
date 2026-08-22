@@ -316,6 +316,9 @@ export default function Queue({ goTo, openLead, search }) {
   const c = useCampaign()
   const ov = c.overview.data
   const today = c.shifts.data?.today
+  // The campaign's own stats. Everything in the counter strip reads from here,
+  // so this page cannot disagree with the Overview about its own campaign.
+  const st = c.overview.data?.stats
 
   const [filter, setFilter] = useState({ key: 'all' })
   const [offset, setOffset] = useState(0)
@@ -371,7 +374,9 @@ export default function Queue({ goTo, openLead, search }) {
      The configured number is still shown below, named as the plan. */
   const cap = today?.cap ?? null
   const planCap = ov?.daily_dial_cap ?? null
-  const called = today?.calls ?? null
+  // Dials the CAMPAIGN has made, not calls the region made today. `Row 21/150`
+  // was counting the main system's calls into the campaign's daily allowance.
+  const called = c.overview.data?.stats?.dials ?? null
   const left = cap != null && called != null ? Math.max(0, cap - called) : null
   const donePct = cap ? widthPct(called, cap) : null
 
@@ -436,10 +441,16 @@ export default function Queue({ goTo, openLead, search }) {
           suffix={cap ? `/${num(cap)}` : null}
           note={cap ? "position in today's list" : 'no list today'}
         />
+        {/* 🔑 CAMPAIGN FIGURES, NOT THE DAY'S. These read cf_shifts.today, which
+            counts every call in the REGION - the main system included. On a day
+            when the ordinary business booked two meetings and the campaign
+            booked none, this tile said "Booked today 1" on a campaign page.
+            The Overview, Targets and the board all read the campaign's own
+            numbers, so this is the one place that disagreed with the rest. */}
         <Tile label="Called" value={num(called)} note="dialled so far" />
-        <Tile label="Got through" value={num(today?.reached)} note="a human answered" />
-        <Tile label="Real talks" value={num(today?.talks)} note="past the opener" />
-        <Tile label="Booked today" value={num(today?.booked)} note="meetings in the diary" hot />
+        <Tile label="Got through" value={num(st?.connects)} note="a human answered" />
+        <Tile label="Real talks" value={num(st?.conversations)} note="past the opener" />
+        <Tile label="Booked today" value={num(st?.meetings)} note="meetings this campaign booked" hot />
         {/* ⚠️ The design puts a running timer here. There is no call-start
             timestamp in the payload — `next_at` is when the row fell due, not
             when the phone started ringing — and a stopwatch started from when
@@ -449,7 +460,7 @@ export default function Queue({ goTo, openLead, search }) {
           on
           label="Dialling"
           value={live ? <span style={{ fontSize: 17 }}><LiveDot /> {live.name || '—'}</span> : '—'}
-          note={live ? 'talking now' : 'nobody on the phone'}
+          note={live ? 'ringing — nobody has answered yet' : 'nobody on the phone'}
         />
       </div>
 
