@@ -2,6 +2,7 @@ import { useCampaign } from '../useCampaign'
 import { Feed, Empty, SectionHead, Dot } from '../bits'
 import { num, pct, humanise } from '../format'
 import { usePendingEdits, pendingEdits } from './CallReview'
+import TestRun from '../TestRun'
 
 /**
  * Setup — everything that is configuration rather than status. A client never
@@ -170,6 +171,10 @@ export default function Setup({ control, busy, goTo }) {
       <Feed feed={c.overview} what="the campaign">
         {(o) => <Controls ov={o} control={control} busy={busy} />}
       </Feed>
+
+      {/* Above the configuration, because it is the thing somebody wants
+          BEFORE they press Start, not a setting they came here to read. */}
+      <TestRun />
 
       <div className="setup-grid" style={{ marginTop: 20 }}>
         {/* ── left: who, how many, aiming for, prompt ── */}
