@@ -617,3 +617,46 @@
 .rx .rx-empty{border:1px dashed var(--hairline);border-radius:12px;padding:26px 22px;
   color:var(--muted);font-size:13.5px;text-align:center}
 .rx .rx-empty b{color:var(--text);display:block;font-family:var(--display);font-size:15px;margin-bottom:5px}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * READABILITY LIFT — Abdus, 2026-08-22: "its a little too dark to see".
+ *
+ * The mockup was built to be looked at; this is built to be read for an hour
+ * at a time. Two changes, and nothing else moves:
+ *
+ *   THE GREYS COME UP. `--muted` and `--dim` carry most of the words on this
+ *   dashboard - every sub-line, every legend, every "of 69 calls where it
+ *   applied" - and at #8B8794 / #5F5B69 on a near-black ground they sit around
+ *   3:1, which is under the 4.5:1 that small text needs. They now clear it.
+ *
+ *   THE SURFACES SEPARATE. Card, raised and page ground were within four
+ *   points of each other, so a card had no edge until you looked for one.
+ *   The steps between them are widened; the hue and the character are kept.
+ *
+ * The accent colours are UNTOUCHED - pink, green, amber, blue and red carry
+ * meaning (Sarah vs the team, on target vs off) and shifting them would change
+ * what the page says, not just how it looks.
+ *
+ * To go back to the CTO's exact values, delete this block.
+ * ───────────────────────────────────────────────────────────────────────── */
+.rx{
+  --ink:#141319;
+  --surface:#1D1C23;
+  --raised:#272530;
+  --card:#2C2A36;
+  --hairline:#403C4B;
+  --hairline-soft:#332F3D;
+  --text:#F6F4F8;
+  --muted:#ADA8B8;
+  --dim:#8A8496;
+}
+
+/* Numbers and labels in the mono face are small and letterspaced, which costs
+ * legibility on top of the colour - so they get a touch more weight rather
+ * than a bigger size, which would reflow every table. */
+.rx .mono{font-weight:500}
+.rx .eyebrow{color:var(--dim);font-weight:600}
+
+/* A dimmed row (a queued call, a lead nobody has reached) was at 50% and read
+ * as switched off rather than as waiting. */
+.rx .q.wait,.rx tr.wait{opacity:.72}
