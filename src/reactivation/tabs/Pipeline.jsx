@@ -116,6 +116,21 @@ function Dots({ attempt, steps, ladder }) {
   )
 }
 
+/* One colour per ask, shared with nothing else. Pink is Sarah's urgent, green
+   is a win, amber is a soft no, dim is a non-event. */
+const TAG_TONE = {
+  'MEETING BOOKED': 'goodt',
+  'CALL BACK BOOKED': 'hott',
+  'ASKED FOR A HUMAN': 'hott',
+  'ASKED FOR PRICING': 'hott',
+  'READY TO MOVE': 'hott',
+  'WANTS IT ON WHATSAPP': '',
+  'NOT A FIT': 'warnt',
+  'SAID NO': 'warnt',
+  'VOICEMAIL': '',
+  'NO ANSWER': '',
+}
+
 function Card({ card, steps, ladder, onOpen }) {
   const open = () => onOpen(card.lead_id)
   return (
@@ -130,18 +145,40 @@ function Card({ card, steps, ladder, onOpen }) {
           never Sarah's side of it. A lead who has not spoken shows the number
           instead, because inventing a characterisation for a card somebody
           rings from is worse than showing nothing. */}
+      {/* Quote first, reason second, number last (migrations 234 + 239). A
+          disqualified lead's reason - "two staff, no sales team" - beats
+          whatever they happened to say, and a lead nobody has spoken to shows
+          the number rather than an invented characterisation. */}
       {card.said
         ? <div className="q" title={card.phone || undefined}>“{card.said}”</div>
-        : <div className="q">{card.phone || '—'}</div>}
+        : card.why
+          ? <div className="q" title={card.phone || undefined}>{card.why}</div>
+          : <div className="q">{card.phone || '—'}</div>}
       <div className="meta">
         <Dots attempt={card.attempt} steps={steps} ladder={ladder} />
-        <span className="when">{oldness(card.age_days) || ''}</span>
+        {/* When we ring next beats how old they are: one is a plan, the other
+            is trivia. Falls back to the age when nothing is scheduled. */}
+        {card.next_at
+          ? <span className="when" style={{ color: 'var(--pink)' }}>{card.next_at}</span>
+          : card.waiting_hours != null && card.waiting_hours >= 4
+            ? <span className="when" style={{ color: 'var(--warn)' }}>
+                waiting {card.waiting_hours < 48
+                  ? `${card.waiting_hours}h`
+                  : `${Math.round(card.waiting_hours / 24)}d`}
+              </span>
+            : <span className="when">{oldness(card.age_days) || ''}</span>}
       </div>
-      {card.reason
-        ? <span className="tagline warnt">{humanise(card.reason)}</span>
-        : card.status
-          ? <span className={`tagline ${phraseTone(card.status)}`}>{card.status}</span>
-          : null}
+      {/* WHAT THEY ASKED FOR, from the call itself - not the column they are
+          in. Two leads sit in "talked, not booked" for the same reason and one
+          asked for pricing while the other asked for a callback; the column
+          cannot tell them apart and this can. */}
+      {card.tag
+        ? <span className={`tagline ${TAG_TONE[card.tag] || ''}`}>{card.tag}</span>
+        : card.reason
+          ? <span className="tagline warnt">{humanise(card.reason)}</span>
+          : card.status
+            ? <span className={`tagline ${phraseTone(card.status)}`}>{card.status}</span>
+            : null}
     </div>
   )
 }

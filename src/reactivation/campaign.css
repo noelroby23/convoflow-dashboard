@@ -660,3 +660,8 @@
 /* A dimmed row (a queued call, a lead nobody has reached) was at 50% and read
  * as switched off rather than as waiting. */
 .rx .q.wait,.rx tr.wait{opacity:.72}
+
+/* The urgent ask — pricing, a callback, a person. Pink because it is Sarah's
+   work coming back needing a human, which is the same thing the Super hot
+   column means (migration 239). */
+.rx .tagline.hott{background:#2A0F1C;color:var(--pink)}
