@@ -172,13 +172,17 @@ function Card({ card, steps, ladder, onOpen }) {
           in. Two leads sit in "talked, not booked" for the same reason and one
           asked for pricing while the other asked for a callback; the column
           cannot tell them apart and this can. */}
+      {/* 🔑 NO FALLBACK TO THE LEAD'S HISTORICAL STATUS. `card.status` is
+          cf.lead_status_phrase - the ordinary business's view of this person,
+          often months old - and rendering it here put "MEETING BOOKED" on a
+          lead with 0 of 4 attempts who has never been called by the campaign.
+          A campaign card shows campaign facts or nothing; the column has
+          already said where they are. */}
       {card.tag
         ? <span className={`tagline ${TAG_TONE[card.tag] || ''}`}>{card.tag}</span>
         : card.reason
           ? <span className="tagline warnt">{humanise(card.reason)}</span>
-          : card.status
-            ? <span className={`tagline ${phraseTone(card.status)}`}>{card.status}</span>
-            : null}
+          : null}
     </div>
   )
 }
