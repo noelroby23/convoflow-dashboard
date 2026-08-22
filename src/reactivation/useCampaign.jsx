@@ -51,7 +51,10 @@ async function rpc(fn, p = {}) {
  * the fast rate is twelve round trips a minute for figures that move once a day.
  */
 const FEEDS = {
-  overview: { fn: 'cf_campaign_overview',   every: 20_000 },
+  // Fastest of the lot: it drives the counter strip, the Overview tiles and the
+  // "Calling now" pill, and at 20s those lag a 5s queue by enough to look like
+  // the page contradicting itself while you watch a call.
+  overview: { fn: 'cf_campaign_overview',   every: 8_000 },
   funnel:   { fn: 'cf_campaign_funnel',     every: 60_000 },
   pipeline: { fn: 'cf_campaign_pipeline',   every: 45_000 },
   ladder:   { fn: 'cf_campaign_ladder',     every: 60_000 },
@@ -59,7 +62,7 @@ const FEEDS = {
   scores:   { fn: 'cf_score_summary',       every: 120_000 },
   findings: { fn: 'cf_score_findings',      every: 120_000 },
   pool:     { fn: 'cf_campaign_pool',       every: 300_000 },
-  events:   { fn: 'cf_campaign_events',     every: 30_000, args: { limit: 40 } },
+  events:   { fn: 'cf_campaign_events',     every: 15_000, args: { limit: 40 } },
   daily:    { fn: 'cf_campaign_daily',      every: 120_000 },
   brief:    { fn: 'cf_manager_brief_facts', every: 300_000 },
 }

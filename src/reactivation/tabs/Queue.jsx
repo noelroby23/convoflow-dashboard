@@ -85,6 +85,9 @@ const clockMinutes = (hhmm) => {
  * has quietly stopped dialling.
  */
 function useQueue({ status, reason, q, offset, paused, every = 15_000 }) {
+  // `every` is the resting rate. While a call is actually on the phone the
+  // caller passes something faster - watching a live call at 15-second refresh
+  // is watching a slideshow, and the whole point of this tab is that it moves.
   const [state, setState] = useState({ data: null, error: null, loading: true })
   const pausedRef = useRef(paused)
   pausedRef.current = paused
@@ -322,11 +325,19 @@ export default function Queue({ goTo, openLead, search }) {
   // read at an old offset renders empty and looks like a broken table.
   useEffect(() => { setOffset(0) }, [filter, q])
 
-  const paused = !!openCall || !!listening
+  // 🔑 PAUSE ONLY FOR A TRANSCRIPT. Reading one means rows moving under you is
+  // a nuisance; LISTENING to a live call is the moment you most want the row to
+  // stay current, so listening no longer freezes the poll.
+  const paused = !!openCall
+  const live = useOnThePhone()
+  // Five seconds while somebody is on the phone or a call is due within the
+  // minute; fifteen when the campaign is idle. Polling hard at 3am against a
+  // draft campaign is just noise on the database.
+  const busy = (live?.length ?? 0) > 0
   const { data, error, loading } = useQueue({
     status: filter.status, reason: filter.reason, q: q || undefined, offset, paused,
+    every: busy ? 5_000 : 15_000,
   })
-  const live = useOnThePhone()
 
   const rows = data?.rows ?? []
   const byStatus = data?.by_status ?? {}
@@ -483,9 +494,25 @@ export default function Queue({ goTo, openLead, search }) {
             >Needs a human ↗</Chip>
           </div>
 
-          <span className="livepill" style={paused ? { color: 'var(--dim)', borderColor: 'var(--hairline)', background: 'none' } : undefined}>
-            {paused ? 'Paused while you read' : 'Updating live'}
-          </span>
+          {/* A live view that has quietly stopped refreshing looks exactly like
+              a campaign that has quietly stopped dialling, so it always says
+              which it is - and offers the way back rather than leaving you to
+              find the transcript you left open. */}
+          {paused ? (
+            <button
+              className="livepill"
+              onClick={() => setOpenCall(null)}
+              title="Close the transcript and go back to live"
+              style={{ color: 'var(--warn)', borderColor: '#4A3A15',
+                       background: '#211A0D', cursor: 'pointer' }}
+            >
+              Paused while you read · resume
+            </button>
+          ) : (
+            <span className="livepill">
+              {busy ? 'Live · every 5s' : 'Live · every 15s'}
+            </span>
+          )}
         </div>
 
         {/* An explicit height is the one adaptation this needs: the design's
