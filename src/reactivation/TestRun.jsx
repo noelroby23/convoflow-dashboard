@@ -25,6 +25,8 @@ export default function TestRun() {
   const [picked, setPicked] = useState(() => new Set())
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState(null)
+  const [clearing, setClearing] = useState(false)
+  const [confirming, setConfirming] = useState(false)
 
   const load = useCallback(async () => {
     const { data, error } = await supabase.rpc('cf_campaign_test', { p: { action: 'list' } })
@@ -62,7 +64,29 @@ export default function TestRun() {
     } finally { setBusy(false) }
   }
 
+  const clear = async () => {
+    setClearing(true)
+    try {
+      const { data, error } = await supabase.rpc('cf_campaign_test', { p: { action: 'clear' } })
+      if (error) throw error
+      const d = Array.isArray(data) ? data[0] : data
+      // It reports what it removed rather than saying "done" - a clear-down that
+      // deleted nothing and one that deleted everything look identical from a toast.
+      toast.success(
+        d?.calls_removed + d?.queue_rows_removed > 0
+          ? `Cleared ${d.calls_removed} call${d.calls_removed === 1 ? '' : 's'} and ${d.queue_rows_removed} queue row${d.queue_rows_removed === 1 ? '' : 's'}`
+          : 'There was no test data to clear')
+      setResult(null)
+      setConfirming(false)
+      await load()
+    } catch (e) {
+      toast.error(e.message)
+    } finally { setClearing(false) }
+  }
+
   const ready = (list?.numbers || []).filter((n) => n.ready)
+  const td = list?.test_data
+  const leftover = (td?.queue_rows ?? 0) + (td?.calls ?? 0)
 
   return (
     <section className="card" style={{ marginTop: 20, borderColor: '#5E2340' }}>
@@ -155,6 +179,68 @@ export default function TestRun() {
               )}
               {result.ok === false && (
                 <p className="mono" style={{ fontSize: 12, color: 'var(--bad)' }}>{result.reason}</p>
+              )}
+            </div>
+          )}
+
+          {/* ── clearing up afterwards ──
+              The test puts real calls into the queue and into cf.call, and those
+              rows are then read by the queue table, the shift figures and the
+              call scorer. Left there, day one of the real campaign opens on a
+              dashboard where some of the movement is your own testing - and a
+              number you have to mentally subtract from is a number nobody
+              trusts. */}
+          {leftover > 0 && (
+            <div style={{
+              marginTop: 18, paddingTop: 15, borderTop: '1px solid var(--hairline-soft)',
+              display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap',
+            }}>
+              <div style={{ flex: 1, minWidth: 240 }}>
+                <p style={{ margin: 0, fontWeight: 600 }}>Done testing?</p>
+                <p className="mono" style={{ fontSize: 11.5, color: 'var(--dim)', margin: '3px 0 0' }}>
+                  {td.calls} test call{td.calls === 1 ? '' : 's'} and {td.queue_rows} queue row
+                  {td.queue_rows === 1 ? '' : 's'} are on the dashboard · nothing else is removed
+                </p>
+              </div>
+              {!confirming ? (
+                <button
+                  onClick={() => setConfirming(true)}
+                  className="mono"
+                  style={{
+                    background: 'none', border: '1px solid var(--hairline)', color: 'var(--muted)',
+                    borderRadius: 9, padding: '10px 16px', cursor: 'pointer',
+                    fontSize: 11, letterSpacing: '.08em', textTransform: 'uppercase',
+                  }}
+                >
+                  Clear test data
+                </button>
+              ) : (
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <span className="mono" style={{ fontSize: 11, color: 'var(--warn)' }}>
+                    can't be undone
+                  </span>
+                  <button
+                    onClick={clear} disabled={clearing}
+                    className="mono"
+                    style={{
+                      background: 'var(--warn)', border: 0, color: '#1A1204', borderRadius: 9,
+                      padding: '10px 16px', cursor: clearing ? 'wait' : 'pointer', fontWeight: 700,
+                      fontSize: 11, letterSpacing: '.08em', textTransform: 'uppercase',
+                    }}
+                  >
+                    {clearing ? 'clearing…' : 'Yes, clear it'}
+                  </button>
+                  <button
+                    onClick={() => setConfirming(false)}
+                    className="mono"
+                    style={{
+                      background: 'none', border: 0, color: 'var(--dim)', cursor: 'pointer',
+                      fontSize: 11, letterSpacing: '.08em', textTransform: 'uppercase',
+                    }}
+                  >
+                    cancel
+                  </button>
+                </div>
               )}
             </div>
           )}
