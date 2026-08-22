@@ -188,6 +188,18 @@ export async function fetchExport(args) {
   return rpc('cf_campaign_export', args)
 }
 
+/**
+ * Move a card between columns.
+ *
+ * 🔑 A REFUSAL IS AN ANSWER, NOT AN ERROR. Most columns are worked out from
+ * facts - a meeting exists or it does not, a deal is won in GHL or it is not -
+ * and the RPC comes back { ok:true, moved:false, reason } for those. The caller
+ * shows the reason; throwing would make a considered refusal look like a fault.
+ */
+export async function moveCard(leadId, toColumn) {
+  return rpc('cf_campaign_move_card', { lead_id: leadId, to_column: toColumn })
+}
+
 /** One lead, in full, for the drawer. */
 export async function fetchLead(leadId) {
   return rpc('cf_lead_detail', { lead_id: leadId })

@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import { useCampaign } from '../useCampaign'
+import { useCallback, useState } from 'react'
+import { toast } from 'sonner'
+import { useCampaign, moveCard } from '../useCampaign'
 import { Feed, Empty, Eyebrow } from '../bits'
 import { humanise, money, num, widthPct } from '../format'
 import { phraseTone } from './Queue'
@@ -131,11 +132,21 @@ const TAG_TONE = {
   'NO ANSWER': '',
 }
 
-function Card({ card, steps, ladder, onOpen }) {
+function Card({ card, steps, ladder, onOpen, onDragStart, onDragEnd, dragging }) {
   const open = () => onOpen(card.lead_id)
   return (
     <div
       className="lead" tabIndex={0} role="button"
+      draggable
+      onDragStart={(e) => {
+        // The lead id travels on the event, so a drop needs no shared state and
+        // cannot act on a stale selection.
+        e.dataTransfer.setData('text/plain', card.lead_id)
+        e.dataTransfer.effectAllowed = 'move'
+        onDragStart?.(card.lead_id)
+      }}
+      onDragEnd={() => onDragEnd?.()}
+      style={dragging ? { opacity: 0.4 } : undefined}
       onClick={open}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open() } }}
     >
@@ -187,8 +198,12 @@ function Card({ card, steps, ladder, onOpen }) {
   )
 }
 
-function Column({ col, index, steps, ladder, onOpen }) {
+function Column({ col, index, steps, ladder, onOpen, onDrop, dragging, onDragStart, onDragEnd }) {
   const [showAll, setShowAll] = useState(false)
+  const [over, setOver] = useState(false)
+  // A column that cannot be set by hand is not a drop target, and says so on
+  // hover rather than accepting the card and bouncing it back.
+  const settable = !!col.settable
   const cards = col.cards || []
   const CAP = 6
   const shown = showAll ? cards : cards.slice(0, CAP)
@@ -204,7 +219,28 @@ function Column({ col, index, steps, ladder, onOpen }) {
   return (
     <section
       className={`col${finish ? ' finish' : ''}${dead ? ' parked' : ''}`}
-      style={{ '--accent': accentOf(col.col) }}
+      style={{
+        '--accent': accentOf(col.col),
+        // Only a settable column lights up. A card hovering over "Signed"
+        // should look like it is going nowhere, because it is.
+        ...(over && settable ? { outline: '2px solid var(--pink)', outlineOffset: 2 } : {}),
+        ...(dragging && !settable ? { opacity: 0.45 } : {}),
+      }}
+      onDragOver={(e) => {
+        if (!settable) return
+        e.preventDefault()
+        e.dataTransfer.dropEffect = 'move'
+        if (!over) setOver(true)
+      }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => {
+        setOver(false)
+        if (!settable) return
+        e.preventDefault()
+        const leadId = e.dataTransfer.getData('text/plain')
+        if (leadId) onDrop?.(leadId, col.col, col.label)
+      }}
+      title={!settable && col.refusal ? col.refusal : undefined}
     >
       <div className="col-head">
         <p className={`owner ${col.owner === 'ron' ? 't' : 's'}`}>
@@ -227,7 +263,11 @@ function Column({ col, index, steps, ladder, onOpen }) {
           <p className="col-sub" style={{ padding: '10px 2px', margin: 0 }}>Nobody here yet.</p>
         )}
         {shown.map((card) => (
-          <Card key={card.lead_id} card={card} steps={steps} ladder={ladder} onOpen={onOpen} />
+          <Card
+            key={card.lead_id} card={card} steps={steps} ladder={ladder} onOpen={onOpen}
+            onDragStart={onDragStart} onDragEnd={onDragEnd}
+            dragging={dragging === card.lead_id}
+          />
         ))}
         {hiddenHere > 0 && (
           <button className="more" onClick={() => setShowAll(true)}>{num(hiddenHere)} more</button>
@@ -259,6 +299,35 @@ export default function Pipeline({ openLead }) {
   const ladder = ov?.ladder ?? []
   const steps = ladder.length || null
   const stats = ov?.stats
+  const [dragging, setDragging] = useState(null)
+
+  /**
+   * The drop. It writes through cf_campaign_move_card, which goes through
+   * cf.set_state - so GHL gets the stage move and the tags too, not just this
+   * board (migration 244).
+   *
+   * 🔑 NO OPTIMISTIC MOVE. The card stays where it is until the database has
+   * confirmed, then the board refetches. An optimistic jump would be a lie for
+   * the half-second before a refusal came back, and refusals are common here:
+   * most columns are worked out from facts and cannot be set by hand.
+   */
+  const drop = useCallback(async (leadId, toCol, label) => {
+    setDragging(null)
+    try {
+      const r = await moveCard(leadId, toCol)
+      if (r?.moved) {
+        toast.success(`Moved to ${label}${r.note ? ` — ${r.note}` : ''}`)
+        c.refresh('pipeline')
+        c.refresh('overview')
+      } else {
+        // A refusal is an answer. Show the reason rather than letting the card
+        // silently snap back with nothing said.
+        toast.error(r?.reason || 'That column cannot be set by hand')
+      }
+    } catch (e) {
+      toast.error(e.message)
+    }
+  }, [c])
 
   return (
     <Feed
@@ -364,19 +433,25 @@ export default function Pipeline({ openLead }) {
                 screen of nothing. */}
             <main className="board" style={{ maxHeight: 'calc(100vh - 330px)', minHeight: 340, marginTop: 6 }}>
               {sarah.map((col, i) => (
-                <Column key={col.col} col={col} index={i + 1} steps={steps} ladder={ladder} onOpen={openLead} />
+                <Column key={col.col} col={col} index={i + 1} steps={steps} ladder={ladder}
+                  onOpen={openLead} onDrop={drop} dragging={dragging}
+                  onDragStart={setDragging} onDragEnd={() => setDragging(null)} />
               ))}
 
               {ron.length > 0 && (
                 <div className="handoff-col"><p>Handoff</p><small>Sarah stops here</small></div>
               )}
               {ron.map((col) => (
-                <Column key={col.col} col={col} index={0} steps={steps} ladder={ladder} onOpen={openLead} />
+                <Column key={col.col} col={col} index={0} steps={steps} ladder={ladder}
+                  onOpen={openLead} onDrop={drop} dragging={dragging}
+                  onDragStart={setDragging} onDragEnd={() => setDragging(null)} />
               ))}
 
               {dead.length > 0 && <div className="divider"><span>Dead end</span></div>}
               {dead.map((col) => (
-                <Column key={col.col} col={col} index={0} steps={steps} ladder={ladder} onOpen={openLead} />
+                <Column key={col.col} col={col} index={0} steps={steps} ladder={ladder}
+                  onOpen={openLead} onDrop={drop} dragging={dragging}
+                  onDragStart={setDragging} onDragEnd={() => setDragging(null)} />
               ))}
             </main>
           </>
