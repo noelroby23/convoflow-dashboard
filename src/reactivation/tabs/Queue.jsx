@@ -246,7 +246,13 @@ export function QueueRow({ m, n, steps, ladder, onOpen, onListen, openCall, onTo
             so this is the call's own account of itself — never invented, and
             never shown for a call that has not happened. */}
         {lc?.summary && <div className="qsaid">{lc.summary}</div>}
-        {isLive && !lc?.summary && <div className="qsaid">Talking now</div>}
+        {/* 🔑 "DIALLING", NEVER "TALKING NOW". We know a call has been PLACED;
+            we do not know whether anybody picked it up. VAPI only tells us that
+            at the end of the call (`end-of-call-report`), so until then the
+            honest word is dialling. Saying "talking now" over a ringing phone
+            is the system claiming something it has not been told - which is the
+            failure this whole project keeps paying for. */}
+        {isLive && !lc?.summary && <div className="qsaid">Dialling…</div>}
       </td>
 
       <td className="qatt">
@@ -257,7 +263,7 @@ export function QueueRow({ m, n, steps, ladder, onOpen, onListen, openCall, onTo
 
       <td>
         {isLive ? (
-          <span className="out oncall">On the phone</span>
+          <span className="out oncall">Dialling</span>
         ) : notCalled ? (
           <span className="out noans">
             Not called{m.exclude_reason ? ` · ${humanise(m.exclude_reason)}` : ''}
@@ -435,7 +441,7 @@ export default function Queue({ goTo, openLead, search }) {
             rather than of the call. Name and a live dot instead. */}
         <Tile
           on
-          label="On the phone"
+          label="Dialling"
           value={live ? <span style={{ fontSize: 17 }}><LiveDot /> {live.name || '—'}</span> : '—'}
           note={live ? 'talking now' : 'nobody on the phone'}
         />
