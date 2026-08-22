@@ -136,7 +136,10 @@ function useOnThePhone() {
       .then((d) => { if (alive) setRow(d?.rows?.[0]?.sort_key === '1' ? d.rows[0] : null) })
       .catch(() => { if (alive) setRow(null) })
     go()
-    const t = setInterval(() => { if (!document.hidden) go() }, 10_000)
+    // 3s while somebody is on the phone, 10s when the line is quiet. This is the
+    // probe the whole page's refresh rate is derived from, so it must not be the
+    // slowest thing on the page.
+    const t = setInterval(() => { if (!document.hidden) go() }, 3_000)
     return () => { alive = false; clearInterval(t) }
   }, [])
   return row
@@ -339,10 +342,13 @@ export default function Queue({ goTo, openLead, search }) {
   // Five seconds while somebody is on the phone or a call is due within the
   // minute; fifteen when the campaign is idle. Polling hard at 3am against a
   // draft campaign is just noise on the database.
-  const busy = (live?.length ?? 0) > 0
+  // useOnThePhone returns a single row or null - not an array. Testing
+  // `.length` on an object is silently false, which is why the pill sat at 15s
+  // with a call visibly dialling.
+  const busy = !!live
   const { data, error, loading } = useQueue({
     status: filter.status, reason: filter.reason, q: q || undefined, offset, paused,
-    every: busy ? 5_000 : 15_000,
+    every: busy ? 3_000 : 10_000,
   })
 
   const rows = data?.rows ?? []
@@ -516,7 +522,7 @@ export default function Queue({ goTo, openLead, search }) {
             </button>
           ) : (
             <span className="livepill">
-              {busy ? 'Live · every 5s' : 'Live · every 15s'}
+              {busy ? 'Live · every 3s' : 'Live · every 10s'}
             </span>
           )}
         </div>
