@@ -59,8 +59,13 @@ const FEEDS = {
   pipeline: { fn: 'cf_campaign_pipeline',   every: 45_000 },
   ladder:   { fn: 'cf_campaign_ladder',     every: 60_000 },
   shifts:   { fn: 'cf_shifts',              every: 60_000 },
-  scores:   { fn: 'cf_score_summary',       every: 120_000 },
-  findings: { fn: 'cf_score_findings',      every: 120_000 },
+  // 🔑 campaign_only. cf.call_score holds every scored call in the system and only
+  // a fraction are this campaign's — 44 of 372 when this was measured. Without the
+  // flag the Call Review tab is a verdict on the main funnel shown on a page that
+  // says "Reactivation" at the top. Migration 252 makes both RPCs honour it, and
+  // defaults it to false so no other page changes.
+  scores:   { fn: 'cf_score_summary',       every: 120_000, args: { campaign_only: true } },
+  findings: { fn: 'cf_score_findings',      every: 120_000, args: { campaign_only: true } },
   pool:     { fn: 'cf_campaign_pool',       every: 300_000 },
   events:   { fn: 'cf_campaign_events',     every: 15_000, args: { limit: 40 } },
   daily:    { fn: 'cf_campaign_daily',      every: 120_000 },
