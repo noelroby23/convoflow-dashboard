@@ -530,7 +530,7 @@ function ShiftCard({ c, ov, draft }) {
               <h2 className="sec-title">Her shift so far</h2>
               <p className="sec-sub">
                 {t.from && t.from !== '—'
-                  ? <>First call {t.from}, last {t.to}, Dubai time. This is her whole day, not only this campaign.</>
+                  ? <>First call {t.from}, last {t.to}, Dubai time. Reactivation calls only.</>
                   : <>She has not made a call today.</>}
               </p>
 
@@ -696,7 +696,7 @@ function FunnelCard({ plan, st, axis, eligible, started }) {
   const cmpFor = {
     'Leads dialled': calledPct != null ? <><b>{pct(calledPct)}</b> of the list</> : '—',
     'Reached': <><b>{pct(st.reach_pct)}</b> of those called</>,
-    'Real conversations': <><b>{pct(st.conversation_pct)}</b> of pick-ups</>,
+    'Real conversations': <><b>{pct(st.talked_pct)}</b> of pick-ups</>,
     'Meetings booked': <><b>{pct(st.booking_pct)}</b> of real talks</>,
     'Showed': <><b>{pct(st.show_pct)}</b> of meetings</>,
     'Closed': <><b>{pct(st.close_pct)}</b> of turn-ups</>,

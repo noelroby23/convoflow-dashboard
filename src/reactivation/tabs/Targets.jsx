@@ -43,7 +43,7 @@ export const METRIC = {
   },
   'Real conversations': {
     label: 'Real conversations', short: 'Conversations', owner: 'Sarah',
-    unit: 'real conversations', stage: 'past the first 20 seconds', fmt: num,
+    unit: 'real conversations', stage: 'got past a brush-off', fmt: num,
   },
   'Meetings booked': {
     label: 'Meetings booked', short: 'Meetings booked', owner: 'Sarah',
