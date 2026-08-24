@@ -665,3 +665,29 @@
    work coming back needing a human, which is the same thing the Super hot
    column means (migration 239). */
 .rx .tagline.hott{background:#2A0F1C;color:var(--pink)}
+
+/* ── 249: THE ONE LINE ──────────────────────────────────────────────────────
+   Called -> picked up -> talked -> booked, before anything else on the page.
+   Deliberately the largest type in the app: it is the only thing on Overview
+   that answers "how did it go" without the reader doing arithmetic. */
+.rx .oneline{
+  display:flex; align-items:stretch; gap:0; flex-wrap:wrap;
+  background:var(--panel); border:1px solid var(--hairline); border-radius:14px;
+  padding:18px 8px; margin-bottom:14px;
+}
+.rx .ol-cell{ display:flex; align-items:center; flex:1 1 150px; min-width:150px; }
+.rx .ol-arrow{
+  font-style:normal; font-size:22px; line-height:1; color:var(--hairline);
+  padding:0 10px; flex:0 0 auto;
+}
+.rx .ol-body{ display:flex; flex-direction:column; gap:2px; padding:0 10px; min-width:0; }
+.rx .ol-body b{
+  font-size:34px; font-weight:650; line-height:1.05; letter-spacing:-0.02em;
+  color:var(--ink); font-variant-numeric:tabular-nums;
+}
+.rx .ol-body span{ font-size:13px; font-weight:550; color:var(--ink); }
+.rx .ol-body em{ font-style:normal; font-size:12px; color:var(--dim); }
+@media (max-width:720px){
+  .rx .oneline{ padding:14px 4px; }
+  .rx .ol-body b{ font-size:26px; }
+}

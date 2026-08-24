@@ -27,6 +27,44 @@ import { campaignPlan, gapText } from './Targets'
  * that put four green "on track" ticks on Home over four missing numbers.
  */
 
+/**
+ * THE ONE LINE. Abdus asked for this twice: "im not able to tell how many calls
+ * have been done total and how many spoke to how many picked up in a simple way
+ * rigtbnow its alot". Every number was already on the page, spread across six
+ * tiles and a traffic-light strip. This states the funnel in one sentence before
+ * any of that.
+ *
+ * 🔑 "Picked up" and "talked" are DIFFERENT numbers and that gap is the point.
+ * On the pilot: 49 called, 11 picked up, 4 got past a brush-off, 1 booked.
+ * `talked` is migration 249 - a connected call carrying a lead turn that lasted
+ * at least cf.system_config.conversation_seconds. It is NOT `conversations`,
+ * which asks only whether the lead said anything at all and reads 11 of 11 here.
+ * The kill criteria in 5.11 measure against `conversations`, so the two must
+ * stay separate.
+ */
+function OneLine({ st }) {
+  const steps = [
+    { n: st.dials,        label: 'called',     sub: 'we dialled' },
+    { n: st.connects,     label: 'picked up',  sub: st.connect_pct != null ? `${pct(st.connect_pct)} of calls` : null },
+    { n: st.talked,       label: 'talked',     sub: st.talked_pct  != null ? `${pct(st.talked_pct)} of pick-ups` : null },
+    { n: st.meetings,     label: 'booked',     sub: st.booking_pct != null ? `${pct(st.booking_pct)} of conversations` : null },
+  ]
+  return (
+    <section className="oneline">
+      {steps.map((s, i) => (
+        <div className="ol-cell" key={s.label}>
+          {i > 0 && <i className="ol-arrow" aria-hidden="true">&rsaquo;</i>}
+          <div className="ol-body">
+            <b>{num(s.n)}</b>
+            <span>{s.label}</span>
+            <em>{s.sub || '\u2014'}</em>
+          </div>
+        </div>
+      ))}
+    </section>
+  )
+}
+
 const toneClassSb = { good: 'on', warn: 'off', bad: 'off', na: '' }
 
 /** The dot on a scoreboard tile. `.sb.on`/`.sb.off` colour it; nothing colours "unknown". */
@@ -148,6 +186,9 @@ export default function Overview({ goTo }) {
 
         return (
           <>
+            {/* ── 2.0 THE ONE LINE ───────────────────────────────────────── */}
+            <OneLine st={st} />
+
             {/* ── 2.1 SCOREBOARD ─────────────────────────────────────────── */}
             <section className="score-wrap">
               <div className="score-top">
@@ -205,9 +246,9 @@ export default function Overview({ goTo }) {
                 />
 
                 <Tile
-                  label="Conversations" value={st.conversations} row={B['Real conversations']}
-                  sub={st.conversation_pct != null
-                    ? `${pct(st.conversation_pct)} of pick-ups stayed on the line`
+                  label="Real conversations" value={st.talked} row={B['Real conversations']}
+                  sub={st.talked_pct != null
+                    ? `${pct(st.talked_pct)} of pick-ups got past a brush-off`
                     : 'no pick-ups to measure'}
                 />
 
