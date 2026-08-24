@@ -203,7 +203,22 @@ function Body({ d, notFound, reason, onClose, busy, setBusy, openCall, setOpenCa
   const extraRows = extras.filter((e) => (seenExtra.has(e.label) ? false : seenExtra.add(e.label)))
 
   const futureMeeting = appts.find((a) => ['booked', 'rescheduled'].includes(a.status) && new Date(a.start_at) > new Date())
-  const anyMeeting = appts[0]
+  /**
+   * 🔑 A MEETING ONLY COUNTS IF THIS CONVERSATION COULD HAVE MADE IT.
+   * Honore was flagged "Booked with almost nothing asked" on the strength of two
+   * meetings from 13 MAY, three months before the campaign released him — he was
+   * disqualified on the call being judged, not booked. `appts[0]` is any meeting
+   * ever, which reads history as a campaign outcome (§7 item 197's class).
+   * Migration 259 adds booked_at, so the question can be asked properly: booked
+   * after the campaign reached them, or failing that after the oldest call on
+   * screen. No date at all falls back to counting it, because refusing to flag is
+   * the safer half of the trade.
+   */
+  const judgeFrom = camp?.released_at
+    || numbered.map((c) => c.at).filter(Boolean).sort()[0]
+    || null
+  const anyMeeting = appts.find((a) =>
+    !a.booked_at || !judgeFrom || new Date(a.booked_at) >= new Date(judgeFrom))
   const spoken = numbered.filter((c) => c.connected).length
 
   /**
