@@ -55,6 +55,13 @@ const FEEDS = {
   // "Calling now" pill, and at 20s those lag a 5s queue by enough to look like
   // the page contradicting itself while you watch a call.
   overview: { fn: 'cf_campaign_overview',   every: 8_000 },
+  // 🔑 IS THE SYSTEM ON. The header used to show a pill only while a call was
+  // literally connecting, which on a bad trunk is a blink — so a dialler working
+  // its way through 74 queued calls looked identical to one that had stopped.
+  // This says which of the two it is, and when it is not calling it says why:
+  // paused, breaker tripped, window shut, queue empty, or just between dials.
+  // Fastest feed on the page because it is the one someone stares at.
+  dialler:  { fn: 'cf_dialler_status',      every: 5_000 },
   funnel:   { fn: 'cf_campaign_funnel',     every: 60_000 },
   pipeline: { fn: 'cf_campaign_pipeline',   every: 45_000 },
   ladder:   { fn: 'cf_campaign_ladder',     every: 60_000 },

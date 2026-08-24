@@ -159,11 +159,7 @@ function Shell() {
           {/* Live only while something is genuinely on the phone, read from the
               shared state — so this pill and the queue's live row are one fact
               rather than two opinions. */}
-          {d.dialingNow > 0 && (
-            <span className="livepill">
-              {d.dialingNow > 1 ? `${d.dialingNow} calls now` : 'Calling now'}
-            </span>
-          )}
+          <DiallerPill />
           <button className="chip" onClick={() => setExportOpen(true)}>Export</button>
           <input
             className="search" placeholder="Find a name or number…"
@@ -203,6 +199,51 @@ function Shell() {
       {exportOpen && <ExportSheet tab={tab} onClose={() => setExportOpen(false)} />}
       {openLead && <LeadDrawer leadId={openLead} onClose={() => setOpenLead(null)} />}
     </div>
+  )
+}
+
+/**
+ * IS THE SYSTEM ON.
+ *
+ * 🔑 It is always visible, and when it is not calling it says WHY. The pill this
+ * replaced only appeared while a call was mid-connect — on a trunk that rejects
+ * in under a second that is a blink, so a dialler steadily working a queue of 74
+ * looked exactly like one that had stopped, and there was no way to tell a
+ * closed calling window from a global pause from an empty queue.
+ *
+ * Three states, and nothing else: ON (working), IDLE (nothing to do right now,
+ * with the reason), OFF (paused or the breaker has tripped — needs a person).
+ */
+function DiallerPill() {
+  const c = useCampaign()
+  const d = c.dialler?.data
+  if (!d?.found) return null
+
+  const tone = d.state === 'on' ? 'good' : d.state === 'off' ? 'bad' : 'dim'
+  const label = d.state === 'on' ? 'CALLING' : d.state === 'off' ? 'STOPPED' : 'IDLE'
+
+  return (
+    <span
+      className="livepill"
+      title={d.why}
+      style={{
+        background: 'transparent',
+        border: `1px solid var(--${tone === 'dim' ? 'hairline' : tone})`,
+        color: `var(--${tone === 'dim' ? 'dim' : tone})`,
+        display: 'inline-flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap',
+      }}
+    >
+      <i style={{
+        width: 7, height: 7, borderRadius: '50%', flex: '0 0 auto',
+        background: `var(--${tone === 'dim' ? 'hairline' : tone})`,
+      }} />
+      <b style={{ letterSpacing: '0.04em' }}>{label}</b>
+      <span style={{ color: 'var(--dim)', fontWeight: 400 }}>
+        {d.state === 'on' && d.dialling_now > 0
+          ? `· on a call · ${num(d.queued)} queued`
+          : `· ${d.why}`}
+      </span>
+    </span>
   )
 }
 
