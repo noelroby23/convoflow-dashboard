@@ -175,6 +175,24 @@ export async function campaignControl(action) {
   return out
 }
 
+/**
+ * Release a batch by hand, now.
+ *
+ * 🔑 THIS OVERRIDES THE PACING AND NOTHING ELSE. It skips the pilot gate, the
+ * daily cap and the ramp — that is the whole point of a button. Every per-lead
+ * guard still runs underneath: DND, a live or won deal, a booked meeting, a
+ * stopped state, anyone already reactivated. It cannot restart a halted
+ * campaign, and it refuses a paused or draft one, with a readable reason.
+ *
+ * Same rule as campaignControl: a refusal comes back { ok:false, reason } with
+ * no error, so it is thrown rather than swallowed into a dead-looking button.
+ */
+export async function releaseBatch(n) {
+  const out = await rpc('cf_campaign_release_now', { n })
+  if (out?.ok === false) throw new Error(out.reason || 'The campaign refused to release')
+  return out
+}
+
 /** One call, fetched only when somebody opens it — a page of 25 rows carrying
  *  25 full transcripts is a slow table nobody asked for. */
 export async function fetchCall(vapiCallId) {

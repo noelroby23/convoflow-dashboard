@@ -1,4 +1,5 @@
-import { useCampaign } from '../useCampaign'
+import { useState } from 'react'
+import { useCampaign, releaseBatch } from '../useCampaign'
 import { Feed, Empty, SectionHead, Dot } from '../bits'
 import { num, pct, humanise } from '../format'
 import { usePendingEdits, pendingEdits } from './CallReview'
@@ -60,6 +61,95 @@ const CONTROLS = [
   },
 ]
 
+/**
+ * RELEASE A BATCH BY HAND.
+ *
+ * 🔑 The pacer is deliberately slow — pilot, gate, ramp, daily cap. Right for an
+ * unattended campaign, and not what somebody watching the screen wants. This
+ * overrides the PACING and nothing else: every per-lead guard still runs, so it
+ * cannot dial a customer, a DND number, someone with a meeting booked, or anyone
+ * already reactivated. It cannot restart a halted campaign either.
+ *
+ * ⚠️ It states WHEN the calls will happen before you press it, not after. A batch
+ * released at five in the afternoon dials this evening, not tomorrow morning, and
+ * that is the single thing most likely to surprise the person pressing it.
+ */
+function ReleaseBatch({ ov, busy }) {
+  const [n, setN] = useState(50)
+  const [state, setState] = useState({ running: false, said: null, error: null })
+  const status = ov?.status || null
+  const pending = ov?.stats?.members_pending ?? null
+  const allowed = (status === 'piloting' || status === 'running') && (pending ?? 0) > 0
+
+  const why = status === 'halted'
+    ? 'It halted itself. Clear the halt first.'
+    : status === 'paused' ? 'The campaign is paused. Resume it first.'
+    : status === 'draft'  ? 'Press Start first, so the pilot gate is on the record.'
+    : (pending ?? 0) === 0 ? 'Everybody enrolled has already been released.'
+    : null
+
+  const go = async () => {
+    setState({ running: true, said: null, error: null })
+    try {
+      const r = await releaseBatch(n)
+      setState({
+        running: false, error: null,
+        said: `Released ${num(r.released)}${r.excluded ? ` · ${num(r.excluded)} were no longer eligible` : ''}`
+             + `${r.still_pending != null ? ` · ${num(r.still_pending)} still waiting` : ''}`,
+      })
+    } catch (e) {
+      setState({ running: false, said: null, error: e.message })
+    }
+  }
+
+  return (
+    <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--hairline)' }}>
+      <p className="eyebrow" style={{ marginBottom: 6 }}>Release a batch now</p>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <input
+          type="number" min="1" max="200" value={n}
+          onChange={(e) => setN(Math.max(1, Math.min(200, Number(e.target.value) || 1)))}
+          disabled={!allowed || busy || state.running}
+          style={{
+            width: 74, padding: '7px 9px', borderRadius: 8, fontSize: 14,
+            background: 'var(--panel-2)', color: 'var(--ink)',
+            border: '1px solid var(--hairline)',
+          }}
+        />
+        <button
+          className={allowed ? 'btn go' : 'btn'}
+          disabled={!allowed || busy || state.running}
+          title={why || undefined}
+          style={!allowed ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}
+          onClick={go}
+        >
+          {state.running ? 'Releasing…' : `Release ${num(n)} now`}
+        </button>
+        {pending != null && (
+          <span style={{ color: 'var(--dim)', fontSize: 12.5 }}>
+            {num(pending)} still waiting to be called
+          </span>
+        )}
+      </div>
+
+      {state.said  && <p style={{ color: 'var(--good)', fontSize: 13, marginTop: 9 }}>{state.said}</p>}
+      {state.error && <p style={{ color: 'var(--pink)', fontSize: 13, marginTop: 9 }}>{state.error}</p>}
+      {why && !state.error && (
+        <p style={{ color: 'var(--dim)', fontSize: 12.5, marginTop: 9 }}>{why}</p>
+      )}
+
+      <p style={{ color: 'var(--muted)', fontSize: 12.5, marginTop: 10, maxWidth: '72ch' }}>
+        This skips the daily cap and the connect gate — that is what it is for. It does
+        <b style={{ color: 'var(--text)' }}> not</b> skip the per-lead checks: nobody who has
+        gone DND, bought from you, has a meeting booked, asked to be left alone, or has been
+        reactivated before can be released by it.
+        {' '}Calls are spaced {ov?.dial_spacing_seconds ? `${num(ov.dial_spacing_seconds)} seconds` : 'evenly'} apart
+        and land in the next open calling window — released late in the day, they dial the same evening.
+      </p>
+    </div>
+  )
+}
+
 function Controls({ ov, control, busy }) {
   const status = ov?.status || null
   return (
@@ -91,6 +181,8 @@ function Controls({ ov, control, busy }) {
           )
         })}
       </div>
+
+      <ReleaseBatch ov={ov} busy={busy} />
 
       <p style={{ color: 'var(--muted)', fontSize: 12.5, marginTop: 12, maxWidth: '72ch' }}>
         <b style={{ color: 'var(--text)' }}>Start always enters the pilot.</b> It releases
