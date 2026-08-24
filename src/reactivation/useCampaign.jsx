@@ -58,7 +58,12 @@ const FEEDS = {
   funnel:   { fn: 'cf_campaign_funnel',     every: 60_000 },
   pipeline: { fn: 'cf_campaign_pipeline',   every: 45_000 },
   ladder:   { fn: 'cf_campaign_ladder',     every: 60_000 },
-  shifts:   { fn: 'cf_shifts',              every: 60_000 },
+  // 🔑 campaign_only, like the scorecard. cf.shift_figures is the basis of the
+  // frozen clock-out record and is deliberately about Sarah's WHOLE day, so it
+  // stays that way — the flag swaps the four headline figures for the campaign's
+  // own. Without it the card read "CALLED 55" on a day the campaign made 35 of
+  // them, the other 20 being website leads and retries from the main funnel.
+  shifts:   { fn: 'cf_shifts',              every: 60_000, args: { campaign_only: true } },
   // 🔑 campaign_only. cf.call_score holds every scored call in the system and only
   // a fraction are this campaign's — 44 of 372 when this was measured. Without the
   // flag the Call Review tab is a verdict on the main funnel shown on a page that
