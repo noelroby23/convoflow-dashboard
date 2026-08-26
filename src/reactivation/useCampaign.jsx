@@ -1,5 +1,6 @@
 import { createContext, useContext, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useDashboard } from '../store/dashboard'
 
 /**
  * ONE STATE OBJECT. Every number on every tab reads from this and nothing else.
@@ -54,7 +55,7 @@ const FEEDS = {
   // Fastest of the lot: it drives the counter strip, the Overview tiles and the
   // "Calling now" pill, and at 20s those lag a 5s queue by enough to look like
   // the page contradicting itself while you watch a call.
-  overview: { fn: 'cf_campaign_overview',   every: 8_000 },
+  overview: { fn: 'cf_campaign_overview',   every: 8_000, ranged: true },
   // 🔑 IS THE SYSTEM ON. The header used to show a pill only while a call was
   // literally connecting, which on a bad trunk is a blink — so a dialler working
   // its way through 74 queued calls looked identical to one that had stopped.
@@ -62,7 +63,7 @@ const FEEDS = {
   // paused, breaker tripped, window shut, queue empty, or just between dials.
   // Fastest feed on the page because it is the one someone stares at.
   dialler:  { fn: 'cf_dialler_status',      every: 5_000 },
-  funnel:   { fn: 'cf_campaign_funnel',     every: 60_000 },
+  funnel:   { fn: 'cf_campaign_funnel',     every: 60_000, ranged: true },
   pipeline: { fn: 'cf_campaign_pipeline',   every: 45_000 },
   ladder:   { fn: 'cf_campaign_ladder',     every: 60_000 },
   // 🔑 campaign_only, like the scorecard. cf.shift_figures is the basis of the
@@ -70,21 +71,53 @@ const FEEDS = {
   // stays that way — the flag swaps the four headline figures for the campaign's
   // own. Without it the card read "CALLED 55" on a day the campaign made 35 of
   // them, the other 20 being website leads and retries from the main funnel.
-  shifts:   { fn: 'cf_shifts',              every: 60_000, args: { campaign_only: true } },
+  shifts:   { fn: 'cf_shifts',              every: 60_000, args: { campaign_only: true }, ranged: true },
   // 🔑 campaign_only. cf.call_score holds every scored call in the system and only
   // a fraction are this campaign's — 44 of 372 when this was measured. Without the
   // flag the Call Review tab is a verdict on the main funnel shown on a page that
   // says "Reactivation" at the top. Migration 252 makes both RPCs honour it, and
   // defaults it to false so no other page changes.
-  scores:   { fn: 'cf_score_summary',       every: 120_000, args: { campaign_only: true } },
-  findings: { fn: 'cf_score_findings',      every: 120_000, args: { campaign_only: true } },
+  scores:   { fn: 'cf_score_summary',       every: 120_000, args: { campaign_only: true }, ranged: true },
+  findings: { fn: 'cf_score_findings',      every: 120_000, args: { campaign_only: true }, ranged: true },
   pool:     { fn: 'cf_campaign_pool',       every: 300_000 },
   events:   { fn: 'cf_campaign_events',     every: 15_000, args: { limit: 40 } },
-  daily:    { fn: 'cf_campaign_daily',      every: 120_000 },
-  brief:    { fn: 'cf_manager_brief_facts', every: 300_000 },
+  daily:    { fn: 'cf_campaign_daily',      every: 120_000, ranged: true },
+  brief:    { fn: 'cf_manager_brief_facts', every: 300_000, ranged: true },
 }
 
 export function CampaignProvider({ children }) {
+  /**
+   * 🔑 THE DATE PICKER IN THE HEADER DRIVES THIS PAGE. It always did for the rest
+   * of the dashboard; the reactivation tabs read `campaign_only` and no dates at
+   * all, so every figure was the campaign's whole life. The card headed
+   * "Booked today · 5" was 5 since the campaign started on 22 August; today was 0.
+   *
+   * ⚠️ THE STORE'S `to` IS INCLUSIVE AND THE SQL'S IS EXCLUSIVE. The preset
+   * "today" is {from: '2026-08-26', to: '2026-08-26'} — the same day twice — and
+   * handing that straight to a `created_at < to` filter returns nothing at all,
+   * which renders as a working page reporting a dead day. One day is added here,
+   * once, where the two conventions meet.
+   *
+   * ⚠️ AND THE DAY BOUNDARY IS DUBAI'S, NOT THE BROWSER'S. A bare 'yyyy-MM-dd'
+   * cast to timestamptz is midnight UTC — four hours late — so a call at 02:00
+   * Dubai would land in the previous day. Both ends are anchored at +04:00.
+   */
+  const range = useDashboard((st) => st.dateRange)
+  const win = useMemo(() => {
+    if (!range?.from || !range?.to) return {}
+    const dubai = (d) => new Date(`${d}T00:00:00+04:00`)
+    const end = dubai(range.to)
+    end.setUTCDate(end.getUTCDate() + 1)          // inclusive -> exclusive
+    return {
+      from: dubai(range.from).toISOString(),
+      to: end.toISOString(),
+      // cf_shifts renders ONE day's card; the day being asked about is the last
+      // one in the range, so a week shows the most recent day rather than the
+      // oldest (migration 266).
+      day: range.to,
+    }
+  }, [range?.from, range?.to])
+
   const [state, setState] = useState(() =>
     Object.fromEntries(Object.keys(FEEDS).map((k) => [k, { data: null, error: null, loading: true }])))
 
@@ -95,7 +128,11 @@ export function CampaignProvider({ children }) {
   const load = useCallback(async (key) => {
     const feed = FEEDS[key]
     try {
-      const data = await rpc(feed.fn, feed.args || {})
+      // Only feeds that measure a PERIOD take the window. The queue, the board,
+      // the pool and the member counts answer "where does this stand right now",
+      // and a list that empties when you scrub to last Tuesday reads as broken
+      // rather than as filtered (§7 item 191).
+      const data = await rpc(feed.fn, { ...(feed.args || {}), ...(feed.ranged ? win : {}) })
       if (alive.current) setState((s) => ({ ...s, [key]: { data, error: null, loading: false } }))
     } catch (error) {
       // The error is kept, never swallowed. A tab that cannot load says so.
@@ -103,7 +140,7 @@ export function CampaignProvider({ children }) {
       // look exactly like an answer.
       if (alive.current) setState((s) => ({ ...s, [key]: { ...s[key], error, loading: false } }))
     }
-  }, [])
+  }, [win])
 
   const refreshAll = useCallback(() => { Object.keys(FEEDS).forEach(load) }, [load])
 

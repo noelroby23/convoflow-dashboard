@@ -455,10 +455,14 @@ export default function Queue({ goTo, openLead, search }) {
             booked none, this tile said "Booked today 1" on a campaign page.
             The Overview, Targets and the board all read the campaign's own
             numbers, so this is the one place that disagreed with the rest. */}
-        <Tile label="Called" value={num(called)} note="dialled so far" />
+        <Tile label="Called" value={num(called)} note="dialled in this range" />
         <Tile label="Got through" value={num(st?.connects)} note="a human answered" />
         <Tile label="Real talks" value={num(st?.conversations)} note="past the opener" />
-        <Tile label="Booked today" value={num(st?.meetings)} note="meetings this campaign booked" hot />
+        {/* 265: the stats are now scoped to the header's date range, so this is
+            "in the window you picked" and not the campaign's whole life. It read
+            "Booked today 5" on a day the campaign booked none — 5 was every meeting
+            since 22 August. The label no longer claims a period the number is not. */}
+        <Tile label="Booked" value={num(st?.meetings)} note="meetings booked in this range" hot />
         {/* ⚠️ The design puts a running timer here. There is no call-start
             timestamp in the payload — `next_at` is when the row fell due, not
             when the phone started ringing — and a stopwatch started from when
