@@ -741,7 +741,19 @@ html, body, #root {
 .cf-card:hover { border-color: var(--edge-hi); transform: translateY(-1px); }
 .cf-card:active { cursor: grabbing; }
 .cf-card.is-dim { opacity: .45; pointer-events: none; }
-.cf-card__name { font-size: 12px; color: var(--ink); font-weight: 500; }
+.cf-card { position: relative; }
+/* The remove button is invisible until the card is hovered — it deletes
+   something, so it should not be the first thing the eye lands on. */
+.cf-card__remove {
+  position: absolute; top: 4px; right: 4px; padding: 3px; line-height: 0;
+  border: 0; background: none; color: var(--faint); cursor: pointer;
+  opacity: 0; transition: opacity .15s, color .15s;
+}
+.cf-card:hover .cf-card__remove { opacity: 1; }
+.cf-card__remove:hover { color: #F87171; }
+.cf-card__remove:focus-visible { opacity: 1; outline: 1px solid var(--brand); border-radius: 4px; }
+.cf-card__company { font-size: 10.5px; color: var(--muted); margin-top: 1px; }
+.cf-card__name { font-size: 12px; color: var(--ink); font-weight: 500; padding-right: 18px; }
 .cf-card__meta { font-size: 10px; color: var(--faint); margin-top: 3px; }
 .cf-card__row { display: flex; align-items: center; justify-content: space-between; margin-top: 5px; gap: 6px; }
 .cf-card__money { font-family: 'DM Mono', ui-monospace, monospace; font-size: 11px; color: var(--ink); }
@@ -952,6 +964,27 @@ html, body, #root {
 .cf-prep__when { margin: 4px 0 0; display: flex; align-items: center; gap: 6px;
   font-size: 12px; color: #6EE7B7; }
 .cf-prep__body { padding: 16px 18px 26px; display: flex; flex-direction: column; gap: 14px; }
+/* The company under the name. A button until you click it, so it reads as a
+   fact rather than a form — and an obvious invitation when it is empty. */
+.cf-prep__company {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: 4px;
+  font-size: 12px; color: var(--muted); background: none; border: 0; padding: 2px 0;
+  cursor: pointer; text-align: left;
+}
+.cf-prep__company b { font-weight: 500; color: var(--ink); }
+.cf-prep__company i { font-style: normal; color: var(--faint); }
+.cf-prep__company:hover i, .cf-prep__company:hover b { color: var(--brand); }
+.cf-prep__company.is-editing { cursor: default; }
+.cf-prep__company input {
+  background: rgba(255,255,255,.06); border: 1px solid var(--edge); border-radius: 6px;
+  padding: 3px 8px; font-size: 12px; color: var(--ink); min-width: 200px;
+}
+.cf-prep__company input:focus { outline: none; border-color: var(--brand); }
+.cf-prep__company button {
+  display: inline-flex; align-items: center; background: none; border: 0;
+  color: var(--brand); cursor: pointer; padding: 2px;
+}
+
 .cf-prep__contact { display: flex; gap: 8px; flex-wrap: wrap; }
 .cf-prep__phone, .cf-prep__join {
   display: inline-flex; align-items: center; gap: 6px;

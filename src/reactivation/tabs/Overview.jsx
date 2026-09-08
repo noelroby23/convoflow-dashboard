@@ -176,12 +176,25 @@ export default function Overview({ goTo }) {
         const plan = campaignPlan(c)
         const st = ov.stats || {}
         const eligible = d.eligible
-        const axis = eligible ?? plan.planList
+        // 🔑 `eligible` IS NOW WHAT IS LEFT, NOT THE WHOLE LIST. Since 281 it
+        // means "still callable", because cf.campaign_eligibility already
+        // refuses everyone the campaign has worked. The funnel's axis and the
+        // "out of N people" headline want the WHOLE database, so they add the
+        // worked back on — otherwise the page would say 357 of 1,544 called,
+        // which is 357 of a number that excludes them.
+        const wholeList = d.worked != null && d.remaining != null
+          ? d.worked + d.remaining
+          : eligible
+        const axis = wholeList ?? plan.planList
         const started = plan.started
         const draft = ov.status === 'draft'
         const B = plan.byMetric
 
-        const usedPct = widthPct(d.worked, eligible)
+        // The bar is "how much of the database is done", so the denominator is
+        // the WHOLE database — worked plus what is left. `eligible` alone is
+        // only the leads still to call, so the bar was measuring progress
+        // against the remainder.
+        const usedPct = widthPct(d.worked, wholeList)
         const callsToGo = d.remaining != null && plan.callsPerLead ? d.remaining * plan.callsPerLead : null
 
         return (
@@ -228,7 +241,7 @@ export default function Overview({ goTo }) {
                     <i className="left" style={{ width: `${100 - usedPct}%` }} />
                   </div>
                   <div className="sb-left">
-                    <b>{num(d.remaining)} leads left</b> of {num(eligible)}
+                    <b>{num(d.remaining)} leads left</b> of {num(wholeList)}
                     {callsToGo != null && <> · about {num(callsToGo)} calls to go</>}
                   </div>
                   <div className="td z" style={{ color: 'var(--dim)' }}>
@@ -238,15 +251,28 @@ export default function Overview({ goTo }) {
                   </div>
                 </Tile>
 
+                {/* 🔑 TWO NUMBERS, BECAUSE THEY ARE TWO QUESTIONS. `connects`
+                    counts CALLS that were answered; `people_reached` counts
+                    HUMANS. All-time they are 160 and 144 — the same person
+                    picks up on attempt two after ducking attempt one. The tile
+                    led with the call count under a label that says "reached"
+                    and a sentence that says "everyone", so it read as people
+                    and was not. */}
                 <Tile
-                  label="Total reached" value={st.connects} row={B['Reached']}
+                  label="Total reached" value={st.people_reached ?? st.connects} row={B['Reached']}
                   sub={st.reach_pct != null
-                    ? `${pct(st.reach_pct)} of everyone called picked up`
+                    ? `${pct(st.reach_pct)} of the people called picked up`
                     : 'nobody has been called yet'}
-                />
+                >
+                  {st.connects != null && st.people_reached != null && st.connects !== st.people_reached && (
+                    <div className="sub" style={{ color: 'var(--dim)' }}>
+                      {num(st.connects)} answered calls · some picked up more than once
+                    </div>
+                  )}
+                </Tile>
 
                 <Tile
-                  label="Real conversations" value={st.talked} row={B['Real conversations']}
+                  label="Real conversations" value={st.people_talked ?? st.talked} row={B['Real conversations']}
                   sub={st.talked_pct != null
                     ? `${pct(st.talked_pct)} of pick-ups got past a brush-off`
                     : 'no pick-ups to measure'}
@@ -259,12 +285,27 @@ export default function Overview({ goTo }) {
                     : 'no conversations to measure'}
                 />
 
+                {/* 🔴 WHO SAYS THEY TURNED UP. Every campaign appointment still
+                    reads `confirmed` in GoHighLevel — nobody has ever marked
+                    one Showed on the calendar. What writes `attended` is the
+                    GHL workflow CFV2 MEETIN ATTENDED, ~30 minutes after the
+                    meeting starts, with nobody involved. So this tile is only
+                    a measurement of attendance for the ones a PERSON marked,
+                    and it now says how many those are (migration 279). */}
                 <Tile
                   label="Turned up" value={st.showed} row={B['Showed']}
                   sub={st.show_pct != null
                     ? `${pct(st.show_pct)} of booked meetings showed`
                     : 'no meetings to measure'}
-                />
+                >
+                  {st.showed > 0 && (
+                    <div className="sub" style={{ color: st.showed_confirmed === st.showed ? 'var(--dim)' : 'var(--warn)' }}>
+                      {st.showed_confirmed === st.showed
+                        ? 'all confirmed by a person'
+                        : `${num(st.showed_confirmed ?? 0)} confirmed by a person · the rest marked automatically 30 min after the start`}
+                    </div>
+                  )}
+                </Tile>
 
                 <Tile
                   label="Signed" value={st.closed} row={B['Closed']} split own="Ron, not Sarah"
@@ -277,7 +318,7 @@ export default function Overview({ goTo }) {
             <div className="headline" style={{ marginTop: 30 }}>
               {started ? (
                 <>
-                  <h1>Sarah has worked {num(d.worked)} of your {num(eligible)} old leads.</h1>
+                  <h1>Sarah has worked {num(d.worked)} of your {num(wholeList)} old leads.</h1>
                   <p className="lede">
                     She has booked <b>{num(st.meetings)} meetings</b>
                     {st.showed != null && <> and got <b>{num(st.showed)} of them to turn up</b></>}.
@@ -292,8 +333,8 @@ export default function Overview({ goTo }) {
               ) : (
                 <>
                   <h1>
-                    {eligible != null
-                      ? <>Sarah has not started on your {num(eligible)} old leads.</>
+                    {wholeList != null
+                      ? <>Sarah has not started on your {num(wholeList)} old leads.</>
                       : <>Sarah has not started yet.</>}
                   </h1>
                   <p className="lede">
@@ -393,9 +434,11 @@ export default function Overview({ goTo }) {
               <p style={{ color: 'var(--dim)', fontSize: 12.5, marginTop: 12 }}>
                 Closing is not on this page — that is Ron's number, on the sales dashboard.
                 {' '}These three are the lines that stop the campaign by themselves if they are crossed.
-                {' '}The first figure counts <b style={{ color: 'var(--muted)', fontWeight: 400 }}>calls</b>;
-                the scoreboard's "total reached" counts <b style={{ color: 'var(--muted)', fontWeight: 400 }}>people</b>,
-                and one person is called up to {num(plan.callsPerLead)} times.
+                {' '}The first figure counts <b style={{ color: 'var(--muted)', fontWeight: 400 }}>calls</b>,
+                because a connect rate is a property of a dial. The scoreboard's "total reached"
+                counts <b style={{ color: 'var(--muted)', fontWeight: 400 }}>people</b>, because a
+                target of 1,350 is 1,350 humans — one person is called up to {num(plan.callsPerLead)} times,
+                so the two differ and neither is wrong.
               </p>
             </section>
           </>
@@ -691,7 +734,10 @@ function FunnelStep({ row, axis, cmp, tone }) {
 function FunnelCard({ plan, st, axis, eligible, started }) {
   const leak = biggestLeak(plan)
   const B = plan.byMetric
-  const calledPct = eligible ? widthPct(B['Leads dialled']?.actual, eligible) : null
+  // The row's actual is now a count of PEOPLE (migration 280), and `axis` is
+  // the whole list, so this finally compares like with like. It used to divide
+  // a count of CALLS by the leads still to call.
+  const calledPct = axis ? widthPct(B['Leads dialled']?.actual, axis) : null
 
   const cmpFor = {
     'Leads dialled': calledPct != null ? <><b>{pct(calledPct)}</b> of the list</> : '—',
@@ -706,8 +752,8 @@ function FunnelCard({ plan, st, axis, eligible, started }) {
     <section className="sec card">
       <p className="eyebrow">Where the leads go</p>
       <h2 className="sec-title">
-        {eligible != null
-          ? <>Out of {num(eligible)} people, this is what has happened</>
+        {axis != null
+          ? <>Out of {num(axis)} people, this is what has happened</>
           : <>What has happened so far</>}
       </h2>
       <p className="sec-sub">

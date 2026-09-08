@@ -691,3 +691,52 @@
   .rx .oneline{ padding:14px 4px; }
   .rx .ol-body b{ font-size:26px; }
 }
+
+/* ── THE TRANSCRIPT WAS BLACK TEXT ON A BLACK CARD ─────────────────────────
+ * Abdus: "in the transcript part the users response is not visible as its in
+ * white font". It is not white — it is `--ink`, and `--ink` means two OPPOSITE
+ * things in the two stylesheets this app carries.
+ *
+ *   index.css   --ink: #FAFAF9   the TEXT colour on a dark app
+ *   campaign.css --ink: #141319  the PAGE colour behind a dark design system
+ *
+ * CallRecording.jsx is shared by the Lead Desk and this page (extracted rather
+ * than copied, on purpose — §7 item 127). Its `.cf-ld__line--lead { color:
+ * var(--ink) }` is correct in the app it was written for, and renders the
+ * lead's own words at #141319 on a #2C2A36 card in here. Visible only when you
+ * drag-select them, which is exactly what the screenshot showed.
+ *
+ * 🔑 THE FIX IS SCOPED, NOT SHARED. Renaming the variable in index.css would
+ * touch every page in the Tailwind app to fix one panel in this one. One
+ * variable meaning two things is §7 item 47's trap; the honest repair is to
+ * stop borrowing the other stylesheet's vocabulary inside `.rx`.
+ * ──────────────────────────────────────────────────────────────────────── */
+.rx .cf-ld__line--lead{color:var(--text)}
+.rx .cf-ld__line--us{color:var(--muted)}
+.rx .cf-ld__line--lead .cf-ld__who{color:var(--good)}
+.rx .cf-ld__line--us .cf-ld__who{color:var(--dim)}
+.rx .cf-ld__bubble{color:var(--text)}
+.rx .cf-ld__row,
+.rx .cf-ld__qatitle{color:var(--text)}
+.rx .cf-ld__recnote,
+.rx .cf-ld__norec,
+.rx .cf-ld__msgmeta,
+.rx .cf-ld__empty{color:var(--dim)}
+.rx .cf-ld__link{color:var(--pink)}
+.rx .cf-ld__transcript{
+  background:var(--raised); border:1px solid var(--hairline-soft);
+  border-radius:10px; padding:10px 12px; max-height:320px;
+}
+
+/* The company on a pipeline card. Sits between the name and the quote — a
+   business name is identity, the quote is what they said. */
+.rx .lead .co{
+  font-family:var(--mono); font-size:10.5px; letter-spacing:.02em;
+  color:var(--dim); margin-top:3px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+/* Company under the name in the lead drawer. */
+.rx .dr-head .co{
+  font-family:var(--mono); font-size:11px; letter-spacing:.02em;
+  color:var(--muted); margin-top:2px;
+}

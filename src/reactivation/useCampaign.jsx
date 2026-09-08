@@ -165,8 +165,19 @@ export function CampaignProvider({ children }) {
     const pipe = state.pipeline.data
 
     const eligible = pool?.eligible ?? null
-    const worked = st ? (st.members_released ?? 0) : null
-    const remaining = eligible != null && worked != null ? Math.max(0, eligible - worked) : null
+    const worked = pool?.worked ?? (st ? (st.members_released ?? 0) : null)
+    // 🔴 THIS USED TO BE `eligible - worked` AND SUBTRACTED THEM TWICE.
+    // cf.campaign_eligibility already refuses anyone the campaign has worked —
+    // measured across all 2,674 uae leads, not one of the 360 released members
+    // is counted as eligible; they carry "already reactivated", "stopped:
+    // not_interested" and so on. So `eligible` IS what is left, and taking the
+    // worked count off it removed 360 people who were never in the number:
+    // 1,184 shown where the truth is 1,544, and every figure derived from it —
+    // calls to go, days of database left — understated by the same 23%.
+    //
+    // It now comes from cf_campaign_pool, which is where "eligible" is defined,
+    // so the two can never be re-derived apart (CONTRACT rule 1).
+    const remaining = pool?.remaining ?? eligible
 
     // Day N of the campaign. NULL before it starts — "day 1 of 24" on a draft
     // campaign is a claim that it has begun, and it has not.

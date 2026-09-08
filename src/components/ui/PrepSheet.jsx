@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { X, CalendarDays, ExternalLink, Phone, Megaphone, Quote } from 'lucide-react'
+import { X, CalendarDays, ExternalLink, Phone, Megaphone, Quote, Building2, Check, Loader2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { toast } from 'sonner'
 
@@ -75,6 +75,74 @@ function Summary({ text }) {
   )
 }
 
+/**
+ * The company they are from, editable in place.
+ *
+ * 🔑 GHL HAS CARRIED THIS ALL ALONG AND NOTHING READ IT. `companyName` is a
+ * standard GHL contact field — Marlyn Lopez is "Gignius ME FZ LLC", Ranjit is
+ * "Corvette" — and 1,958 of our leads had one waiting when the backfill ran.
+ * So the empty state here is "not on file", never "this lead has no company".
+ *
+ * 🔑 THE SAVE GOES THROUGH cf_set_company, WHICH WRITES GHL TOO. GHL owns
+ * contact data (§3 rule 1); a company typed here and kept only in our database
+ * would be a second answer to the same question, and the next backfill would
+ * overwrite it from the CRM. Proven end to end on a live contact: the RPC, the
+ * mirror outbox, the Engine, and GHL's own record reading back the new value.
+ */
+function Company({ leadId, value, onSaved }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(value ?? '')
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => { setDraft(value ?? '') }, [value, leadId])
+
+  const save = async () => {
+    if ((draft ?? '').trim() === (value ?? '')) { setEditing(false); return }
+    setBusy(true)
+    try {
+      const { data, error } = await supabase.rpc('cf_set_company', {
+        p: { lead_id: leadId, company: draft },
+      })
+      if (error) throw new Error(error.message)
+      if (data && data.ok === false) throw new Error(data.reason || 'refused')
+      onSaved((draft ?? '').trim() || null)
+      toast.success((draft ?? '').trim() ? 'Company saved — and written to GHL' : 'Company cleared')
+      setEditing(false)
+    } catch (e) {
+      toast.error(e.message || 'Could not save that')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!editing) {
+    return (
+      <button type="button" className="cf-prep__company" onClick={() => setEditing(true)}
+              title="Click to edit — this writes to the GHL contact too">
+        <Building2 size={12} />
+        {value ? <b>{value}</b> : <i>add company</i>}
+      </button>
+    )
+  }
+  return (
+    <span className="cf-prep__company is-editing">
+      <Building2 size={12} />
+      <input
+        autoFocus value={draft} disabled={busy} placeholder="Company name"
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') save()
+          // Escape closes the editor and not the sheet behind it.
+          if (e.key === 'Escape') { e.stopPropagation(); setDraft(value ?? ''); setEditing(false) }
+        }}
+      />
+      <button type="button" onClick={save} disabled={busy} aria-label="Save company">
+        {busy ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+      </button>
+    </span>
+  )
+}
+
 export default function PrepSheet({ leadId, onClose }) {
   const [b, setB] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -111,6 +179,14 @@ export default function PrepSheet({ leadId, onClose }) {
         <header className="cf-ld__head">
           <div className="min-w-0">
             <h2 className="cf-ld__name">{b?.name ?? (loading ? 'Loading…' : 'Lead')}</h2>
+            {/* The company sits directly under the name, which is where a
+                salesperson looks for it — and is editable there rather than
+                behind a menu, because the reason it is blank is usually that
+                nobody has typed it yet. */}
+            {!loading && b?.found && (
+              <Company leadId={leadId} value={b.company}
+                       onSaved={(v) => setB((prev) => ({ ...prev, company: v }))} />
+            )}
             {b?.meeting?.start_at && (
               <p className="cf-prep__when"><CalendarDays size={12} /> {when(b.meeting.start_at)}</p>
             )}

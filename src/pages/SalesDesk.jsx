@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CalendarCheck, Banknote, Loader2, ExternalLink, Plus, UserPlus, X} from 'lucide-react'
+import { CalendarCheck, Banknote, Loader2, ExternalLink, Plus, UserPlus, X, Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useDashboard } from '../store/dashboard'
 import { Panel, PipelineFlow } from '../components/ui/Console'
@@ -138,7 +138,7 @@ const MEETING_STATE = {
   disqualified: 'disqualified',
 }
 
-function Card({ children, onDragStart, dim, onOpen }) {
+function Card({ children, onDragStart, dim, onOpen, onRemove, removeTitle }) {
   return (
     <div
       draggable
@@ -146,6 +146,17 @@ function Card({ children, onDragStart, dim, onOpen }) {
       onClick={onOpen}
       className={`cf-card${dim ? ' is-dim' : ''}${onOpen ? ' is-clickable' : ''}`}
     >
+      {/* Sits above the card's own click target and stops the event, or
+          removing a duplicate would also open the prep sheet for it. */}
+      {onRemove && (
+        <button
+          type="button" className="cf-card__remove" title={removeTitle}
+          onClick={(e) => { e.stopPropagation(); onRemove() }}
+          aria-label={removeTitle}
+        >
+          <Trash2 size={11} />
+        </button>
+      )}
       {children}
     </div>
   )
@@ -337,6 +348,41 @@ export default function SalesDesk() {
     }
   }
 
+  // ── removing a meeting from the board ──────────────────────────────────
+  //
+  // Abdus: "ranjit is duplicate i need to be able to delete a prospect here".
+  // He has two meetings, both marked attended, and this board draws one card
+  // per appointment — so he is on it twice and counted twice.
+  //
+  // 🔑 IT CANCELS RATHER THAN DELETES, AND THAT IS THE ONLY REMOVAL THAT
+  // STICKS. cf.appointment mirrors GHL's calendar and the hourly sync at :27
+  // re-inserts anything GHL still holds, so a deleted row would be back within
+  // the hour and the button would look broken. A cancelled row survives the
+  // sync and stops counting as a booked meeting (migration 280).
+  const removeMeeting = async (card) => {
+    if (!window.confirm(
+      `Remove ${card.name}'s meeting on ${when(card.when)} from the board?\n\n` +
+      `It is marked cancelled — it stops counting as a meeting and stops any ` +
+      `reminder still queued for it. The lead itself is untouched, and the ` +
+      `event stays in the GHL calendar.`)) return
+    setBusy(card.id)
+    try {
+      const { data, error } = await supabase.rpc('cf_remove_meeting', {
+        p: { ghl_event_id: card.id },
+      })
+      const body = Array.isArray(data) ? data[0] : data
+      if (error) throw new Error(error.message)
+      if (body?.ok === false) throw new Error(body.error)
+      toast.success(body?.already ? 'That meeting was already removed' : 'Removed from the board')
+      await load()
+    } catch (e) {
+      toast.error(e.message || 'Could not remove that meeting')
+      await load()
+    } finally {
+      setBusy(null)
+    }
+  }
+
   useEffect(() => {
     supabase.rpc('cf_channels', { p: {} }).then(({ data }) => setChannels(data ?? []))
   }, [])
@@ -414,8 +460,13 @@ export default function SalesDesk() {
               {(col.cards ?? []).map(c => (
                 <Card key={c.id} dim={busy === c.id}
                       onOpen={() => c.lead_id && setPrep(c.lead_id)}
+                      onRemove={() => removeMeeting(c)}
+                      removeTitle="Remove this meeting from the board"
                       onDragStart={() => setDrag({ kind: 'meeting', id: c.id, leadId: c.lead_id, from: col.key })}>
                   <div className="cf-card__name">{c.name}</div>
+                  {/* The company under the name, where a salesperson looks for
+                      it. GHL has carried it all along and nothing read it. */}
+                  {c.company && <div className="cf-card__company">{c.company}</div>}
                   <div className="cf-card__meta">{when(c.when)}</div>
                   {c.channel && <div className="cf-card__tag">{CHANNEL_LABEL[c.channel] ?? c.channel}</div>}
                   {c.ad && <div className="cf-card__tag">{c.ad}</div>}

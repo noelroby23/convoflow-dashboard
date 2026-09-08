@@ -39,6 +39,9 @@ const ACCENT = {
   not_interested: 'var(--dim)',
   super_hot: 'var(--s4)',
   meeting_booked: 'var(--s4)',
+  // 278: booked and did not happen. Amber rather than pink — it is a warning
+  // about a meeting, not a meeting.
+  no_show: 'var(--warn)',
   turned_up: 'var(--s4)',
   in_discussion: 'var(--t1)',
   signed: 'var(--t2)',
@@ -74,6 +77,7 @@ const BULK = {
   talked_not_booked: { label: 'Send the WhatsApps they asked for', tone: '' },
   super_hot: { label: (n) => `Assign all ${num(n)} to Ron`, tone: '' },
   meeting_booked: { label: 'Get Sarah to chase the unconfirmed', tone: '' },
+  no_show: { label: 'Try the ones who did not show', tone: '' },
   turned_up: { label: 'Log the missing outcomes', tone: '' },
   in_discussion: { label: 'Nudge Ron on the quiet ones', tone: ' t' },
 }
@@ -151,6 +155,11 @@ function Card({ card, steps, ladder, onOpen, onDragStart, onDragEnd, dragging })
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open() } }}
     >
       <div className="n">{card.name || '—'}</div>
+      {/* The business they are from. GHL has carried `companyName` all along
+          and nothing read it until migration 276 — 1,958 leads had one
+          waiting. It goes under the name because that is where somebody
+          picking up the phone looks for it. */}
+      {card.company && <div className="co">{card.company}</div>}
       {/* The line that mattered, in their own words (migration 234). Verbatim
           from their own turn of the last connected call — never a summary, and
           never Sarah's side of it. A lead who has not spoken shows the number

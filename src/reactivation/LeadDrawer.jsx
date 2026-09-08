@@ -338,6 +338,9 @@ function Body({ d, notFound, reason, onClose, busy, setBusy, openCall, setOpenCa
         <div className="top">
           <div>
             <h2>{lead.name || 'Unnamed lead'}</h2>
+            {/* The business they are from, right under the name. GHL carried
+                `companyName` all along and nothing read it (migration 276). */}
+            {lead.company && <div className="co">{lead.company}</div>}
             <div className="ph">
               {lead.phone || 'no number on file'}
               {lead.call_phone && lead.call_phone !== lead.phone && <> · calls go to {lead.call_phone}</>}
@@ -375,6 +378,7 @@ function Body({ d, notFound, reason, onClose, busy, setBusy, openCall, setOpenCa
 
         <div className="dr-h">Who they are</div>
         <div className="facts">
+          <Fact k="Company">{lead.company}</Fact>
           <Fact k="Phone">{lead.phone}</Fact>
           <Fact k="Email">{lead.email}</Fact>
           <Fact k="Came from">{lead.source}</Fact>
