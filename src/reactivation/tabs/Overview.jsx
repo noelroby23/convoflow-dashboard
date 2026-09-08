@@ -260,16 +260,17 @@ export default function Overview({ goTo }) {
                     and was not. */}
                 <Tile
                   label="Total reached" value={st.people_reached ?? st.connects} row={B['Reached']}
-                  sub={st.reach_pct != null
-                    ? `${pct(st.reach_pct)} of the people called picked up`
-                    : 'nobody has been called yet'}
-                >
-                  {st.connects != null && st.people_reached != null && st.connects !== st.people_reached && (
-                    <div className="sub" style={{ color: 'var(--dim)' }}>
-                      {num(st.connects)} answered calls · some picked up more than once
-                    </div>
-                  )}
-                </Tile>
+                  sub={<>
+                    {st.reach_pct != null
+                      ? `${pct(st.reach_pct)} of the people called picked up`
+                      : 'nobody has been called yet'}
+                    {st.connects != null && st.people_reached != null && st.connects !== st.people_reached && (
+                      <div style={{ color: 'var(--dim)', marginTop: 2 }}>
+                        {num(st.connects)} answered calls — some picked up on a later attempt
+                      </div>
+                    )}
+                  </>}
+                />
 
                 <Tile
                   label="Real conversations" value={st.people_talked ?? st.talked} row={B['Real conversations']}
@@ -294,18 +295,22 @@ export default function Overview({ goTo }) {
                     and it now says how many those are (migration 279). */}
                 <Tile
                   label="Turned up" value={st.showed} row={B['Showed']}
-                  sub={st.show_pct != null
-                    ? `${pct(st.show_pct)} of booked meetings showed`
-                    : 'no meetings to measure'}
-                >
-                  {st.showed > 0 && (
-                    <div className="sub" style={{ color: st.showed_confirmed === st.showed ? 'var(--dim)' : 'var(--warn)' }}>
-                      {st.showed_confirmed === st.showed
-                        ? 'all confirmed by a person'
-                        : `${num(st.showed_confirmed ?? 0)} confirmed by a person · the rest marked automatically 30 min after the start`}
-                    </div>
-                  )}
-                </Tile>
+                  sub={<>
+                    {st.show_pct != null
+                      ? `${pct(st.show_pct)} of booked meetings showed`
+                      : 'no meetings to measure'}
+                    {st.showed > 0 && (
+                      <div style={{
+                        marginTop: 2,
+                        color: st.showed_confirmed === st.showed ? 'var(--dim)' : 'var(--warn)',
+                      }}>
+                        {st.showed_confirmed === st.showed
+                          ? 'all confirmed by a person'
+                          : `only ${num(st.showed_confirmed ?? 0)} confirmed by a person — the rest were marked automatically 30 min after the start`}
+                      </div>
+                    )}
+                  </>}
+                />
 
                 <Tile
                   label="Signed" value={st.closed} row={B['Closed']} split own="Ron, not Sarah"
