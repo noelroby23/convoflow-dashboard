@@ -64,7 +64,7 @@ function rangeMatchesPreset(from, to) {
   return match?.id ?? 'custom'
 }
 
-function CalendarMonth({ month, startDate, endDate, onSelectDate }) {
+export function CalendarMonth({ month, startDate, endDate, onSelectDate }) {
   const days = useMemo(() => getCalendarDays(month), [month])
   const today = new Date()
 
@@ -78,11 +78,16 @@ function CalendarMonth({ month, startDate, endDate, onSelectDate }) {
       </div>
       <div className="grid grid-cols-7 gap-1">
         {days.map((day) => {
-          const isSelectedStart = startDate && isSameDay(day, startDate)
-          const isSelectedEnd = endDate && isSameDay(day, endDate)
-          const selected = isSelectedStart || isSelectedEnd
+          // A day belonging to the neighbouring month is already drawn by that
+          // month's own grid, so drawing it here puts the SAME date on screen
+          // twice: Aug 30 showed under both "Aug" and "Sep", and a click on the
+          // 30 under "Sep" selected August. Hold the column, draw nothing.
+          if (!isSameMonth(day, month)) {
+            return <div key={day.toISOString()} className="h-9" aria-hidden="true" />
+          }
+
+          const selected = Boolean((startDate && isSameDay(day, startDate)) || (endDate && isSameDay(day, endDate)))
           const inRange = isInRange(day, startDate, endDate)
-          const currentMonth = isSameMonth(day, month)
           const isToday = isSameDay(day, today)
 
           return (
@@ -91,8 +96,7 @@ function CalendarMonth({ month, startDate, endDate, onSelectDate }) {
               type="button"
               onClick={() => onSelectDate(day)}
               className={[
-                'h-9 rounded-full text-sm transition-colors',
-                currentMonth ? 'text-[#374151]' : 'text-[#D1D5DB]',
+                'h-9 rounded-full text-sm transition-colors text-[#374151]',
                 selected ? 'bg-[#FF6B8A] text-white shadow-sm' : '',
                 !selected && inRange ? 'bg-[#FFE0E6] text-[#B8325A]' : '',
                 !selected && !inRange ? 'hover:bg-[#FFF0F3]' : '',

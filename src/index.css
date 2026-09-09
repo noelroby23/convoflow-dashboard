@@ -492,7 +492,10 @@ html, body, #root {
   background: linear-gradient(90deg, #EC4899, #F472B6) !important;
 }
 .cf-dr__panel [class*="border-"] { border-color: rgba(255, 255, 255, .12) !important; }
-.cf-dr__panel button:hover { background: rgba(255, 255, 255, .07) !important; }
+/* Scoped away from a chosen day. `button:hover` outranks the selection rule
+   below it on specificity, so hovering the day you had just clicked painted
+   it grey — the click looked like it had not registered. */
+.cf-dr__panel button:not([class*="bg-[#FF6B8A]"]):not([class*="bg-[#EC4899]"]):not([class*="bg-[#FFE0E6]"]):hover { background: rgba(255, 255, 255, .07) !important; }
 .cf-dr__panel input {
   background: rgba(255, 255, 255, .05) !important;
   border-color: rgba(255, 255, 255, .14) !important;
@@ -681,7 +684,11 @@ html, body, #root {
 .cf-dr__panel [class*="bg-[#FF6B8A]"],
 .cf-dr__panel [class*="bg-[#EC4899]"],
 .cf-dr__panel [class*="bg-gradient"] { background: #EC4899 !important; color: #fff !important; }
-.cf-dr__panel button:hover { background: rgba(255,255,255,.06) !important; }
+/* The days BETWEEN the two ends are the third thing that has to survive
+   the wipe above. Without this a range renders as two dots and nine
+   blank cells, so nothing on screen says what is selected. */
+.cf-dr__panel [class*="bg-[#FFE0E6]"] { background: rgba(236, 72, 153, .22) !important; color: #FBCFE8 !important; }
+.cf-dr__panel button:not([class*="bg-[#FF6B8A]"]):not([class*="bg-[#EC4899]"]):not([class*="bg-[#FFE0E6]"]):hover { background: rgba(255,255,255,.06) !important; }
 
 /* A node that opens something looks like it does. */
 .cf-node--click { cursor: pointer; text-align: left; font: inherit; color: inherit; width: 100%; }
