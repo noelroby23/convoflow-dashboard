@@ -170,8 +170,12 @@ function Cards({ m }) {
         <Eyebrow color={C.pinkSoft} size={13} style={{ letterSpacing: '0.1em' }}>Meetings showed · the target</Eyebrow>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, marginTop: 14, flexWrap: 'wrap' }}>
           <Num size={86} color={showHex}>{num(m.showed?.actual)}</Num>
+          {/* "of — by now" reads as a broken number rather than an absent pace
+              line. When there is no due figure the card says only what it knows. */}
           <span className="mono" style={{ fontSize: 19, color: C.muted }}>
-            of {num(m.showed?.due)} by now, {num(m.showed?.target)} in the campaign
+            {m.showed?.due != null
+              ? `of ${num(m.showed.due)} by now, ${num(m.showed?.target)} in the campaign`
+              : `${num(m.showed?.target)} in the campaign`}
           </span>
         </div>
         <div style={{ fontSize: 14, color: C.muted, marginTop: 10, textWrap: 'pretty' }}>
@@ -181,7 +185,7 @@ function Cards({ m }) {
         <div style={{ fontSize: 14, fontWeight: 600, color: C.pinkSoft, marginTop: 12, textWrap: 'pretty' }}>
           {m.showsLeft === 0 ? 'Target met.'
             : m.reqBookings != null
-              ? `Still needed: ${num(m.reqBookings)} more bookings, ${num(m.reqTalks)} more conversations, ${num(m.reqDials)} more people dialled`
+              ? `On top of what you have: ${num(m.reqBookings)} more bookings, ${num(m.reqTalks)} more conversations, ${num(m.reqDials)} more people dialled`
               : 'Not enough measured rates yet to say what is still needed.'}
         </div>
       </div>
@@ -197,7 +201,9 @@ function Cards({ m }) {
               <Eyebrow size={12} style={{ letterSpacing: '0.1em', fontWeight: 600 }}>{label}</Eyebrow>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
                 <Num size={38} color={hex}>{num(row?.actual)}</Num>
-                <span className="mono" style={{ fontSize: 14, color: C.muted }}>of {num(row?.due)}</span>
+                {row?.due != null && (
+                  <span className="mono" style={{ fontSize: 14, color: C.muted }}>of {num(row.due)} by now</span>
+                )}
               </div>
               <Bar value={row?.actual} of={row?.due} color={hex} />
               <span className="mono" style={{ fontSize: 12, color: C.dim }}>

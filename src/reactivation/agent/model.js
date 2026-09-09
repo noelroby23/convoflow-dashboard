@@ -28,6 +28,12 @@ import { toneFor } from '../format'
  * Adding any of them would mean inventing a second population to divide by.
  */
 
+/**
+ * How many people have to have reached a step before its conversion is worth
+ * reading. Below this the percentage is arithmetic on noise.
+ */
+const MIN_SAMPLE = 25
+
 const n = (v) => (v == null || v === '' || Number.isNaN(Number(v)) ? null : Number(v))
 
 /** a / b as a rate, null when the denominator is missing or empty. */
@@ -124,20 +130,41 @@ export function buildModel(c) {
     const reqDials = liveTalk && reqTalks != null ? Math.ceil(reqTalks / liveTalk) : null
 
     /**
-     * Which step of the chain is furthest off its plan. Only steps with enough
-     * volume behind them are eligible: a 0% booking rate on four conversations
-     * is noise, and naming it as "the step that is off" sends somebody to
-     * rewrite a working prompt (§7 item 201 is what that costs).
+     * The funnel, step by step, with each step's conversion from the one above
+     * and the plan's own conversion beside it.
+     *
+     * 🔑 THE VERDICT'S "STEP THAT IS OFF" IS PICKED FROM THIS LIST, not from a
+     * parallel one. An earlier cut compared dialled-to-talked directly, skipping
+     * "reached" — so the banner named a 17% step the funnel underneath it did
+     * not draw, and the two halves of one screen described the same chain
+     * differently (§7 item 166's family).
      */
-    const chain = [
-      { label: 'Dialled to talked', live: liveTalk, plan: rate(talked?.target, dialled?.target), enough: n(dialled?.actual) >= 200 && n(talked?.actual) > 0 },
-      { label: 'Talked to booked', live: liveBook, plan: rate(booked?.target, talked?.target), enough: n(talked?.actual) >= 20 && n(booked?.actual) > 0 },
-      { label: 'Booked to showed', live: liveShow, plan: planShow, enough: n(booked?.actual) >= 5 && n(showed?.actual) > 0 },
-    ]
-    const measured = chain.filter((x) => x.enough && x.live != null && x.plan).length
-    const worst = chain
-      .filter((x) => x.enough && x.live != null && x.plan)
-      .map((x) => ({ ...x, ratio: x.live / x.plan }))
+    const steps = STEPS.map((s, i) => {
+      const row = by[s.metric]
+      const prev = i === 0 ? null : by[STEPS[i - 1].metric]
+      const conv = i === 0 ? null : rate(row?.actual, prev?.actual)
+      const convPlan = i === 0 ? null : rate(row?.target, prev?.target)
+      return {
+        ...s,
+        actual: row?.actual ?? null,
+        target: row?.target ?? null,
+        due: row?.due ?? null,
+        tone: row?.tone ?? 'na',
+        conv,
+        convPlan,
+        convTone: conv == null || !convPlan ? 'na' : toneFor(conv, convPlan),
+        // Enough behind it to be worth naming. A 0% booking rate on four
+        // conversations is noise, and calling it "the step that is off" sends
+        // somebody to rewrite a prompt that is working (§7 item 201).
+        enough: n(prev?.actual) >= MIN_SAMPLE && n(row?.actual) != null,
+        from: prev ? STEPS[i - 1].label : null,
+      }
+    })
+
+    const readable = steps.filter((x) => x.enough && x.conv != null && x.convPlan)
+    const measured = readable.length
+    const worst = readable
+      .map((x) => ({ label: `${x.from} to ${x.label.toLowerCase()}`, live: x.conv, plan: x.convPlan, ratio: x.conv / x.convPlan }))
       .sort((a, b) => a.ratio - b.ratio)[0] || null
 
     /* ------------------------------------------------------------ the board */
@@ -176,25 +203,9 @@ export function buildModel(c) {
       showed, booked, talked, dialled, showsLeft,
       liveShow, planShow, liveBook, liveTalk,
       reqBookings, reqTalks, reqDials,
-      worst, measured, chainLength: chain.length,
+      worst, measured, chainLength: steps.length - 1,
 
-      // the funnel, in the design's own shape: each step with its conversion
-      // from the step above and the plan's own conversion beside it
-      steps: STEPS.map((s, i) => {
-        const row = by[s.metric]
-        const prev = i === 0 ? null : by[STEPS[i - 1].metric]
-        const conv = i === 0 ? null : rate(row?.actual, prev?.actual)
-        const convPlan = i === 0 ? null : rate(row?.target, prev?.target)
-        return {
-          ...s,
-          actual: row?.actual ?? null,
-          target: row?.target ?? null,
-          due: row?.due ?? null,
-          tone: row?.tone ?? 'na',
-          conv, convPlan,
-          convTone: conv == null || !convPlan ? 'na' : toneFor(conv, convPlan),
-        }
-      }),
+      steps,
 
       // the board
       board, colBy, countOf, cardsOf, allCards, toMark,

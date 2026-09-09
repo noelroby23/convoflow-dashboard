@@ -41,6 +41,35 @@ const FEEDS = {
   brief: null,
 }
 
+
+/**
+ * `derived` as CampaignProvider computes it. Without this every figure hanging
+ * off `dayOf` — the pace line, "due by now", every traffic light — is null, and
+ * the snapshot shows a page that is missing half its numbers for a reason that
+ * exists only in the harness.
+ */
+function derivedFrom(state) {
+  const ov = state.overview.data
+  const pool = state.pool.data
+  const pipe = state.pipeline.data
+  const started = ov?.started_at ? new Date(ov.started_at) : null
+  const dayOf = started ? Math.max(1, Math.floor((Date.now() - started.getTime()) / 86400000) + 1) : null
+  const eligible = pool?.eligible ?? null
+  const worked = pool?.worked ?? null
+  const remaining = pool?.remaining ?? eligible
+  const perDay = dayOf && worked ? worked / dayOf : null
+  return {
+    eligible, worked, remaining, dayOf, perDay,
+    daysLeft: perDay && perDay > 0 && remaining != null ? Math.ceil(remaining / perDay) : null,
+    dialingNow: ov?.stats?.in_flight ?? 0,
+    status: ov?.status ?? null,
+    halted: !!ov?.halted_reason,
+    isLive: ov?.status === 'running' || ov?.status === 'piloting',
+    sarahTotal: pipe?.sarah_total ?? null,
+    ronTotal: pipe?.ron_total ?? null,
+  }
+}
+
 const server = await createServer({
   root: join(here, '..'),
   server: { middlewareMode: true, hmr: false },
@@ -64,7 +93,7 @@ try {
       feed(v && typeof v === 'object' && !Array.isArray(v) ? { found: false } : null)])),
   }
 
-  const withApi = (state) => ({ ...state, derived: {}, refresh: () => {}, refreshAll: () => {} })
+  const withApi = (state) => ({ ...state, derived: derivedFrom(state), refresh: () => {}, refreshAll: () => {} })
 
   const PAGES = ['Overview', 'Pipeline', 'Meetings', 'Live', 'Leads', 'Handover', 'Deals', 'Performance']
 

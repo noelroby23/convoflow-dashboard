@@ -40,8 +40,18 @@ export default function Meetings({ m, openLead }) {
    *  the campaign's name (§7 item 210). */
   const mine = useMemo(() => {
     if (!all || !m.pipe) return null
-    const ids = new Set(m.allCards.map((k) => k.lead_id))
-    return all.filter((a) => ids.has(a.lead_id))
+    const card = new Map(m.allCards.map((k) => [k.lead_id, k]))
+    return all.filter((a) => card.has(a.lead_id)).map((a) => ({
+      ...a,
+      // 🔑 THE NAME COMES OFF THE BOARD, not off this feed. `cf_dash_meetings`
+      // returns `cf.lead.full_name` raw, where the board passes it through
+      // `cf.proper_name()` — so the same person read "nicolas abinader" here and
+      // "Nicolas Abinader" one page across. Case-fixing it in the component
+      // would have been a third spelling: `initcap` flattens McDonald and
+      // O'Brien, which is exactly why that function exists in SQL.
+      name: card.get(a.lead_id)?.name || a.name,
+      company: card.get(a.lead_id)?.company || null,
+    }))
   }, [all, m.pipe, m.allCards])
 
   const mark = async (a, outcome) => {
@@ -140,7 +150,9 @@ function Group({ label, count, note, empty, children }) {
         <Eyebrow size={11} style={{ letterSpacing: '0.12em' }}>{label}</Eyebrow>
         <span className="mono" style={{ fontSize: 12, color: C.muted }}>{num(count)}</span>
       </div>
-      {note && <div style={{ fontSize: 13, color: C.muted, marginBottom: 12, lineHeight: 1.5, maxWidth: 70 + 'ch', textWrap: 'pretty' }}>{note}</div>}
+      {note && any && (
+        <div style={{ fontSize: 13, color: C.warn, marginBottom: 12, lineHeight: 1.5, maxWidth: '70ch', textWrap: 'pretty' }}>{note}</div>
+      )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {any ? children : <div style={{ fontSize: 14, color: C.muted }}>{empty}</div>}
       </div>
@@ -171,6 +183,7 @@ function Row({ a, openLead, actions, busy }) {
       <div onClick={() => openLead(a.lead_id)} style={{ flex: 1, minWidth: 200, cursor: 'pointer' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 17, fontWeight: 600, letterSpacing: '-0.005em' }}>{a.name}</span>
+          {a.company && <span style={{ fontSize: 14, color: C.soft }}>{a.company}</span>}
           <Pill tone={TONE_OF[a.status] || 'cancelled'}>{a.status}</Pill>
           {a.same_day && <Pill tone="booked">same day</Pill>}
         </div>

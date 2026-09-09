@@ -17,36 +17,60 @@ import { C, MONO, Card, Eyebrow, Num, Bar, Dot, Pill, hexFor, ghostBtn, fieldSty
  * guess would drift the first time the pacer changed (§7 item 141).
  */
 
-const LIMIT = 60
+/**
+ * TWO READS, DELIBERATELY, because they answer different questions at different
+ * speeds.
+ *
+ * `cf_campaign_members` returns released members in DIALLING ORDER — the first
+ * rows are who is about to be called, which is exactly right for the queue and
+ * exactly wrong for a call log: at 60 rows the log showed two calls, because
+ * everybody already dialled had sorted past the cut.
+ *
+ * So the queue takes a small fast slice and the log takes a large slow one.
+ * Measured: 60 rows is 41 kB, 400 rows is 357 kB and holds 203 calls — heavy
+ * every 15 seconds, unremarkable every 90.
+ */
+const QUEUE_LIMIT = 60
+const LOG_LIMIT = 400
 
 export default function Live({ m, openLead }) {
-  const [rows, setRows] = useState(null)
+  const [queue, setQueue] = useState(null)
+  const [log, setLog] = useState(null)
   const [error, setError] = useState(null)
   const [q, setQ] = useState('')
   const [expanded, setExpanded] = useState(null)
 
-  const load = useCallback(async () => {
+  const loadQueue = useCallback(async () => {
     try {
-      const d = await fetchMembers({ limit: LIMIT, status: 'released', q: q.trim() || undefined })
-      setRows(d?.rows || []); setError(null)
+      const d = await fetchMembers({ limit: QUEUE_LIMIT, status: 'released' })
+      setQueue(d?.rows || []); setError(null)
+    } catch (e) { setError(e) }
+  }, [])
+
+  const loadLog = useCallback(async () => {
+    try {
+      const d = await fetchMembers({ limit: LOG_LIMIT, status: 'released', q: q.trim() || undefined })
+      setLog(d?.rows || []); setError(null)
     } catch (e) { setError(e) }
   }, [q])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { loadQueue() }, [loadQueue])
+  useEffect(() => { loadLog() }, [loadLog])
 
-  // The dialler polls at 5s; the list every 15 is enough to keep them agreeing
-  // without asking for 60 rows twelve times a minute.
+  // The dialler polls at 5s; the queue every 15 keeps them agreeing without
+  // asking for the list twelve times a minute.
   useEffect(() => {
-    const t = setInterval(() => { if (!document.hidden) load() }, 15_000)
-    return () => clearInterval(t)
-  }, [load])
+    const a = setInterval(() => { if (!document.hidden) loadQueue() }, 15_000)
+    const b = setInterval(() => { if (!document.hidden) loadLog() }, 90_000)
+    return () => { clearInterval(a); clearInterval(b) }
+  }, [loadQueue, loadLog])
 
   return (
     <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
       <Today m={m} />
       <WhereTheListStands m={m} />
-      <Dialler m={m} rows={rows} error={error} openLead={openLead} />
-      <Log m={m} rows={rows} error={error} q={q} setQ={setQ}
+      <Dialler m={m} queue={queue} log={log} error={error} openLead={openLead} />
+      <Log rows={log} error={error} q={q} setQ={setQ}
            expanded={expanded} setExpanded={setExpanded} openLead={openLead} />
     </div>
   )
@@ -69,7 +93,7 @@ function Today({ m }) {
 
   const tiles = [
     { label: 'Dialled', value: t?.calls, target: perDay(m.dialled?.target) },
-    { label: 'Reached', value: t?.reached, target: perDay(m.showed == null ? null : m.plan.byMetric?.Reached?.target) },
+    { label: 'Reached', value: t?.reached, target: perDay(m.plan.byMetric?.Reached?.target) },
     { label: 'Real conversations', value: t?.talks, target: perDay(m.talked?.target) },
     { label: 'Booked', value: t?.booked, target: perDay(m.booked?.target) },
   ]
@@ -143,7 +167,11 @@ function WhereTheListStands({ m }) {
         gridTemplateColumns: 'repeat(auto-fit,minmax(168px,1fr))', gap: 12,
       }}>
         {cols.map((k) => {
-          const share = total ? Math.round((k.count / total) * 100) : null
+          const raw = total ? (k.count / total) * 100 : null
+          const share = raw == null ? null
+            : raw === 0 ? '0%'
+              : raw < 0.5 ? '<1%'
+                : `${Math.round(raw)}%`
           return (
             <div key={k.col} style={{
               background: C.raised, borderRadius: 13, padding: 14,
@@ -151,12 +179,15 @@ function WhereTheListStands({ m }) {
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                 <Dot color={k.colour} size={7} />
-                <Eyebrow size={11} style={{ letterSpacing: '0.06em' }}>{k.label}</Eyebrow>
+                <Eyebrow size={11} style={{
+                  letterSpacing: '0.06em', lineHeight: 1.3, minHeight: '2.6em',
+                  display: 'flex', alignItems: 'flex-start',
+                }}>{k.label}</Eyebrow>
               </div>
-              <Num size={26} style={{ marginTop: 8 }}>{num(k.count)}</Num>
+              <Num size={26} style={{ marginTop: 4 }}>{num(k.count)}</Num>
               <div style={{ marginTop: 9 }}><Bar value={k.count} of={total} color={k.colour} height={5} /></div>
               <div className="mono" style={{ fontSize: 11, color: C.dim, marginTop: 6 }}>
-                {share == null ? '—' : `${share}% of the list`}
+                {share == null ? '—' : `${share} of the list`}
               </div>
             </div>
           )
@@ -168,11 +199,13 @@ function WhereTheListStands({ m }) {
 
 /* ------------------------------------------------------------- live dialler */
 
-function Dialler({ m, rows, error, openLead }) {
+function Dialler({ m, queue, log, error, openLead }) {
   const d = m.dial
-  const live = (rows || []).filter((r) => r.live_status === 'Dialing now')
-  const next = (rows || []).filter((r) => r.live_status === 'Calling next' || r.live_status === 'Scheduled').slice(0, 12)
-  const done = (rows || []).filter((r) => r.last_call_at)
+  const live = (queue || []).filter((r) => r.live_status === 'Dialing now')
+  const next = (queue || []).filter((r) => r.live_status === 'Calling next' || r.live_status === 'Scheduled').slice(0, 12)
+  // Just finished reads the LOG's slice, not the queue's — the queue is sorted
+  // by who is next, so the people just called have already sorted out of it.
+  const done = (log || []).filter((r) => r.last_call_at)
     .sort((a, b) => new Date(b.last_call_at) - new Date(a.last_call_at)).slice(0, 12)
 
   const tone = d?.state === 'on' ? C.good : d?.state === 'off' ? C.bad : C.dim
@@ -209,9 +242,9 @@ function Dialler({ m, rows, error, openLead }) {
       </div>
 
       {error && <div style={{ marginTop: 16 }}><Failed error={error} what="the queue" /></div>}
-      {!rows && !error && <Loading what="the queue" />}
+      {!queue && !error && <Loading what="the queue" />}
 
-      {rows && (
+      {queue && (
         <div style={{
           marginTop: 16, display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 16,
@@ -285,7 +318,7 @@ function Log({ rows, error, q, setQ, expanded, setExpanded, openLead }) {
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
         <div style={{ fontSize: 19, fontWeight: 600 }}>Call log</div>
         <span className="mono" style={{ fontSize: 13, color: C.muted }}>
-          {num(called.length)} of the most recent {LIMIT} released
+          {num(called.length)} people, last call each · newest first
         </span>
         <input
           className="cfa-field" value={q} onChange={(e) => setQ(e.target.value)}
