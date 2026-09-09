@@ -1,0 +1,1 @@
+{"why": "on a call right now", "found": true, "state": "on", "paused": false, "queued": 211, "breaker": false, "due_now": 1, "next_at": "2026-09-09T08:21:32.704641+00:00", "concurrency": 1, "gap_seconds": 40, "window_open": true, "dialling_now": 1, "last_dial_at": "2026-09-09T10:47:07.272002+00:00", "campaign_status": "running", "seconds_since_last_dial": 28}

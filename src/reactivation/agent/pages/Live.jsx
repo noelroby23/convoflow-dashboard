@@ -124,7 +124,9 @@ function Today({ m }) {
 
 function WhereTheListStands({ m }) {
   const total = m.pipe?.members ?? null
-  const cols = m.board.filter((k) => k.owner === 'sarah' && k.col !== 'waiting')
+  // Everyone the campaign has actually touched. `waiting` is excluded because
+  // it is the not-yet-released remainder and would be 60% of every bar.
+  const cols = m.board.filter((k) => k.col !== 'waiting')
   const waiting = m.colBy.waiting
 
   return (

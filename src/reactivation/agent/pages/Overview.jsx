@@ -1,5 +1,5 @@
 import { num, pct as fmtPct } from '../../format'
-import { C, MONO, Card, Eyebrow, Num, Bar, Dot, hexFor, Feed } from '../ui'
+import { C, Card, Eyebrow, Num, Bar, Dot, hexFor, Feed, Empty } from '../ui'
 
 /**
  * Overview — the design's verdict-first page.
@@ -14,7 +14,11 @@ const rateText = (r) => (r == null ? '—' : `${Math.round(r * 100)}%`)
 
 export default function Overview({ m, goTo }) {
   return (
-    <Feed feed={m.c.funnel} what="the funnel">
+    <Feed feed={m.c.funnel} what="the funnel"
+          empty={<div style={{ padding: 24 }}>
+            <Empty>No campaign on record for this region. Nothing has been enrolled, so there is
+              nothing to measure — this is not a failed load.</Empty>
+          </div>}>
       {() => (
         <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
           <Verdict m={m} />

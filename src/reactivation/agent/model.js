@@ -50,23 +50,45 @@ export const STEPS = [
   { metric: 'Closed',             label: 'Closed',        def: 'A deal was won.' },
 ]
 
-/** Columns the design's Pipeline board draws, left to right, Sarah then Ron. */
-export const BOARD_ORDER = [
-  'waiting', 'first_attempt', 'in_follow_up', 'talked_not_booked', 'super_hot',
-  'meeting_booked', 'no_show', 'turned_up', 'not_interested', 'in_discussion', 'won',
-]
-
+/**
+ * Colour per column. Anything not named here falls back to its OWNER's colour.
+ *
+ * 🔴 THIS USED TO BE AN ORDERED LIST OF COLUMN IDS, AND IT HID 383 PEOPLE.
+ * The board returns 14 columns; the list named 11, and it named one — `won` —
+ * that does not exist (it is `signed`). So "Never answered" with 220 people,
+ * "Not called" with 162 and "Lost after meeting" were dropped off the board
+ * silently, and the Deals page's won column never rendered at all.
+ *
+ * The order now comes from the database, which already returns the columns
+ * left to right in the order they are meant to read. A column added in SQL
+ * appears here by itself instead of vanishing.
+ */
 const COLOUR_BY_COL = {
   waiting: '#5F5B69', first_attempt: '#6BA8F5', in_follow_up: '#F59E0B',
   talked_not_booked: '#9CA3AF', super_hot: '#EC4899', meeting_booked: '#F9A8D4',
   no_show: '#EF4444', turned_up: '#22C55E', not_interested: '#6B7280',
-  in_discussion: '#6BA8F5', won: '#22C55E',
+  in_discussion: '#6BA8F5', signed: '#22C55E',
+  never_answered: '#5F5B69', lost_after_meeting: '#6B7280', excluded: '#4A4753',
 }
+
+const COLOUR_BY_OWNER = { sarah: '#F9A8D4', ron: '#6BA8F5', dead: '#5F5B69' }
 
 export function useAgentModel() {
   const c = useCampaign()
+  return useMemo(() => buildModel(c), [c])
+}
 
-  return useMemo(() => {
+/**
+ * The adapter proper, as a plain function of the feed state.
+ *
+ * 🔑 IT IS NOT A HOOK, so it can be rendered against captured fixtures without a
+ * database. `scripts/render-agent.mjs` calls it with real RPC output and asserts
+ * every page paints — because a green `vite build` says nothing about whether
+ * the code RUNS: rollup assumes an unresolved identifier is a global and ships
+ * it (§7 item 178 shipped a dead dashboard that built clean).
+ */
+export function buildModel(c) {
+  {
     const plan = campaignPlan(c)
     const ov = c.overview.data
     const st = ov?.stats
@@ -120,10 +142,10 @@ export function useAgentModel() {
 
     /* ------------------------------------------------------------ the board */
 
-    const cols = pipe?.columns || []
+    const cols = (pipe?.columns || [])
+      .map((k) => ({ ...k, colour: COLOUR_BY_COL[k.col] || COLOUR_BY_OWNER[k.owner] || '#9CA3AF' }))
     const colBy = Object.fromEntries(cols.map((k) => [k.col, k]))
-    const board = BOARD_ORDER.map((id) => colBy[id]).filter(Boolean)
-      .map((k) => ({ ...k, colour: COLOUR_BY_COL[k.col] || '#9CA3AF' }))
+    const board = cols
 
     const countOf = (id) => (colBy[id]?.count == null ? null : Number(colBy[id].count))
     const cardsOf = (id) => colBy[id]?.cards || []
@@ -187,5 +209,5 @@ export function useAgentModel() {
         { key: 'live', label: 'On the phone now', count: dial?.dialling_now ?? null, go: 'Open call log', page: 'live', live: (dial?.dialling_now || 0) > 0 },
       ],
     }
-  }, [c])
+  }
 }

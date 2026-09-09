@@ -52,9 +52,23 @@ export default function Pipeline({ m, openLead }) {
 
 /* -------------------------------------------------------------------- board */
 
+/**
+ * 🔑 THE OWNERS ARE READ OFF THE COLUMNS, NEVER LISTED HERE. The board has
+ * three — Sarah, Ron, and `dead` for everyone the campaign has finished with —
+ * and an earlier cut of this file assumed two, which put 383 closed-out people
+ * in Ron's half of the handoff. Grouping by whatever `owner` values come back
+ * means a fourth one appears as its own band instead of landing in the wrong
+ * one silently.
+ */
+const OWNER_BAND = {
+  sarah: { label: 'Sarah — until somebody turns up', colour: '#F9A8D4' },
+  ron: { label: 'Ron — past the handoff', colour: '#6BA8F5' },
+  dead: { label: 'Closed out', colour: '#5F5B69' },
+}
+
 function Board({ m, openLead, drop, dragging, setDragging }) {
-  const sarah = m.board.filter((k) => k.owner === 'sarah')
-  const ron = m.board.filter((k) => k.owner !== 'sarah')
+  const owners = []
+  for (const k of m.board) if (!owners.includes(k.owner)) owners.push(k.owner)
 
   return (
     <Card style={{ flex: 1, minWidth: 320 }}>
@@ -68,25 +82,35 @@ function Board({ m, openLead, drop, dragging, setDragging }) {
       </div>
 
       <div style={{ marginTop: 16, overflowX: 'auto', paddingBottom: 8 }}>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-          {sarah.map((col) => (
-            <Column key={col.col} col={col} openLead={openLead} drop={drop}
-                    dragging={dragging} setDragging={setDragging} />
-          ))}
-
-          {/* The literal handoff. It is a line on the board, so nobody has to
-              argue about whose number a bad figure is. */}
-          {ron.length > 0 && (
-            <div style={{
-              flex: '0 0 auto', alignSelf: 'stretch', width: 1, margin: '0 6px',
-              background: 'linear-gradient(180deg,transparent,rgba(107,168,245,0.6),transparent)',
-            }} />
-          )}
-
-          {ron.map((col) => (
-            <Column key={col.col} col={col} openLead={openLead} drop={drop}
-                    dragging={dragging} setDragging={setDragging} />
-          ))}
+        <div style={{ display: 'flex', gap: 12, alignItems: 'stretch' }}>
+          {owners.map((owner, band) => {
+            const meta = OWNER_BAND[owner] || { label: owner, colour: '#9CA3AF' }
+            return (
+              <div key={owner} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                {/* The literal handoff. It is a line on the board, so nobody has
+                    to argue about whose number a bad figure is. */}
+                {band > 0 && (
+                  <div style={{
+                    flex: '0 0 auto', alignSelf: 'stretch', width: 1, margin: '0 8px',
+                    background: `linear-gradient(180deg,transparent,${meta.colour},transparent)`,
+                  }} />
+                )}
+                {m.board.filter((k) => k.owner === owner).map((col, i) => (
+                  <div key={col.col} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {i === 0 && (
+                      <div style={{
+                        fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase',
+                        fontWeight: 700, color: meta.colour, whiteSpace: 'nowrap', paddingLeft: 2,
+                      }}>{meta.label}</div>
+                    )}
+                    {i > 0 && <div style={{ height: 15 }} />}
+                    <Column col={col} openLead={openLead} drop={drop}
+                            dragging={dragging} setDragging={setDragging} />
+                  </div>
+                ))}
+              </div>
+            )
+          })}
         </div>
       </div>
     </Card>

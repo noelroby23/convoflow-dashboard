@@ -22,7 +22,10 @@ export default function Deals({ m, openLead }) {
   const closed = m.plan.byMetric?.['Closed']
   const mrr = m.plan.byMetric?.['MRR added (AED)']
 
-  const cols = m.board.filter((k) => k.owner !== 'sarah')
+  // 🔑 Ron's columns BY NAME, not "everything that is not Sarah's". The board
+  // has a third owner — `dead`, the people the campaign has finished with — and
+  // the negative test quietly filed 383 of them as deals.
+  const cols = m.board.filter((k) => k.owner === 'ron')
   const turnedUp = m.countOf('turned_up')
 
   return (
