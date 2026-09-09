@@ -40,15 +40,19 @@ const mockFallbackOverview = USE_MOCK ? {
  */
 export function useCfGrowth(dateFrom, dateTo) {
   const refreshKey = useDashboard(s => s.refreshKey)
+  const scope = useDashboard(s => s.homeScope)
   return useSupabaseQuery(
     async () => {
       const { data, error } = await supabase.rpc('cf_dash_growth', {
-        p: { region: 'uae', from: dateFrom, to: dateTo },
+        p: { region: 'uae', from: dateFrom, to: dateTo, scope },
       })
       if (error) return { data: null, error }
       return { data: Array.isArray(data) ? (data[0] ?? null) : data, error: null }
     },
-    [dateFrom, dateTo, refreshKey],
+    // scope belongs in the deps, not just in the payload. Without it the chart
+    // keeps the previous population's series while the cards above it change,
+    // and the two disagree about the same window.
+    [dateFrom, dateTo, scope, refreshKey],
     null
   )
 }
@@ -56,11 +60,15 @@ export function useCfGrowth(dateFrom, dateTo) {
 export function useDashboardOverview(dateFrom, dateTo) {
   const currentClientId = useDashboard(s => s.currentClientId)
   const refreshKey = useDashboard(s => s.refreshKey)
+  // 'ads' | 'reactivation' | 'both'. Migration 294 does the splitting in SQL,
+  // so the cards, the chart and the tables below all read one definition of
+  // who is in the window rather than three filters that can drift apart.
+  const scope = useDashboard(s => s.homeScope)
 
   return useSupabaseQuery(
     async () => {
       const { data, error } = await supabase.rpc('cf_dash_kpis', {
-        p: { region: 'uae', from: dateFrom, to: dateTo },
+        p: { region: 'uae', from: dateFrom, to: dateTo, scope },
       })
 
       if (error) return { data: null, error }
@@ -121,7 +129,7 @@ export function useDashboardOverview(dateFrom, dateTo) {
       }
 
     },
-    [currentClientId, dateFrom, dateTo, refreshKey],
+    [currentClientId, dateFrom, dateTo, scope, refreshKey],
     mockFallbackOverview
   )
 }

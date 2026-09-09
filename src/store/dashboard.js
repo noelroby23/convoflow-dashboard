@@ -92,6 +92,23 @@ export const getPresetRange = (preset) => {
   }
 }
 
+// Which population Home is talking about. The page mixes two businesses that
+// do not share a cost base: leads bought from Meta, and the reactivation
+// campaign dialling a database we already owned. Counting them together made
+// Home report a 66.7% show rate for a week whose ads produced 3 of 3 — both
+// no-shows belonged to the campaign.
+//
+// 'ads' is the default because Home is the ad P&L. Deliberately NOT persisted
+// (partialize below keeps only dateRange), so a stored value can never
+// override a future change to this default — §7 item 50 is the record of
+// exactly that trap costing a day.
+export const HOME_SCOPES = [
+  { id: 'ads', label: 'Ads', hint: 'Everything except the reactivation campaign' },
+  { id: 'reactivation', label: 'Reactivation', hint: 'The reactivation campaign only' },
+  { id: 'both', label: 'Both', hint: 'The two together' },
+]
+export const DEFAULT_HOME_SCOPE = 'ads'
+
 export const useDashboard = create(
   persist(
     (set) => ({
@@ -99,6 +116,7 @@ export const useDashboard = create(
       currentClientName: getInitialClientId() === DEFAULT_CLIENT_ID ? DEFAULT_CLIENT_NAME : 'Current Market',
       dateRange: { preset: DEFAULT_DATE_PRESET, ...getPresetRange(DEFAULT_DATE_PRESET) },
       refreshKey: 0,
+      homeScope: DEFAULT_HOME_SCOPE,
       reportBuilder: null,
       reportContent: null,
       isReportOpen: false,
@@ -106,6 +124,7 @@ export const useDashboard = create(
       setDatePreset: (preset) => set({ dateRange: { preset, ...getPresetRange(preset) } }),
       setCustomDateRange: (from, to) => set({ dateRange: { preset: 'custom', from, to } }),
       refresh: () => set(state => ({ refreshKey: state.refreshKey + 1 })),
+      setHomeScope: (scope) => set({ homeScope: scope }),
       setReportBuilder: (fn) => set({ reportBuilder: fn }),
       openReport: () => set(state => {
         const content = state.reportBuilder?.()

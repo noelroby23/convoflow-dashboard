@@ -10,7 +10,7 @@ import StatusBadge from '../components/ui/StatusBadge'
 import AISummary from '../components/ui/AISummary'
 import DailyAISummaryModal from '../components/ui/DailyAISummaryModal'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { useDashboard } from '../store/dashboard'
+import { useDashboard, HOME_SCOPES } from '../store/dashboard'
 import { homeReport } from '../lib/reports/generators'
 
 function getLeadDateValue(lead) {
@@ -70,10 +70,15 @@ export default function Overview() {
   const location = useLocation()
   const dateRange = useDashboard(s => s.dateRange)
   const setReportBuilder = useDashboard(s => s.setReportBuilder)
+  // Which business this page is about. Leads bought from Meta and the
+  // reactivation campaign do not share a cost base, and counting them together
+  // is what made the show rate read 66.7% for a week whose ads produced 3 of 3.
+  const homeScope = useDashboard(s => s.homeScope)
+  const setHomeScope = useDashboard(s => s.setHomeScope)
   const { data: overview, loading: overviewLoading, error: overviewError } = useDashboardOverview(dateRange.from, dateRange.to)
   const { data: targets } = useTargets()
-  const { data: activeLeads, loading: activeLeadsLoading, error: activeLeadsError } = useDashboardContactsByBucket('leads')
-  const { data: activePipeline, loading: pipelineLoading, error: pipelineError } = useDashboardContactsByBucket('active')
+  const { data: activeLeads, loading: activeLeadsLoading, error: activeLeadsError } = useDashboardContactsByBucket('leads', homeScope)
+  const { data: activePipeline, loading: pipelineLoading, error: pipelineError } = useDashboardContactsByBucket('active', homeScope)
   const { data: adOptions } = useDashboardAdOptions()
   const { data: growth } = useCfGrowth(dateRange.from, dateRange.to)
   const [chartMetric, setChartMetric] = useState('leads')
@@ -117,6 +122,7 @@ export default function Overview() {
   const winRateN = overview?.win_rate_n ?? null
   const winRateAll = overview?.win_rate_alltime ?? null
   const windowDays = overview?.window_days ?? null
+  const scopeLabel = HOME_SCOPES.find(o => o.id === homeScope)?.label ?? 'Ads'
   const closedWon = overview?.closed_won ?? 0
   const totalSpend = overview?.total_spend ?? 0
   const closedRevenue = overview?.closed_revenue ?? 0
@@ -240,7 +246,21 @@ export default function Overview() {
           </div>
         ) : (
           <div className="mb-5">
-            <div className="cf-eyebrow mb-2.5">The pipeline · {windowDays} days</div>
+            <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
+              <div className="cf-eyebrow">
+                The pipeline · {windowDays} days · {scopeLabel.toLowerCase()}
+              </div>
+              {/* Reuses the chart's own segmented control rather than a second
+                  one, so there is one of these on the page and not two that
+                  drift apart. */}
+              <div className="cf-seg">
+                {HOME_SCOPES.map(o => (
+                  <button key={o.id} title={o.hint}
+                          onClick={() => setHomeScope(o.id)}
+                          className={o.id === homeScope ? 'is-on' : ''}>{o.label}</button>
+                ))}
+              </div>
+            </div>
             <PipelineFlow kpis={overview} growth={growth} onShowLeads={showEveryLead} />
           </div>
         )}
@@ -250,7 +270,10 @@ export default function Overview() {
           "how close to target", and an arc answers that without arithmetic. */}
       <ErrorBoundary>
         {overviewError && !overviewLoading ? null : (
-          <Panel eyebrow="Unit economics" title="Are the ads paying for themselves?"
+          <Panel eyebrow="Unit economics"
+                 title={homeScope === 'reactivation'
+                   ? 'The reactivation campaign buys no ads, so there is no cost per lead'
+                   : 'Are the ads paying for themselves?'}
                  right={<span className="text-[11px] text-[#57544E]">hover a dial for its definition</span>}>
             <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-2">
               <Gauge label="Cost / lead"

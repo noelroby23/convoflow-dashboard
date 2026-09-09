@@ -256,8 +256,8 @@ export function useContactDetails(bucket = null) {
   return useCfContacts(bucket)
 }
 
-export function useDashboardContactsByBucket(bucket = null) {
-  return useCfContacts(bucket, { emptyWhenNoBucket: true })
+export function useDashboardContactsByBucket(bucket = null, scope = undefined) {
+  return useCfContacts(bucket, { emptyWhenNoBucket: true, scope })
 }
 
 export function useAllContacts() {
@@ -273,14 +273,19 @@ export function useLeadTrackerContacts() {
 // 'up to the next export' and swallowed this on the way past. Vite does not
 // error on an undefined reference, it treats it as a global, so the build
 // passed clean and the page threw ReferenceError in the browser.
-function useCfContacts(bucket, { emptyWhenNoBucket = false } = {}) {
+//
+// `scope` is optional and is only ever passed by Home. Omitting it means
+// 'both' server-side, so every other caller — Sarah's Performance, Lead
+// Tracker, the rep drilldown — keeps the exact population it had.
+function useCfContacts(bucket, { emptyWhenNoBucket = false, scope } = {}) {
   const { dateRange, refreshKey } = useDashboardQueryState()
   return useNormalizedContactQuery(
     async () => {
       if (emptyWhenNoBucket && !bucket) return { data: [], error: null }
-      return supabase.rpc('cf_contacts_by_bucket', cfArgs(dateRange, { bucket: bucket ?? 'leads' }))
+      return supabase.rpc('cf_contacts_by_bucket',
+        cfArgs(dateRange, { bucket: bucket ?? 'leads', ...(scope ? { scope } : {}) }))
     },
-    [dateRange.from, dateRange.to, bucket, refreshKey],
+    [dateRange.from, dateRange.to, bucket, scope, refreshKey],
     null
   )
 }
