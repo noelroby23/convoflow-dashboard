@@ -283,6 +283,35 @@ export async function moveCard(leadId, toColumn) {
   return rpc('cf_campaign_move_card', { lead_id: leadId, to_column: toColumn })
 }
 
+/**
+ * The meetings in the window, for the Agent view's Meetings page.
+ *
+ * ⚠️ `cf_dash_meetings` IS NOT CAMPAIGN-SCOPED — it returns every UAE meeting,
+ * because four other pages read it and §5.11a holds the campaign OUT of the
+ * business's numbers rather than the other way round. The caller filters to the
+ * campaign's own people using the member list it already has. Rendering this
+ * feed raw on a page headed "Reactivation" would be §7 item 210 again: a
+ * verdict on the main funnel shown under the campaign's name.
+ */
+export async function fetchMeetings(args) {
+  return rpc('cf_dash_meetings', args)
+}
+
+/**
+ * Mark a meeting attended or missed.
+ *
+ * 🔑 A MEETING OUTCOME IS SET BY A HUMAN, NEVER BY THE SYSTEM (§5.6). This is
+ * one of the two doors that write it, and the allow-list behind
+ * `cf.set_appointment_outcome` is what makes "human" acceptable — so a refusal
+ * here is the rule speaking, not a fault, and it comes back { ok:false, error }
+ * with no Postgres error at all.
+ */
+export async function setMeetingOutcome(ghlEventId, outcome) {
+  const out = await rpc('cf_set_meeting_outcome', { ghl_event_id: ghlEventId, outcome })
+  if (out?.ok === false) throw new Error(out.error || 'that outcome was refused')
+  return out
+}
+
 /** One lead, in full, for the drawer. */
 export async function fetchLead(leadId) {
   return rpc('cf_lead_detail', { lead_id: leadId })

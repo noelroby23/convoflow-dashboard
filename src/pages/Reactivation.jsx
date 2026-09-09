@@ -13,6 +13,8 @@ import FollowUps  from '../reactivation/tabs/FollowUps'
 import CallReview from '../reactivation/tabs/CallReview'
 import Setup      from '../reactivation/tabs/Setup'
 
+import AgentView    from '../reactivation/agent/AgentView'
+
 import LeadDrawer   from '../reactivation/LeadDrawer'
 import ExportSheet  from '../reactivation/ExportSheet'
 import ManagerBrief from '../reactivation/ManagerBrief'
@@ -55,7 +57,7 @@ const TABS = [
   { id: 'setup',     label: 'Setup',       Comp: Setup },
 ]
 
-function Shell() {
+function Shell({ onSwitchView }) {
   const c = useCampaign()
   const [tab, setTab] = useState('overview')
   const [openLead, setOpenLead] = useState(null)
@@ -160,6 +162,9 @@ function Shell() {
               shared state — so this pill and the queue's live row are one fact
               rather than two opinions. */}
           <DiallerPill />
+          <button className="chip" onClick={onSwitchView} title="Switch to the Agent layout">
+            Agent view
+          </button>
           <button className="chip" onClick={() => setExportOpen(true)}>Export</button>
           <input
             className="search" placeholder="Find a name or number…"
@@ -247,10 +252,38 @@ function DiallerPill() {
   )
 }
 
+/**
+ * TWO VIEWS OF ONE CAMPAIGN, and one provider under both.
+ *
+ * 🔑 `CampaignProvider` sits ABOVE the switch on purpose. Every figure on both
+ * layouts comes out of the same state object and the same poll cycle, so
+ * flipping views cannot produce two answers to the same question — which is the
+ * fault this dashboard has already shipped twice, once with three different
+ * numbers for "meetings booked" on three pages. Mounting a second provider per
+ * view would have re-created it as a feature.
+ *
+ * The choice is remembered, because a view you have to re-pick on every visit
+ * is a view nobody uses.
+ */
+
+const VIEW_KEY = 'cf_reactivation_view'
+
 export default function Reactivation() {
+  const [view, setView] = useState(() => {
+    try { return window.localStorage.getItem(VIEW_KEY) === 'agent' ? 'agent' : 'classic' }
+    catch { return 'classic' }
+  })
+
+  const switchTo = useCallback((next) => {
+    setView(next)
+    try { window.localStorage.setItem(VIEW_KEY, next) } catch { /* private window, keep going */ }
+  }, [])
+
   return (
     <CampaignProvider>
-      <Shell />
+      {view === 'agent'
+        ? <AgentView onSwitchView={() => switchTo('classic')} />
+        : <Shell onSwitchView={() => switchTo('agent')} />}
     </CampaignProvider>
   )
 }

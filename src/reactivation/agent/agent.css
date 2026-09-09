@@ -1,0 +1,72 @@
+/* The CTO's Agent Dashboard layout, as a second view of the reactivation data.
+ *
+ * ⚠️ SCOPED UNDER `.cfa`, AND IT MUST STAY THAT WAY. Three design systems now
+ * live in this app — Tailwind everywhere, `.rx` for the classic reactivation
+ * view, and this — and they use the SAME variable names for different things.
+ * `--ink` is the TEXT colour in index.css and the PAGE colour in campaign.css,
+ * which is exactly how a lead's own words once rendered black on black
+ * (CLAUDE.md §7 item 228). Nothing in here may reach outside `.cfa`.
+ *
+ * 📌 Almost every rule in the source design is an inline style, and the port
+ * keeps it that way — the styles live beside the markup in the page components,
+ * and this file carries only what an inline style cannot express: the fonts,
+ * the keyframes, the scrollbar and the base.
+ */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+.cfa{
+  --bg:#0F0F1A; --rail:#12121F; --surface:#16162A; --raised:#1C1C2E;
+  --text:#F5F5FA; --soft:#D1D5DB; --muted:#9CA3AF; --dim:#6B7280;
+  --pink:#EC4899; --pink-soft:#F9A8D4; --pink-link:#F472B6; --pink-deep:#DB2777;
+  --good:#22C55E; --good-soft:#4ADE80; --warn:#F59E0B; --bad:#EF4444; --bad-soft:#F87171;
+  --line:rgba(255,255,255,0.08); --line-soft:rgba(255,255,255,0.06);
+  --display:'Outfit',system-ui,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+
+  background:var(--bg); color:var(--text); font-family:var(--display);
+  -webkit-font-smoothing:antialiased;
+  display:flex; height:100vh; overflow:hidden;
+}
+.cfa *{box-sizing:border-box}
+.cfa h1,.cfa h2,.cfa h3{margin:0;font-weight:700;letter-spacing:-0.02em}
+.cfa button{font-family:var(--display)}
+.cfa input,.cfa select{font-family:var(--display)}
+.cfa .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+.cfa ::-webkit-scrollbar{height:8px;width:8px}
+.cfa ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.12);border-radius:8px}
+
+@keyframes cfpulse{0%{opacity:1}50%{opacity:.35}100%{opacity:1}}
+@keyframes cfrow{
+  0%{background:rgba(236,72,153,0.05)}
+  50%{background:rgba(236,72,153,0.12)}
+  100%{background:rgba(236,72,153,0.05)}
+}
+
+/* Hover states an inline style cannot carry. Each mirrors a `style-hover`
+   attribute in the source design. */
+.cfa .cfa-nav:hover{color:var(--text)}
+.cfa .cfa-ghost:hover{border-color:var(--pink);color:var(--pink-soft)}
+.cfa .cfa-solid:hover{background:var(--pink-deep)}
+.cfa .cfa-row:hover{background:var(--raised)}
+.cfa .cfa-name:hover{color:var(--pink-soft)}
+.cfa .cfa-outline:hover{border-color:rgba(255,255,255,0.18)}
+.cfa .cfa-field:focus{border-color:var(--pink);outline:none}
+.cfa .cfa-link:hover{text-decoration:underline}
+
+/* Focus is never removed, only restyled — the classic view's rule, kept. */
+.cfa button:focus-visible,.cfa [tabindex]:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
+
+/* The shared call player and transcript (src/components/ui/CallRecording.jsx)
+ * are styled by GLOBAL `cf-ld__*` rules in index.css, which colour the lead's
+ * own words with `var(--ink)`.
+ *
+ * ⚠️ THAT VARIABLE MEANS TWO OPPOSITE THINGS IN THIS APP — the TEXT colour in
+ * index.css and the PAGE colour in campaign.css — and it is how a lead's words
+ * once rendered black on a black card (§7 item 228). `.cfa` deliberately does
+ * not define `--ink` at all, so today those lines inherit index.css's light
+ * value and read correctly. These three rules make that independent of what
+ * index.css does next, exactly as `.rx` already does. */
+.cfa .cf-ld__line--lead{color:var(--text)}
+.cfa .cf-ld__line--us{color:var(--muted)}
+.cfa .cf-ld__line--lead .cf-ld__who{color:var(--good-soft)}
