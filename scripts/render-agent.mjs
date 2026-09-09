@@ -138,6 +138,17 @@ try {
     fail('AgentView', e.message)
   }
 
+  /* BOTH VIEWS, under one provider — the switch is the whole feature, and a
+     one-way door is worse than no door. */
+  try {
+    const page = await server.ssrLoadModule('/src/pages/Reactivation.jsx')
+    const html = renderToStaticMarkup(React.createElement(page.default))
+    if (!/Agent view/.test(html)) fail('Reactivation page', 'the classic view has no way through to the Agent one')
+    else pass('classic view carries the switch', `${html.length} chars`)
+  } catch (e) {
+    fail('Reactivation page', e.message)
+  }
+
   /* The live world's numbers must be the database's own, not a plausible
      re-derivation. Checked against the fixture rather than against a literal,
      so recapturing the fixtures keeps these honest. */
