@@ -190,7 +190,9 @@ function Body({ d, notFound, reason, onClose, busy, setBusy, openCall, setOpenCa
   // carrier failure with nothing in it.
   const selected = useMemo(() => {
     if (openCall) return numbered.find((c) => c.vapi_call_id === openCall) || null
-    return numbered.find((c) => c.connected && c.transcript) || numbered[0] || null
+    // 309: the MAIN call — the latest sales call — never a reminder that happened to be newer
+    return (d.main_call_id && numbered.find((c) => c.vapi_call_id === d.main_call_id))
+      || numbered.find((c) => c.connected && c.transcript) || numbered[0] || null
   }, [openCall, numbered])
 
   const answers = QUAL.map((q) => ({ label: q.label, value: answerOf(known, q.keys) }))
@@ -453,7 +455,8 @@ function Body({ d, notFound, reason, onClose, busy, setBusy, openCall, setOpenCa
                 {fmtWhen(c.at)}
                 {!c.started && ' · never rang'}
                 {c.secs != null && c.secs > 0 && ` · ${dur(c.secs)}`}
-                {c.role && ` · ${c.role}`}
+                {(c.agent || c.role) && ` · ${c.agent || c.role}`}
+                {c.is_main && ' · main call'}
               </div>
             </div>
             <CallRecording callId={c.vapi_call_id} hasRecording={!!c.has_recording} />

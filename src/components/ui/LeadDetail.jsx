@@ -210,7 +210,7 @@ export default function LeadDetail({ leadId, onClose }) {
                     </span>
                     <span className="cf-ld__meta">{fmt(c.at || c.started)}</span>
                     {c.secs != null && <span className="cf-ld__meta">{c.secs}s</span>}
-                    {c.role && <span className="cf-ld__meta">{c.role}</span>}
+                    {(c.agent || c.role) && <span className="cf-ld__meta">{c.agent || c.role}{c.is_main ? ' · main call' : ''}</span>}
                     <span className="ml-auto">
                       <Recording callId={c.vapi_call_id} hasRecording={c.has_recording} />
                     </span>

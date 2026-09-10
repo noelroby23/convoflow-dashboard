@@ -123,6 +123,17 @@ const BAD = '#F43F5E'
 const BRAND = '#EC4899'
 const COOL = '#60A5FA'
 
+// 313: "100% showed" beside "5 meetings" read as wrong when one had not happened yet,
+// and a meeting nobody marks counts as neither. Say both, in words.
+function showNote(k) {
+  const shows = Number(k?.showed_up ?? 0), noShows = Number(k?.no_shows ?? 0)
+  const unmarked = Number(k?.meetings_unmarked ?? 0), happened = shows + noShows
+  const parts = []
+  if (happened) parts.push(`${shows} of ${happened} that happened`)
+  if (unmarked) parts.push(`${unmarked} not marked yet`)
+  return parts.length ? parts.join(' · ') : 'none happened yet'
+}
+
 const band = (pct, hi, mid) => (pct == null ? undefined : pct >= hi ? GOOD : pct >= mid ? WARN : BAD)
 
 export function PipelineFlow({ kpis, growth, onShowLeads }) {
@@ -168,8 +179,7 @@ export function PipelineFlow({ kpis, growth, onShowLeads }) {
 
       <Node label="Showed up" value={shows} tone={GOOD}
             delta={null}
-            note={noRecords ? `records start ${sinceLabel}`
-                  : kpis?.no_shows ? `${kpis.no_shows} no-show` : 'no no-shows yet'} />
+            note={noRecords ? `records start ${sinceLabel}` : showNote(kpis)} />
       <Link pct={closeRate} caption="closed" tone={band(closeRate, 25, 10)} />
 
       <Node label="Won" value={won} tone={GOOD}

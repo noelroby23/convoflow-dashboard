@@ -34,6 +34,8 @@ const pretty = (v) => (v == null ? null : YESNO[String(v).toLowerCase()] ?? Stri
 // Ordered the way a salesperson would ask, not the way the database stores it.
 const FROM_THE_CALL = [
   ['business',             'Business'],
+  // 309: what they SAID about volume. The ad-form answer stays under the form.
+  ['call_lead_volume',     'Leads a month'],
   ['conversion_leak',      'Their main problem'],
   ['consistent_lead_gen',  'Steady lead flow?'],
   ['appointments_per_10',  'Appointments per 10 leads'],
@@ -146,6 +148,8 @@ function Company({ leadId, value, onSaved }) {
 export default function PrepSheet({ leadId, onClose }) {
   const [b, setB] = useState(null)
   const [loading, setLoading] = useState(true)
+  // 309: the main call first; every other call one click away, each named by the agent that made it
+  const [allCalls, setAllCalls] = useState(false)
 
   useEffect(() => {
     if (!leadId) return
@@ -213,8 +217,29 @@ export default function PrepSheet({ leadId, onClose }) {
                 conversation was actually about, in prose. */}
             {b.call_summary && (
               <div className="cf-prep__block">
-                <span className="cf-prep__lbl">What was discussed on the call</span>
+                <span className="cf-prep__lbl">
+                  What was discussed on the call
+                  {b.summary_from?.agent && ` — ${b.summary_from.agent}, ${when(b.summary_from.at)}`}
+                </span>
                 <Summary text={b.call_summary} />
+                {(b.calls ?? []).length > 1 && (
+                  <button type="button" className="cf-prep__allcalls" onClick={() => setAllCalls(v => !v)}>
+                    {allCalls ? 'Hide the other calls' : `See all ${b.calls.length} calls`}
+                  </button>
+                )}
+                {allCalls && (
+                  <ul className="cf-prep__calls">
+                    {b.calls.map(c => (
+                      <li key={c.vapi_call_id} className={c.is_main ? 'is-main' : ''}>
+                        <div className="cf-prep__callhead">
+                          <b>{c.agent}</b>{c.is_main && ' · main call'} · {when(c.at)}
+                          {' · '}{c.connected ? (c.outcome ? String(c.outcome).replace(/_/g, ' ') : 'connected') : 'did not connect'}
+                        </div>
+                        {c.summary && <Summary text={c.summary} />}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             )}
 
