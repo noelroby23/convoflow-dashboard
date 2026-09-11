@@ -77,11 +77,18 @@ export default function AdCreatives() {
           <span className="ml-auto text-xs text-[#9CA3AF]">{range?.from} → {range?.to}</span>
         </div>
 
-        {cov && cov.coverage_pct != null && cov.coverage_pct < 90 && (
+        {/* 315: measured against Meta's OWN count. Website-form leads have no ad by nature,
+            so they are reported beside it rather than as missing attribution. */}
+        {cov && (
           <p className="text-xs text-[var(--ink-3)]">
-            {pct(cov.coverage_pct)} of leads in this window carry an ad ID
-            ({num(cov.leads_attributed)} of {num(cov.leads_total)}), so an ad reading 0 leads
-            may simply be unattributed rather than unproductive.
+            Meta reports {num(cov.meta_leads)} lead{Number(cov.meta_leads) === 1 ? '' : 's'} in this window;
+            {' '}{num(cov.leads_attributed)} are matched to an ad here
+            {Number(cov.website_leads) > 0 && <> and {num(cov.website_leads)} more came through the website form</>}.
+            {Number(cov.meta_leads) > Number(cov.leads_attributed) && (
+              <> {num(Number(cov.meta_leads) - Number(cov.leads_attributed))} of Meta's are not matched yet,
+                 so an ad reading 0 may be unmatched rather than unproductive.</>
+            )}
+            {totals.frequency != null && <> Frequency across all ads: {Number(totals.frequency).toFixed(2)} (Meta's own figure).</>}
           </p>
         )}
 

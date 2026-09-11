@@ -206,8 +206,13 @@ export default function LeadLookup() {
           <Panel title="Where the issue is — last 7 days" icon={Bug}>
             {qa?.tickets ? (
               <>
-                <p className="text-3xl font-semibold">{qa.ai_failure_rate ?? 0}<span className="text-base text-[#6B7280]">% AI failure</span></p>
-                <p className="text-xs text-[#9CA3AF] mb-3">{qa.tickets} calls reviewed · {qa.open_tickets} open tickets</p>
+                <p className="text-3xl font-semibold">{qa.ai_failure_rate ?? 0}<span className="text-base text-[#6B7280]">% were the AI's fault</span></p>
+                <p className="text-xs text-[#9CA3AF] mb-3">
+                  {qa.tickets} calls and chats reviewed in the last 7 days
+                  {qa.by_verdict?.ai_failure != null && <> · {qa.by_verdict.ai_failure} AI mistakes</>}
+                  {qa.by_verdict?.lead_not_ready != null && <> · {qa.by_verdict.lead_not_ready} where the lead wasn't ready (not a fault)</>}
+                  {' '}· {qa.open_tickets} findings still open, all time
+                </p>
                 {qa.top_issues?.map((t, i) => (
                   <div key={i} className="text-sm border-t border-[#F3F4F6] pt-2 mt-2">
                     <span className={`text-xs px-2 py-0.5 rounded-full mr-2 ${VERDICT_STYLE[t.verdict] || ''}`}>{t.verdict}</span>

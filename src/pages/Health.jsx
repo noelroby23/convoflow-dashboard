@@ -13,11 +13,17 @@ export default function Health() {
   const setReportBuilder = useDashboard(s => s.setReportBuilder)
 
   const closedRevenue = data?.closed_revenue ?? 0
-  const leadsTarget = targets?.monthly_leads ?? 100
-  const meetingsTarget = targets?.monthly_meetings ?? 30
-  const showedUpTarget = targets?.monthly_shows ?? 23
-  const closesTarget = targets?.monthly_closes ?? 4
-  const revenueTarget = targets?.monthly_revenue ?? (closesTarget * 10000)
+  // 315: the targets are MONTHLY; the actuals are for the days selected. Comparing a 7-day
+  // actual with a 30-day target reads as 23% on a week that is exactly on plan, so every
+  // target is scaled to the number of days in the window.
+  const windowDays = Number(data?.window_days ?? 30)
+  const scale = windowDays / 30
+  const scaled = (monthly) => (monthly == null ? null : Math.max(1, Math.round(Number(monthly) * scale)))
+  const leadsTarget = scaled(targets?.monthly_leads ?? 100)
+  const meetingsTarget = scaled(targets?.monthly_meetings ?? 30)
+  const showedUpTarget = scaled(targets?.monthly_shows ?? 23)
+  const closesTarget = scaled(targets?.monthly_closes ?? 4)
+  const revenueTarget = targets?.monthly_revenue != null ? scaled(targets.monthly_revenue) : closesTarget * 10000
   const pct = (actual, target) => target > 0 ? (actual / target) * 100 : 0
 
   const metrics = useMemo(() => [
@@ -79,14 +85,15 @@ export default function Health() {
       <ErrorBoundary>
         <div className="grid grid-cols-4 gap-3">
           {[
-            { label: 'Total Spend', value: `AED ${(data?.total_spend ?? 0).toLocaleString()}`, color: '#DC2626' },
-            { label: 'Leads Generated', value: data?.total_leads ?? 0, color: '#2563EB' },
-            { label: 'Closed Revenue', value: `AED ${closedRevenue.toLocaleString()}`, color: '#16A34A' },
-            { label: 'Active Pipeline', value: `AED ${(data?.pipeline_value ?? 0).toLocaleString()}`, color: '#EC4899' },
-          ].map(({ label, value, color }) => (
+            { label: 'Ad Spend', value: `AED ${Math.round(data?.total_spend ?? 0).toLocaleString()}`, color: '#DC2626', sub: `${windowDays} day${windowDays === 1 ? '' : 's'} selected` },
+            { label: 'Leads', value: data?.total_leads ?? 0, color: '#2563EB', sub: 'form fills, new or returning' },
+            { label: 'Closed Revenue', value: `AED ${Math.round(closedRevenue).toLocaleString()}`, color: '#16A34A', sub: 'deals won in these days' },
+            { label: 'Open Pipeline', value: `AED ${Math.round(data?.pipeline_value ?? 0).toLocaleString()}`, color: '#EC4899', sub: `all ${data?.active_opportunities ?? 0} open deals, any date` },
+          ].map(({ label, value, color, sub }) => (
             <div key={label} className="bg-white rounded-xl border border-[#E5E7EB] p-5 shadow-sm text-center">
               <p className="text-xs font-semibold uppercase tracking-wide text-[#6B7280] mb-1">{label}</p>
               <p className="text-2xl font-bold" style={{ color }}>{loading ? '—' : value}</p>
+              {sub && <p className="text-[11px] text-[#9CA3AF] mt-1">{sub}</p>}
             </div>
           ))}
         </div>
@@ -127,7 +134,11 @@ export default function Health() {
       {/* Actual vs Target table */}
       <ErrorBoundary>
         <div className="bg-white rounded-xl border border-[#E5E7EB] p-6 shadow-sm">
-          <h2 className="text-sm font-bold text-[#0F0F1A] mb-4">Actual vs Target</h2>
+          <h2 className="text-sm font-bold text-[#0F0F1A] mb-1">Actual vs Target</h2>
+          <p className="text-xs text-[#9CA3AF] mb-4">
+            Monthly targets scaled to the {windowDays} day{windowDays === 1 ? '' : 's'} selected
+            {windowDays !== 30 ? ` (× ${scale.toFixed(2)})` : ''}. Meetings exclude cancelled ones.
+          </p>
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[#E5E7EB]">

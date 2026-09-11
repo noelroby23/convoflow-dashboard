@@ -216,7 +216,9 @@ export function useAdPerformance() {
         closed_won: 0,
         // Null, not 0: an unknown cost is not a free one (§7 item 56).
         cost_per_lead: r.cost_per_lead ?? null,
+        // Meta's own frequency for this ad over this window (315), not an average of days
         avg_frequency: r.frequency ?? null,
+        frequency_source: r.frequency_source ?? null,
       }))
       return { data: rows, error: null }
     },
@@ -322,12 +324,15 @@ export function useDashboardAdOptions() {
 }
 export function useSarahPerformance() {
   const { currentClientId, dateRange, refreshKey } = useDashboardQueryState()
+  // 315: the stage breakdown counts the same people as the Total Leads card above it,
+  // which reads cf_dash_kpis under Home's Ads / Reactivation / Both toggle.
+  const scope = useDashboard(s => s.homeScope)
 
   const { data, loading, error } = useSupabaseQuery(
     async () => {
       const [breakdownResult, conversationCountResult] = await Promise.all([
-        supabase.rpc('cf_sarah_breakdown', cfArgs(dateRange)),
-        supabase.rpc('cf_real_conversations', cfArgs(dateRange)),
+        supabase.rpc('cf_sarah_breakdown', cfArgs(dateRange, { scope })),
+        supabase.rpc('cf_real_conversations', cfArgs(dateRange, { scope })),
       ])
 
       if (breakdownResult.error) return { data: null, error: breakdownResult.error }
@@ -348,7 +353,7 @@ export function useSarahPerformance() {
         error: null,
       }
     },
-    [currentClientId, dateRange.from, dateRange.to, refreshKey],
+    [currentClientId, dateRange.from, dateRange.to, scope, refreshKey],
     mockFallbackSarahPerformance
   )
 
@@ -383,6 +388,22 @@ export function useTrendMetricsByDate() {
     },
     [dateRange.from, dateRange.to, refreshKey],
     mockFallbackDailyMetrics
+  )
+}
+
+// 315: Week-over-Week. Days, Monday weeks and the whole window worked out on the server,
+// with Meta's own frequency for each — frequency cannot be averaged or added up (§7 item 172),
+// so the browser must never derive a week or a window from day rows.
+export function useTrends(scope = 'ads') {
+  const { dateRange, refreshKey } = useDashboardQueryState()
+  return useSupabaseQuery(
+    async () => {
+      if (!dateRange.from || !dateRange.to) return { data: null, error: null }
+      const { data, error } = await supabase.rpc('cf_dash_trends', cfArgs(dateRange, { scope }))
+      return { data: data ?? null, error }
+    },
+    [dateRange.from, dateRange.to, scope, refreshKey],
+    null
   )
 }
 

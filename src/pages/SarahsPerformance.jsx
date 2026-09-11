@@ -79,7 +79,13 @@ export default function SarahsPerformance() {
   const kpiTotalLeads = kpis?.total_leads ?? totalLeads
   const meetingsBooked = kpis?.meetings_booked ?? 0
   const bookingRate = kpiTotalLeads > 0 ? Number(((meetingsBooked / kpiTotalLeads) * 100).toFixed(1)) : 0
-  const meetingsTarget = targets?.monthly_meetings ? Math.round(targets.monthly_meetings / 2) : 15
+  // 315: the monthly target scaled to the days selected (it was halved, whatever the range)
+  const windowDays = Number(kpis?.window_days ?? 30)
+  const meetingsTarget = targets?.monthly_meetings
+    ? Math.max(1, Math.round(Number(targets.monthly_meetings) * windowDays / 30)) : null
+  const scope = useDashboard(s => s.homeScope)
+  const scopeLabel = scope === 'reactivation' ? 'the reactivation campaign only'
+    : scope === 'both' ? 'ads and the reactivation campaign together' : 'ads and the website form (not the reactivation campaign)'
 
   return (
     <div>
@@ -89,20 +95,20 @@ export default function SarahsPerformance() {
             label="Total Leads"
             value={kpiTotalLeads}
             loading={loading || kpisLoading}
-            description="All non-test leads assigned to Sarah's pipeline."
+            description="Everyone who filled a form in these days — new or returning, one per person, test numbers excluded."
           />
           <KPICard
             label="Conversations"
             value={realConversations}
             loading={loading || kpisLoading}
-            description="Leads who actually spoke with Sarah — voicemails and machines excluded."
+            description="Of those people, how many spoke on a call or replied on WhatsApp after they came in. Voicemails and machines excluded."
           />
           <KPICard
             label="Meetings Booked"
             value={meetingsBooked}
             loading={loading || kpisLoading}
             target={meetingsTarget}
-            description="Total meetings booked by Sarah, including those who showed or closed."
+            description={`Meetings booked in these days, cancelled ones excluded. Target: the monthly target scaled to ${windowDays} day${windowDays === 1 ? '' : 's'}.`}
           />
           <KPICard
             label="Booking Rate"
@@ -118,7 +124,7 @@ export default function SarahsPerformance() {
         <div className="bg-white rounded-xl border border-[#E5E7EB] p-6 shadow-sm">
           <div className="mb-4">
             <h2 className="text-sm font-bold text-[#0F0F1A]">Stage Breakdown</h2>
-            <p className="text-xs text-[#6B7280] mt-1">Sarah-owned stages only, from follow-up through meeting booked and early exits.</p>
+            <p className="text-xs text-[#6B7280] mt-1">Where each of those {totalLeads} people is now. Counting {scopeLabel} — change it with the toggle on Home.</p>
           </div>
 
           {error && !loading && (

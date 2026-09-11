@@ -206,13 +206,17 @@ export function revenueReport(overview) {
 }
 
 // ─── Week-over-Week / Trends ─────────────────────────────────────────────────
-export function trendsReport(chartData, ads) {
+export function trendsReport(chartData, ads, win = null) {
+  // 315: when the server's window figures are given, use them. Cost per lead and frequency
+  // cannot be averaged across days — the window's own figure is the only right one.
   const filtered = (chartData ?? []).filter(d => d.cpl > 0)
-  const avgCPL = filtered.length ? +(filtered.reduce((s, d) => s + d.cpl, 0) / filtered.length).toFixed(1) : 0
-  const totalLeads = (chartData ?? []).reduce((s, d) => s + d.leads, 0)
-  const totalSpend = (chartData ?? []).reduce((s, d) => s + d.spend, 0)
-  const avgFreq = chartData?.length ? +((chartData ?? []).reduce((s, d) => s + d.frequency, 0) / chartData.length).toFixed(2) : 0
-  const cplTrend = chartData?.length >= 2 ? +(chartData[chartData.length - 1].cpl - chartData[0].cpl).toFixed(1) : 0
+  const avgCPL = win?.cpl != null ? +Number(win.cpl).toFixed(1)
+    : filtered.length ? +(filtered.reduce((s, d) => s + d.cpl, 0) / filtered.length).toFixed(1) : 0
+  const totalLeads = win?.leads != null ? Number(win.leads) : (chartData ?? []).reduce((s, d) => s + d.leads, 0)
+  const totalSpend = win?.spend != null ? Math.round(Number(win.spend)) : (chartData ?? []).reduce((s, d) => s + d.spend, 0)
+  const avgFreq = win?.frequency != null ? +Number(win.frequency).toFixed(2)
+    : chartData?.length ? +((chartData ?? []).reduce((s, d) => s + (d.frequency ?? 0), 0) / chartData.length).toFixed(2) : 0
+  const cplTrend = filtered.length >= 2 ? +(filtered[filtered.length - 1].cpl - filtered[0].cpl).toFixed(1) : 0
   const highFreqAds = (ads ?? []).filter(a => (a.avg_frequency ?? 0) > 1.5)
 
   const recommendations = []
